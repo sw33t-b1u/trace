@@ -13,7 +13,15 @@ from trace_engine.crawler import batch as batch_mod
 from trace_engine.crawler.fetcher import FetchError, FetchResult
 from trace_engine.crawler.state import CrawlState
 from trace_engine.pir.relevance import RelevanceVerdict
+from trace_engine.stix.extractor import ExtractedEntity, Extraction
 from trace_engine.validate.schema import PIRDocument, SourceEntry, SourcesDocument
+
+
+def _extr(local_id: str = "a", type_: str = "indicator") -> Extraction:
+    return Extraction(
+        entities=[ExtractedEntity(local_id=local_id, type=type_, properties={"name": local_id})]
+    )
+
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -37,13 +45,15 @@ def _fetch_result(url: str, body: bytes = b"hello world") -> FetchResult:
     return FetchResult(url=url, status_code=200, content=body, content_type="text/html")
 
 
-def _patch_pipeline(*, content: bytes, text: str, verdict: RelevanceVerdict, objects: list[dict]):
+def _patch_pipeline(
+    *, content: bytes, text: str, verdict: RelevanceVerdict, extraction: Extraction
+):
     """Convenience wrapper patching the four downstream dependencies of crawl_batch."""
     return [
         patch.object(batch_mod, "fetch", return_value=_fetch_result("u", content)),
         patch.object(batch_mod, "read_report", return_value=text),
         patch.object(batch_mod.pir_relevance, "evaluate", return_value=verdict),
-        patch.object(batch_mod, "extract_stix_objects", return_value=objects),
+        patch.object(batch_mod, "extract_entities", return_value=extraction),
     ]
 
 
@@ -59,9 +69,7 @@ def test_unchanged_url_skipped_on_second_run(tmp_path: Path, cfg: Config) -> Non
     with (
         patch.object(batch_mod, "fetch", return_value=_fetch_result("https://example.com/a")),
         patch.object(batch_mod, "read_report", return_value="article body"),
-        patch.object(
-            batch_mod, "extract_stix_objects", return_value=[{"type": "threat-actor", "id": "x"}]
-        ),
+        patch.object(batch_mod, "extract_entities", return_value=_extr("a", "threat-actor")),
     ):
         outcomes = list(
             batch_mod.crawl_batch(
@@ -79,7 +87,7 @@ def test_unchanged_url_skipped_on_second_run(tmp_path: Path, cfg: Config) -> Non
     with (
         patch.object(batch_mod, "fetch", return_value=_fetch_result("https://example.com/a")),
         patch.object(batch_mod, "read_report", side_effect=AssertionError("must not run")),
-        patch.object(batch_mod, "extract_stix_objects", side_effect=AssertionError("must not run")),
+        patch.object(batch_mod, "extract_entities", side_effect=AssertionError("must not run")),
     ):
         outcomes2 = list(
             batch_mod.crawl_batch(
@@ -103,7 +111,7 @@ def test_changed_content_triggers_reextraction(tmp_path: Path, cfg: Config) -> N
             batch_mod, "fetch", return_value=_fetch_result("https://example.com/a", b"v1")
         ),
         patch.object(batch_mod, "read_report", return_value="v1 body"),
-        patch.object(batch_mod, "extract_stix_objects", return_value=[{"type": "indicator"}]),
+        patch.object(batch_mod, "extract_entities", return_value=_extr()),
     ):
         first = list(
             batch_mod.crawl_batch(
@@ -117,7 +125,7 @@ def test_changed_content_triggers_reextraction(tmp_path: Path, cfg: Config) -> N
             batch_mod, "fetch", return_value=_fetch_result("https://example.com/a", b"v2")
         ),
         patch.object(batch_mod, "read_report", return_value="v2 body"),
-        patch.object(batch_mod, "extract_stix_objects", return_value=[{"type": "indicator"}]),
+        patch.object(batch_mod, "extract_entities", return_value=_extr()),
     ):
         second = list(
             batch_mod.crawl_batch(
@@ -133,7 +141,7 @@ def test_below_threshold_skips_extraction(
     state = CrawlState.load(tmp_path / "state.json")
     sources = _sources("https://example.com/a")
     extract = patch.object(
-        batch_mod, "extract_stix_objects", side_effect=AssertionError("should not run")
+        batch_mod, "extract_entities", side_effect=AssertionError("should not run")
     )
 
     with (
@@ -177,7 +185,7 @@ def test_relevance_failure_falls_open(tmp_path: Path, cfg: Config, pir_doc: PIRD
             "evaluate",
             return_value=RelevanceVerdict(score=0.0, failed=True),
         ),
-        patch.object(batch_mod, "extract_stix_objects", return_value=[{"type": "indicator"}]),
+        patch.object(batch_mod, "extract_entities", return_value=_extr()),
     ):
         outcomes = list(
             batch_mod.crawl_batch(
@@ -246,7 +254,7 @@ def test_recheck_on_pir_change_reextracts_when_hash_differs(
             "evaluate",
             return_value=RelevanceVerdict(score=0.9, matched_pir_ids=["PIR-TEST-001"]),
         ),
-        patch.object(batch_mod, "extract_stix_objects", return_value=[{"type": "indicator"}]),
+        patch.object(batch_mod, "extract_entities", return_value=_extr()),
     ):
         list(
             batch_mod.crawl_batch(
@@ -266,7 +274,7 @@ def test_recheck_on_pir_change_reextracts_when_hash_differs(
 
     def stub_extract(*a, **k):
         extract_call_count["n"] += 1
-        return [{"type": "indicator"}]
+        return _extr()
 
     with (
         patch.object(batch_mod, "fetch", return_value=_fetch_result("https://example.com/a")),
@@ -276,7 +284,7 @@ def test_recheck_on_pir_change_reextracts_when_hash_differs(
             "evaluate",
             return_value=RelevanceVerdict(score=0.9, matched_pir_ids=["PIR-TEST-001"]),
         ),
-        patch.object(batch_mod, "extract_stix_objects", side_effect=stub_extract),
+        patch.object(batch_mod, "extract_entities", side_effect=stub_extract),
     ):
         out = list(
             batch_mod.crawl_batch(

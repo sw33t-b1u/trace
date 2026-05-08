@@ -57,6 +57,59 @@ def test_extraction_failed_fails_open(pir_doc: PIRDocument, cfg: Config) -> None
     assert v.keep(0.5) is True  # fail-open
 
 
+def test_truncated_rationale_salvages_decision(pir_doc: PIRDocument, cfg: Config) -> None:
+    """Gemini cuts the rationale string mid-token; score and matched_pir_ids
+    have already been emitted, so the verdict is recoverable."""
+    truncated = '{\n  "score": 0.0,\n  "matched_pir_ids": [],\n  "rationale": "The'
+    with patch("trace_engine.pir.relevance.call_llm", return_value=truncated):
+        v = pir_relevance.evaluate("article", pir_doc, config=cfg)
+    assert v.failed is False
+    assert v.score == 0.0
+    assert v.matched_pir_ids == []
+    assert v.rationale == "(truncated)"
+    assert v.keep(0.5) is False  # below threshold → skip
+
+
+def test_truncated_with_matches_preserves_ids(pir_doc: PIRDocument, cfg: Config) -> None:
+    truncated = (
+        '{\n  "score": 0.7,\n  "matched_pir_ids": ["PIR-TEST-001", "PIR-X"],\n'
+        '  "rationale": "Active campaign by FIN'
+    )
+    with patch("trace_engine.pir.relevance.call_llm", return_value=truncated):
+        v = pir_relevance.evaluate("article", pir_doc, config=cfg)
+    assert v.failed is False
+    assert v.score == 0.7
+    assert v.matched_pir_ids == ["PIR-TEST-001", "PIR-X"]
+    assert v.keep(0.5) is True
+
+
+def test_completely_unparseable_response_fails_open(pir_doc: PIRDocument, cfg: Config) -> None:
+    """No score in the response at all → fail-open."""
+    with patch("trace_engine.pir.relevance.call_llm", return_value='garbage with "no" score'):
+        v = pir_relevance.evaluate("article", pir_doc, config=cfg)
+    assert v.failed is True
+    assert v.keep(0.5) is True
+
+
+def test_markdown_fenced_response_parses(pir_doc: PIRDocument, cfg: Config) -> None:
+    """Gemini sometimes wraps JSON in ```json ... ``` even with json_mode=True."""
+    fenced = '```json\n{\n  "score": 0.7,\n  "matched_pir_ids": ["PIR-TEST-001"]\n}\n```'
+    with patch("trace_engine.pir.relevance.call_llm", return_value=fenced):
+        v = pir_relevance.evaluate("article body", pir_doc, config=cfg)
+    assert v.failed is False
+    assert v.score == pytest.approx(0.7)
+    assert v.matched_pir_ids == ["PIR-TEST-001"]
+
+
+def test_response_with_leading_prose_parses(pir_doc: PIRDocument, cfg: Config) -> None:
+    """Tolerate ``Here is the JSON: {...}`` prefix."""
+    raw = 'Here is the JSON:\n{"score": 0.9, "matched_pir_ids": []}'
+    with patch("trace_engine.pir.relevance.call_llm", return_value=raw):
+        v = pir_relevance.evaluate("article", pir_doc, config=cfg)
+    assert v.failed is False
+    assert v.score == pytest.approx(0.9)
+
+
 def test_score_clamped_to_unit_range(pir_doc: PIRDocument, cfg: Config) -> None:
     payload = json.dumps({"score": 9.9, "matched_pir_ids": []})
     with patch("trace_engine.pir.relevance.call_llm", return_value=payload):
@@ -75,3 +128,53 @@ def test_restrict_to_filters_pir_context(pir_doc: PIRDocument, cfg: Config) -> N
         pir_relevance.evaluate("article", pir_doc, config=cfg, restrict_to=["PIR-NOT-IN-DOC"])
     # No PIR ids in scope → empty PIR context array in prompt.
     assert "PIR-TEST-001" not in captured["prompt"]
+
+
+def test_summarise_truncates_long_description() -> None:
+    from trace_engine.pir.relevance import _PIR_DESCRIPTION_MAX_CHARS, _summarise_pir
+    from trace_engine.validate.schema import PIRItem
+
+    long = "x" * 1000
+    item = PIRItem(
+        pir_id="PIR-X",
+        threat_actor_tags=[],
+        asset_weight_rules=[],
+        valid_from="2025-01-01",
+        valid_until="2026-01-01",
+        description=long,
+    )
+    s = _summarise_pir(item)
+    assert s["description"] is not None
+    # truncated, plus the ellipsis suffix
+    assert len(s["description"]) <= _PIR_DESCRIPTION_MAX_CHARS + 1
+
+
+def test_summarise_caps_notable_groups() -> None:
+    from trace_engine.pir.relevance import _PIR_LIST_FIELD_MAX_ITEMS, _summarise_pir
+    from trace_engine.validate.schema import PIRItem
+
+    item = PIRItem.model_validate(
+        {
+            "pir_id": "PIR-X",
+            "threat_actor_tags": [],
+            "asset_weight_rules": [],
+            "valid_from": "2025-01-01",
+            "valid_until": "2026-01-01",
+            "notable_groups": [f"APT{i}" for i in range(50)],
+        }
+    )
+    s = _summarise_pir(item)
+    assert len(s["notable_groups"]) == _PIR_LIST_FIELD_MAX_ITEMS
+
+
+def test_max_output_tokens_uses_constant(pir_doc: PIRDocument, cfg: Config) -> None:
+    """Regression: NPR run truncated at 512. We now request 1024."""
+    captured: dict[str, int] = {}
+
+    def fake_call(tier, prompt, **kw):
+        captured["max_output_tokens"] = kw.get("max_output_tokens")
+        return json.dumps({"score": 0.5, "matched_pir_ids": []})
+
+    with patch("trace_engine.pir.relevance.call_llm", side_effect=fake_call):
+        pir_relevance.evaluate("article", pir_doc, config=cfg)
+    assert captured["max_output_tokens"] == 1024

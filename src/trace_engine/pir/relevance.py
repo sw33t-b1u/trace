@@ -14,17 +14,24 @@ for rationale).
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 
 import structlog
 
 from trace_engine.config import Config, load_config
 from trace_engine.llm.client import call_llm, load_prompt
+from trace_engine.stix.extractor import _extract_json_from_text
 from trace_engine.validate.schema import PIRDocument, PIRItem
 
 logger = structlog.get_logger(__name__)
 
 _RELEVANCE_INPUT_MAX_CHARS = 3000
+_PIR_DESCRIPTION_MAX_CHARS = 240
+_PIR_LIST_FIELD_MAX_ITEMS = 8
+# Verdict JSON is small (score + ids + short rationale) but Gemini occasionally
+# truncates at 512; 1024 leaves comfortable headroom without inviting prose.
+_RELEVANCE_MAX_OUTPUT_TOKENS = 1024
 
 
 @dataclass(frozen=True)
@@ -42,21 +49,39 @@ class RelevanceVerdict:
 
 
 def _summarise_pir(item: PIRItem) -> dict:
+    """Compact PIR summary for the L2 prompt.
+
+    Long descriptions and unbounded `notable_groups` / `collection_focus`
+    arrays were causing the JSON verdict to get truncated at the model's
+    output limit. Keep the surface area small and predictable.
+    """
     extra = item.model_dump(exclude_none=True)
-    notable_groups = extra.get("notable_groups") or []
-    collection_focus = extra.get("collection_focus") or []
-    return {
+    notable_groups = _trim_list(extra.get("notable_groups"))
+    collection_focus = _trim_list(extra.get("collection_focus"))
+    description = item.description or ""
+    if len(description) > _PIR_DESCRIPTION_MAX_CHARS:
+        description = description[:_PIR_DESCRIPTION_MAX_CHARS].rstrip() + "…"
+    summary = {
         "pir_id": item.pir_id,
         "intelligence_level": item.intelligence_level,
-        "description": item.description,
+        "description": description or None,
         "threat_actor_tags": list(item.threat_actor_tags),
-        "notable_groups": list(notable_groups) if isinstance(notable_groups, list) else [],
-        "collection_focus": (list(collection_focus) if isinstance(collection_focus, list) else []),
         "asset_weight_rules": [
             {"tag": r.tag, "criticality_multiplier": r.criticality_multiplier}
             for r in item.asset_weight_rules
         ],
     }
+    if notable_groups:
+        summary["notable_groups"] = notable_groups
+    if collection_focus:
+        summary["collection_focus"] = collection_focus
+    return summary
+
+
+def _trim_list(raw: object) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    return [str(v) for v in raw[:_PIR_LIST_FIELD_MAX_ITEMS]]
 
 
 def _build_pir_context(doc: PIRDocument, *, restrict_to: list[str] | None = None) -> str:
@@ -102,30 +127,78 @@ def evaluate(
             prompt,
             config=cfg,
             json_mode=True,
-            max_output_tokens=512,
+            max_output_tokens=_RELEVANCE_MAX_OUTPUT_TOKENS,
         )
-        parsed = json.loads(raw)
-    except (json.JSONDecodeError, RuntimeError, ValueError) as exc:
-        logger.warning("relevance_extraction_failed", error=str(exc))
-        return RelevanceVerdict(score=0.0, failed=True, rationale=f"extraction_failed: {exc}")
+    except (RuntimeError, ValueError) as exc:
+        logger.warning("relevance_call_failed", error=str(exc))
+        return RelevanceVerdict(score=0.0, failed=True, rationale=f"call_failed: {exc}")
 
-    score = _coerce_score(parsed.get("score"))
-    matched = parsed.get("matched_pir_ids") or []
-    if not isinstance(matched, list):
-        matched = []
-    rationale = (parsed.get("rationale") or "").strip()
-    if len(rationale) > 500:
-        rationale = rationale[:500]
+    parsed = _extract_json_from_text(raw)
+    if isinstance(parsed, dict):
+        return _verdict_from_dict(parsed)
 
-    logger.info(
-        "relevance_call_done",
-        score=score,
-        matched_pir_ids=matched,
+    # Full JSON parse failed — try the salvage path. Truncation typically
+    # happens inside `rationale`, after `score` and `matched_pir_ids` have
+    # already been emitted. We can still record a real verdict.
+    salvaged = _salvage_partial_verdict(raw)
+    if salvaged is not None:
+        logger.info(
+            "relevance_salvaged_partial_json",
+            score=salvaged.score,
+            matched_pir_ids=salvaged.matched_pir_ids,
+        )
+        return salvaged
+
+    logger.warning(
+        "relevance_parse_failed",
+        response_type=type(parsed).__name__ if parsed is not None else "None",
+        preview=raw[:200],
     )
     return RelevanceVerdict(
+        score=0.0,
+        failed=True,
+        rationale=f"parse_failed: {raw[:120]!r}",
+    )
+
+
+def _verdict_from_dict(parsed: dict) -> RelevanceVerdict:
+    score = _coerce_score(parsed.get("score"))
+    matched_raw = parsed.get("matched_pir_ids") or []
+    matched = [str(m) for m in matched_raw] if isinstance(matched_raw, list) else []
+    rationale = (parsed.get("rationale") or "").strip()
+    if len(rationale) > 200:
+        rationale = rationale[:200]
+    logger.info("relevance_call_done", score=score, matched_pir_ids=matched)
+    return RelevanceVerdict(score=score, matched_pir_ids=matched, rationale=rationale)
+
+
+_SCORE_RE = re.compile(r'"score"\s*:\s*([0-9]+(?:\.[0-9]+)?)')
+_MATCHED_RE = re.compile(r'"matched_pir_ids"\s*:\s*\[([^\]]*)\]', re.DOTALL)
+_PIR_ID_RE = re.compile(r'"([^"]+)"')
+
+
+def _salvage_partial_verdict(raw: str) -> RelevanceVerdict | None:
+    """Recover ``score`` and ``matched_pir_ids`` from a truncated JSON string.
+
+    The model sometimes runs out of output budget mid-``rationale``. Score
+    and matched_pir_ids are emitted earlier in the response, so a regex
+    scrape can still produce a usable verdict. Rationale falls back to
+    ``"(truncated)"`` so callers see why it's empty.
+    """
+    score_match = _SCORE_RE.search(raw)
+    if score_match is None:
+        return None
+    score = _coerce_score(score_match.group(1))
+
+    matched_match = _MATCHED_RE.search(raw)
+    matched: list[str] = []
+    if matched_match is not None:
+        matched = [m for m in _PIR_ID_RE.findall(matched_match.group(1)) if m]
+
+    return RelevanceVerdict(
         score=score,
-        matched_pir_ids=[str(m) for m in matched],
-        rationale=rationale,
+        matched_pir_ids=matched,
+        rationale="(truncated)",
     )
 
 

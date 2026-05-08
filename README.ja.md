@@ -61,14 +61,14 @@ CTI ベンダーブログ・ニュース記事・PDF レポート・任意の UR
 
 ## ドキュメント
 
-| ドキュメント | 説明 |
-|-------------|------|
-| [high-level-design.md](high-level-design.md) | アーキテクチャ・データモデル・主要アルゴリズム・BEACON 移管計画 |
-| [docs/setup.ja.md](docs/setup.ja.md) | 前提条件・インストール・環境変数・GCP 認証 |
-| [docs/data-model.ja.md](docs/data-model.ja.md) | 検証契約: assets.json, pir.json, STIX バンドル |
-| [docs/crawl_design.ja.md](docs/crawl_design.ja.md) | sources.yaml スキーマ・crawl_state.json の意味・dedupe 戦略 |
-| [docs/dependencies.ja.md](docs/dependencies.ja.md) | 依存ライブラリの採用理由とライセンス |
-| [docs/beacon_handoff.md](docs/beacon_handoff.md) | BEACON から移管した範囲とその理由 |
+| ドキュメント | JA / EN | 説明 |
+|-------------|---------|------|
+| Setup | [ja](docs/setup.ja.md) / [en](docs/setup.md) | 前提条件・インストール・環境変数・GCP 認証・CLI クイックリファレンス |
+| Data model | [ja](docs/data-model.ja.md) / [en](docs/data-model.md) | 検証契約: `assets.json`, `pir_output.json`, STIX バンドル, `ValidationFinding` |
+| Crawl 設計 | [ja](docs/crawl_design.ja.md) / [en](docs/crawl_design.md) | `sources.yaml` スキーマ（注釈付き例）・`crawl_state.json` 意味論・L2/L3/L4 フロー・dedupe 戦略 |
+| Dependencies | [ja](docs/dependencies.ja.md) / [en](docs/dependencies.md) | 依存ライブラリの採用理由とライセンス |
+| BEACON 移管 | [beacon_handoff.md](docs/beacon_handoff.md) | BEACON から移管した範囲とその理由 |
+| `high-level-design.md` | local-only / gitignored | アーキテクチャ・データモデル・主要アルゴリズム |
 
 ## クイックスタート
 

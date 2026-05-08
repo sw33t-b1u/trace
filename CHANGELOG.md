@@ -6,6 +6,80 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [0.2.0] — 2026-05-09
+
+### Changed — STIX extraction split into LLM-extract + code-build (BREAKING)
+
+The L3 pipeline no longer asks the LLM to emit STIX 2.1 objects directly.
+Instead the LLM returns a structured ``Extraction`` (entities and
+relationships keyed by short ``local_id`` aliases) and TRACE's code
+assembles the STIX 2.1 bundle. This eliminates the wire-format mistakes
+that the LLM kept making — non-UUIDv4 ids, ``HH:mm:ss:sss`` timestamps,
+duplicate ids, dangling cross-references — by removing the LLM's chance
+to make them at all.
+
+**Public API changes** (any caller importing from `trace_engine.stix.extractor`):
+
+- Removed `extract_stix_objects(text, ...) -> list[dict]`.
+  Replaced by `extract_entities(text, ..., pir_doc=None) -> Extraction`.
+- Removed `build_stix_bundle(objects, ...) -> dict`.
+  Replaced by `build_stix_bundle_from_extraction(extraction, source_url=None,
+  collected_at=None, matched_pir_ids=None, relevance_score=None,
+  relevance_rationale=None) -> dict`.
+- New dataclasses exported: `Extraction`, `ExtractedEntity`,
+  `ExtractedRelationship`.
+- Module constant rename: `_VALID_STIX_TYPES` → `_VALID_ENTITY_TYPES`
+  (now excludes `relationship`, which is no longer an entity type).
+  Added `_VALID_RELATIONSHIP_TYPES = {"uses", "exploits", "indicates"}`.
+
+**Prompt change**: `src/trace_engine/llm/prompts/stix_extraction.md` was
+fully rewritten. The LLM is now asked for
+`{entities: [{local_id, type, name, …}], relationships: [{source, target,
+relationship_type}]}` only — no `id`, `spec_version`, `created`,
+`modified`, or `source_ref`/`target_ref` fields.
+
+### Added
+
+- ``Extraction`` / ``ExtractedEntity`` / ``ExtractedRelationship`` dataclasses
+  in `trace_engine.stix.extractor` to model the LLM's structured output.
+- L2 partial-JSON salvage: when Gemini truncates the verdict JSON
+  (typically inside `rationale`), `pir.relevance.evaluate` now extracts
+  `score` and `matched_pir_ids` via regex and proceeds with a real
+  decision instead of failing open. Verdicts where the rationale was
+  cut off are recorded as `rationale="(truncated)"`.
+
+### Removed
+
+- `_normalize_stix_objects` post-processing in `stix.extractor` is gone.
+  UUIDv4 ids and millisecond-precise timestamps are now produced by
+  construction in `build_stix_bundle_from_extraction`, so there is
+  nothing left to coerce.
+- Tests `tests/test_stix_postprocess.py` (post-processor is gone).
+
+### Fixed
+
+- OASIS `{103}` UUIDv4 validity errors caused by LLM emitting sequential
+  or non-v4 ids (`12345678-90ab-cdef-1234-…`).
+- STIX timestamp format errors caused by LLM writing
+  `2026-04-11T00:00:00:000Z` (colon) instead of the spec's
+  `2026-04-11T00:00:00.000Z` (dot).
+- Duplicate STIX ids in a single bundle when the LLM reused the same id
+  across multiple objects.
+- L2 relevance gate failing open on every article whose response Gemini
+  truncated mid-`rationale` (the prior cause of bundles being generated
+  for clearly off-topic articles when `--pir` was supplied).
+
+### Documentation
+
+- HLD §5.2 (STIX bundle output schema), §6.1 (single-URL pipeline), and
+  §6.3 (L2 verdict shape) rewritten to describe the new flow.
+- `docs/data-model.md` STIX section reorganised around "LLM extracts,
+  code builds".
+- `docs/crawl_design.md` §4 split into L3 (entity extraction) + §4a
+  (L4 bundle assembly).
+
+---
+
 ## [0.1.0] — 2026-05-08
 
 ### Added — Initial scope

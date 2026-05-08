@@ -1,5 +1,7 @@
 # TRACE Dependencies
 
+Japanese translation: [`docs/dependencies.ja.md`](dependencies.ja.md)
+
 Per RULES.md Rule 18, every runtime dependency carries a justification. This
 document is the canonical record. The list mirrors `pyproject.toml`; if you
 add a new dependency, update both files in the same commit.

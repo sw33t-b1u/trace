@@ -40,7 +40,10 @@ from trace_engine.config import load_config  # noqa: E402
 from trace_engine.ingest.report_reader import _MAX_CHARS, read_report  # noqa: E402
 from trace_engine.pir import relevance as pir_relevance  # noqa: E402
 from trace_engine.pir.loader import load_pir  # noqa: E402
-from trace_engine.stix.extractor import build_stix_bundle, extract_stix_objects  # noqa: E402
+from trace_engine.stix.extractor import (  # noqa: E402
+    build_stix_bundle_from_extraction,
+    extract_entities,
+)
 
 load_dotenv()
 configure_logging()
@@ -147,9 +150,9 @@ def main() -> None:
             print(f"Skipped (relevance score {verdict.score:.2f} < threshold {threshold:.2f})")
             sys.exit(0)
 
-    objects = extract_stix_objects(text, task=args.task, config=cfg, pir_doc=pir_doc)
-    bundle = build_stix_bundle(
-        objects,
+    extraction = extract_entities(text, task=args.task, config=cfg, pir_doc=pir_doc)
+    bundle = build_stix_bundle_from_extraction(
+        extraction,
         source_url=str(args.input),
         matched_pir_ids=verdict.matched_pir_ids if verdict else None,
         relevance_score=verdict.score if verdict else None,
@@ -163,9 +166,16 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    logger.info("stix_bundle_written", path=str(out), object_count=len(objects))
+    object_count = len(bundle["objects"])
+    logger.info(
+        "stix_bundle_written",
+        path=str(out),
+        entities=len(extraction.entities),
+        relationships=len(extraction.relationships),
+        object_count=object_count,
+    )
     print(
-        f"STIX bundle written: {out} ({len(objects)} objects)\n"
+        f"STIX bundle written: {out} ({object_count} objects)\n"
         f"Validate before feeding SAGE:\n"
         f"  uv run python cmd/validate_stix.py --bundle {out}"
     )

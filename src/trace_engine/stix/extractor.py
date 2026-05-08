@@ -1,8 +1,23 @@
-"""Extract STIX 2.1 objects from CTI report text using LLM.
+"""LLM-driven CTI report → STIX 2.1 bundle.
 
-The LLM (Vertex AI Gemini) reads a CTI report and returns a JSON array of
-STIX 2.1 objects (intrusion-set, attack-pattern, malware, tool, vulnerability,
-indicator, relationship).  The bundle can then be fed directly to SAGE ETL.
+Two-step pipeline:
+
+1. ``extract_entities(text, ...)`` — Vertex AI Gemini reads the article and
+   returns a structured ``Extraction`` (entities + relationships) using
+   short ``local_id`` aliases. The LLM does **not** generate UUIDs,
+   timestamps, ``spec_version``, or any STIX wire format — those are
+   mechanical and would just produce malformed output.
+
+2. ``build_stix_bundle_from_extraction(extraction, source_url, ...)`` —
+   TRACE assigns ``<type>--<uuid4>`` ids, a single ``created/modified``
+   timestamp, and ``spec_version="2.1"`` to every object, translates
+   ``relationships[*].{source,target}`` from local_ids to STIX ids, and
+   stamps the bundle with the L4 ``x_trace_*`` metadata.
+
+Anything ``relationships[*]`` references that doesn't appear in
+``entities[*].local_id`` is dropped with a structured log warning. SAGE
+ignores unknown ``x_*`` properties so the bundle envelope stays
+forward-compatible.
 """
 
 from __future__ import annotations
@@ -10,6 +25,7 @@ from __future__ import annotations
 import json
 import re
 import uuid
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 import structlog
@@ -24,7 +40,7 @@ logger = structlog.get_logger(__name__)
 # with dense, ambiguous, or multi-language content.
 _DEFAULT_TASK: TaskType = "medium"
 
-_VALID_STIX_TYPES: frozenset[str] = frozenset(
+_VALID_ENTITY_TYPES: frozenset[str] = frozenset(
     {
         "threat-actor",
         "intrusion-set",
@@ -33,30 +49,55 @@ _VALID_STIX_TYPES: frozenset[str] = frozenset(
         "tool",
         "vulnerability",
         "indicator",
-        "relationship",
     }
 )
 
+_VALID_RELATIONSHIP_TYPES: frozenset[str] = frozenset({"uses", "exploits", "indicates"})
+
+
+# ---------------------------------------------------------------------------
+# Data model
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ExtractedEntity:
+    local_id: str
+    type: str
+    properties: dict  # raw fields from the LLM (name, description, …)
+
+
+@dataclass
+class ExtractedRelationship:
+    source: str  # local_id
+    target: str  # local_id
+    relationship_type: str
+
+
+@dataclass
+class Extraction:
+    entities: list[ExtractedEntity] = field(default_factory=list)
+    relationships: list[ExtractedRelationship] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# JSON salvage (LLM responses)
+# ---------------------------------------------------------------------------
+
 
 def _extract_json_from_text(raw: str) -> list | dict | None:
-    """Extract a JSON value from a plain-text LLM response.
+    """Extract a JSON value from a possibly noisy LLM response.
 
-    The model may wrap the JSON in a Markdown code block (```json ... ```) or
-    return it inline.  This function tries, in order:
-      1. Parse the full response as-is (already valid JSON)
-      2. Extract the content of the first ```json ... ``` block
-      3. Find the first '[' or '{' and parse from there
-      4. Repair a truncated JSON array by closing after the last complete '}'
-
-    Returns the parsed value, or None if all strategies fail.
+    Strategies tried in order:
+      1. Parse the full response as-is.
+      2. Extract the first ```json ... ``` Markdown block.
+      3. Find the first '[' or '{' and parse from there.
     """
-    # Strategy 1: verbatim parse
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
         pass
 
-    # Strategy 2: markdown code block  ```json\n...\n```
     block = re.search(r"```(?:json)?\s*\n([\s\S]+?)\n```", raw)
     if block:
         try:
@@ -64,7 +105,6 @@ def _extract_json_from_text(raw: str) -> list | dict | None:
         except json.JSONDecodeError:
             pass
 
-    # Strategy 3: find first '[' or '{' and parse from there
     start = min(
         (raw.find("[") if raw.find("[") != -1 else len(raw)),
         (raw.find("{") if raw.find("{") != -1 else len(raw)),
@@ -73,27 +113,14 @@ def _extract_json_from_text(raw: str) -> list | dict | None:
         try:
             return json.loads(raw[start:])
         except json.JSONDecodeError:
-            candidate = raw[start:]
-
-            # Strategy 4: repair truncated array — close after last complete '}'
-            last = None
-            for m in re.finditer(r"\}", candidate):
-                last = m
-            if last is not None:
-                repaired = re.sub(r",\s*$", "", candidate[: last.end()]) + "\n]"
-                try:
-                    result = json.loads(repaired)
-                    if isinstance(result, list):
-                        logger.warning(
-                            "truncated_json_repaired",
-                            original_chars=len(raw),
-                            repaired_objects=len(result),
-                        )
-                        return result
-                except json.JSONDecodeError:
-                    pass
+            return None
 
     return None
+
+
+# ---------------------------------------------------------------------------
+# PIR context injection (L3 hint, not a filter)
+# ---------------------------------------------------------------------------
 
 
 def _render_pir_context_block(pir_doc: PIRDocument | None) -> str:
@@ -137,98 +164,173 @@ def _safe_list_field(item: PIRItem, name: str) -> list[str]:
     return [str(v) for v in raw]
 
 
-def extract_stix_objects(
+# ---------------------------------------------------------------------------
+# L3: LLM extraction (entities + relationships only)
+# ---------------------------------------------------------------------------
+
+
+def extract_entities(
     text: str,
     task: TaskType = _DEFAULT_TASK,
     config=None,
     *,
     pir_doc: PIRDocument | None = None,
-) -> list[dict]:
-    """Call LLM to extract STIX 2.1 objects from CTI report text.
+) -> Extraction:
+    """Ask the LLM to return ``{entities: [...], relationships: [...]}``.
 
-    Uses plain-text mode (json_mode=False) to avoid Gemini's constrained JSON
-    decoding, which can truncate output prematurely for complex STIX structures.
-    JSON is extracted from the response with _extract_json_from_text().
+    The LLM produces only domain knowledge — names, descriptions,
+    relationship_types — keyed by short ``local_id`` aliases it picks. STIX
+    wire format (ids, timestamps, spec_version, ref translation) is the
+    job of ``build_stix_bundle_from_extraction``.
 
-    Args:
-        text: Plain text of a CTI report (PDF, web article, etc.).
-        task: LLM complexity tier. "medium" (gemini-2.5-flash) is the default
-              and handles typical CTI blog posts and reports well.
-              Use "complex" (gemini-2.5-pro) only for dense or ambiguous content.
-        config: TRACE Config. Uses load_config() if None.
-        pir_doc: Optional ``PIRDocument`` whose summary is appended to the
-            prompt as a "## PIR Context" section (L3). Hint to the model only;
-            does not filter the output.
-
-    Returns:
-        List of STIX 2.1 object dicts filtered to known STIX types.
+    Returns an empty ``Extraction`` if the response can't be parsed; the
+    caller can decide how to surface that (CLIs log + exit, batch records
+    `extraction_failed`).
     """
     template = load_prompt("stix_extraction.md")
     prompt = template.replace("{{REPORT_TEXT}}", text).replace(
         "{{PIR_CONTEXT_BLOCK}}", _render_pir_context_block(pir_doc)
     )
 
-    logger.info("extracting_stix_objects", chars=len(text), task=task)
-    raw = call_llm(task, prompt, config=config, json_mode=False, max_output_tokens=65536)
+    logger.info("extracting_entities", chars=len(text), task=task)
+    raw = call_llm(task, prompt, config=config, json_mode=True, max_output_tokens=8192)
 
     parsed = _extract_json_from_text(raw)
-    if parsed is None:
-        logger.warning("llm_json_extract_failed", chars=len(raw))
+    if not isinstance(parsed, dict):
+        logger.warning(
+            "extraction_response_not_object",
+            response_type=type(parsed).__name__ if parsed is not None else "None",
+            preview=raw[:200],
+        )
+        return Extraction()
+
+    entities = _coerce_entities(parsed.get("entities"))
+    relationships = _coerce_relationships(parsed.get("relationships"))
+    logger.info(
+        "entities_extracted",
+        entities=len(entities),
+        relationships=len(relationships),
+    )
+    return Extraction(entities=entities, relationships=relationships)
+
+
+def _coerce_entities(raw: object) -> list[ExtractedEntity]:
+    if not isinstance(raw, list):
         return []
+    out: list[ExtractedEntity] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        local_id = item.get("local_id")
+        stix_type = item.get("type")
+        if not isinstance(local_id, str) or not local_id:
+            continue
+        if not isinstance(stix_type, str) or stix_type not in _VALID_ENTITY_TYPES:
+            continue
+        properties = {k: v for k, v in item.items() if k not in ("local_id", "type")}
+        out.append(ExtractedEntity(local_id=local_id, type=stix_type, properties=properties))
+    return out
 
-    # LLM may return a bare list or a wrapped {"objects": [...]}
-    if isinstance(parsed, dict):
-        objects: list = parsed.get("objects", [])
-    elif isinstance(parsed, list):
-        objects = parsed
-    else:
-        logger.warning("unexpected_llm_response_format", response_type=type(parsed).__name__)
-        objects = []
 
-    valid = [o for o in objects if isinstance(o, dict) and o.get("type") in _VALID_STIX_TYPES]
-    logger.info("stix_objects_extracted", total=len(objects), valid=len(valid))
-    return valid
+def _coerce_relationships(raw: object) -> list[ExtractedRelationship]:
+    if not isinstance(raw, list):
+        return []
+    out: list[ExtractedRelationship] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        source = item.get("source")
+        target = item.get("target")
+        rtype = item.get("relationship_type")
+        if not (isinstance(source, str) and isinstance(target, str) and isinstance(rtype, str)):
+            continue
+        if rtype not in _VALID_RELATIONSHIP_TYPES:
+            continue
+        out.append(ExtractedRelationship(source=source, target=target, relationship_type=rtype))
+    return out
 
 
-def build_stix_bundle(
-    objects: list[dict],
+# ---------------------------------------------------------------------------
+# L4: TRACE-built STIX 2.1 bundle
+# ---------------------------------------------------------------------------
+
+
+def build_stix_bundle_from_extraction(
+    extraction: Extraction,
     *,
     source_url: str | None = None,
     collected_at: str | None = None,
     matched_pir_ids: list[str] | None = None,
     relevance_score: float | None = None,
     relevance_rationale: str | None = None,
+    now: datetime | None = None,
 ) -> dict:
-    """Wrap extracted STIX objects in a STIX 2.1 bundle.
+    """Construct a STIX 2.1 bundle from an ``Extraction``.
 
-    L4 metadata: ``x_trace_source_url``, ``x_trace_collected_at``, and
-    (when supplied) ``x_trace_matched_pir_ids`` / ``x_trace_relevance_score`` /
-    ``x_trace_relevance_rationale``. SAGE ignores unknown ``x_*`` properties
-    so adding them is backward-compatible.
+    All STIX wire-format details (UUIDv4 ids, ISO-8601 millisecond
+    timestamps, ``spec_version``, cross-reference resolution) are produced
+    here in code; the LLM never has a chance to malform them.
 
-    Args:
-        objects: List of STIX 2.1 object dicts from extract_stix_objects().
-        source_url: Origin URL or file path of the report.
-        collected_at: ISO-8601 timestamp of when the article was fetched.
-            Defaults to "now (UTC)" if omitted.
-        matched_pir_ids: PIR ids judged relevant by the L2 gate, if any.
-        relevance_score: 0.0–1.0 score from the L2 gate, if any.
-        relevance_rationale: Short LLM-authored justification, if any.
-
-    Returns:
-        A STIX 2.1 bundle dict ready for JSON serialization or SAGE ETL.
+    Unresolved relationship endpoints (LLM hallucinated a local_id that
+    doesn't exist in ``entities``) are dropped with a structured log
+    warning rather than emitting a dangling reference SAGE would later
+    fail on.
     """
-    now = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    ts = (now or datetime.now(tz=UTC)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+    objects: list[dict] = []
+    local_to_stix: dict[str, str] = {}
+
+    for entity in extraction.entities:
+        stix_id = f"{entity.type}--{uuid.uuid4()}"
+        local_to_stix[entity.local_id] = stix_id
+        obj = {
+            "type": entity.type,
+            "id": stix_id,
+            "spec_version": "2.1",
+            "created": ts,
+            "modified": ts,
+        }
+        # Copy LLM-supplied properties (name, description, labels, …) but never
+        # let them override the wire-format fields above.
+        for key, value in entity.properties.items():
+            if key in obj:
+                continue
+            obj[key] = value
+        objects.append(obj)
+
+    dropped = 0
+    for rel in extraction.relationships:
+        src_id = local_to_stix.get(rel.source)
+        tgt_id = local_to_stix.get(rel.target)
+        if src_id is None or tgt_id is None:
+            dropped += 1
+            continue
+        objects.append(
+            {
+                "type": "relationship",
+                "id": f"relationship--{uuid.uuid4()}",
+                "spec_version": "2.1",
+                "created": ts,
+                "modified": ts,
+                "relationship_type": rel.relationship_type,
+                "source_ref": src_id,
+                "target_ref": tgt_id,
+            }
+        )
+    if dropped:
+        logger.warning("stix_relationships_dropped", count=dropped)
+
     bundle: dict = {
         "type": "bundle",
         "id": f"bundle--{uuid.uuid4()}",
         "spec_version": "2.1",
-        "created": now,
+        "created": ts,
         "objects": objects,
     }
     if source_url is not None:
         bundle["x_trace_source_url"] = source_url
-        bundle["x_trace_collected_at"] = collected_at or now
+        bundle["x_trace_collected_at"] = collected_at or ts
     if matched_pir_ids is not None:
         bundle["x_trace_matched_pir_ids"] = list(matched_pir_ids)
     if relevance_score is not None:

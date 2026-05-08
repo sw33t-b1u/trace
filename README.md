@@ -61,14 +61,14 @@ When `--pir` is supplied, articles are filtered through a lightweight relevance 
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [high-level-design.md](high-level-design.md) | Architecture, data model, algorithms, BEACON migration plan |
-| [docs/setup.md](docs/setup.md) | Prerequisites, installation, environment variables, GCP authentication |
-| [docs/data-model.md](docs/data-model.md) | Validation contract: assets.json, pir.json, STIX bundle |
-| [docs/crawl_design.md](docs/crawl_design.md) | sources.yaml schema, crawl_state.json semantics, dedupe strategy |
-| [docs/dependencies.md](docs/dependencies.md) | Dependency rationale and license information |
-| [docs/beacon_handoff.md](docs/beacon_handoff.md) | What moved out of BEACON and why |
+| Document | EN / JA | Description |
+|----------|---------|-------------|
+| Setup | [setup.md](docs/setup.md) / [ja](docs/setup.ja.md) | Prerequisites, installation, environment variables, GCP authentication, CLI quick reference |
+| Data model | [data-model.md](docs/data-model.md) / [ja](docs/data-model.ja.md) | Validation contracts: `assets.json`, `pir_output.json`, STIX bundle, `ValidationFinding` |
+| Crawl design | [crawl_design.md](docs/crawl_design.md) / [ja](docs/crawl_design.ja.md) | `sources.yaml` schema (with annotated example), `crawl_state.json` semantics, L2/L3/L4 flow, dedupe strategy |
+| Dependencies | [dependencies.md](docs/dependencies.md) / [ja](docs/dependencies.ja.md) | Dependency rationale and license information |
+| BEACON handoff | [beacon_handoff.md](docs/beacon_handoff.md) | What moved out of BEACON and why |
+| `high-level-design.md` | local-only; gitignored | Architecture, data model, algorithms |
 
 ## Quick Start
 
@@ -79,7 +79,9 @@ make setup              # Install Git hooks
 cp .env.example .env    # Fill in GCP_PROJECT_ID and other variables
 ```
 
-See [docs/setup.md](docs/setup.md) for the full setup procedure.
+See [docs/setup.md](docs/setup.md) for the full setup procedure and
+[docs/crawl_design.md](docs/crawl_design.md) for the `input/sources.yaml`
+schema before running `crawl_batch`.
 
 ## Development
 

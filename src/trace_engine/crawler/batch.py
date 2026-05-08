@@ -34,7 +34,7 @@ from trace_engine.crawler.state import (
 )
 from trace_engine.ingest.report_reader import read_report
 from trace_engine.pir import relevance as pir_relevance
-from trace_engine.stix.extractor import build_stix_bundle, extract_stix_objects
+from trace_engine.stix.extractor import build_stix_bundle_from_extraction, extract_entities
 from trace_engine.validate.schema import PIRDocument, SourcesDocument
 
 logger = structlog.get_logger(__name__)
@@ -172,8 +172,8 @@ def crawl_batch(
                 )
                 continue
 
-        objects = extract_stix_objects(text, task=source.task, config=cfg, pir_doc=pir_doc)
-        if not objects:
+        extraction = extract_entities(text, task=source.task, config=cfg, pir_doc=pir_doc)
+        if not extraction.entities:
             decision: Literal["extraction_failed", "no_pir", "kept"] = "extraction_failed"
             state.upsert(
                 source.url,
@@ -195,8 +195,8 @@ def crawl_batch(
             )
             continue
 
-        bundle = build_stix_bundle(
-            objects,
+        bundle = build_stix_bundle_from_extraction(
+            extraction,
             source_url=source.url,
             matched_pir_ids=verdict.matched_pir_ids if verdict else None,
             relevance_score=verdict.score if verdict else None,
