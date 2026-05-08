@@ -1,0 +1,11 @@
+version: 1
+sources:
+  - url: https://example.com/cti-blog
+    label: ExampleVendor Blog
+    task: medium
+  - url: https://news.example.org/article-42
+    label: Example News
+    task: simple
+    max_chars: 12000
+    pir_ids:
+      - PIR-TEST-001

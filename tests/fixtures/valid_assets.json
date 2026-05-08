@@ -1,0 +1,40 @@
+{
+  "network_segments": [
+    {"id": "seg-1", "name": "DMZ", "cidr": "10.0.1.0/24", "zone": "dmz"}
+  ],
+  "security_controls": [
+    {"id": "ctrl-1", "name": "EDR", "control_type": "edr", "coverage": ["windows"]}
+  ],
+  "assets": [
+    {
+      "id": "asset-1",
+      "name": "Web server",
+      "asset_type": "server",
+      "environment": "onprem",
+      "criticality": 8.0,
+      "owner": "team@example.com",
+      "network_segment_id": "seg-1",
+      "exposed_to_internet": true,
+      "tags": ["external-facing", "web"],
+      "security_control_ids": ["ctrl-1"]
+    },
+    {
+      "id": "asset-2",
+      "name": "DB server",
+      "asset_type": "server",
+      "criticality": 9.0,
+      "network_segment_id": "seg-1",
+      "tags": ["sensitive-data"],
+      "security_control_ids": ["ctrl-1"]
+    }
+  ],
+  "asset_vulnerabilities": [
+    {"asset_id": "asset-1", "vuln_stix_id_ref": "CVE-2024-0001", "remediation_status": "open"}
+  ],
+  "asset_connections": [
+    {"src": "asset-1", "dst": "asset-2", "protocol": "tcp", "port": 5432}
+  ],
+  "actor_targets": [
+    {"actor_stix_id_ref": "APT-X", "asset_id": "asset-1", "confidence": 75}
+  ]
+}

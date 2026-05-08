@@ -1,0 +1,14 @@
+[
+  {
+    "pir_id": "PIR-TEST-001",
+    "intelligence_level": "operational",
+    "description": "Test PIR for state-sponsored China-attributed activity",
+    "threat_actor_tags": ["apt-china"],
+    "asset_weight_rules": [
+      {"tag": "external-facing", "criticality_multiplier": 2.0},
+      {"tag": "sensitive-data", "criticality_multiplier": 1.5}
+    ],
+    "valid_from": "2025-01-01",
+    "valid_until": "2025-12-31"
+  }
+]

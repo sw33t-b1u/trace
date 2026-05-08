@@ -1,0 +1,4020 @@
+{
+  "_metadata": {
+    "sources": {
+      "mitre_attack": "https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json",
+      "misp_galaxy_threat_actor": "https://raw.githubusercontent.com/MISP/misp-galaxy/main/clusters/threat-actor.json"
+    },
+    "last_auto_sync": "2026-04-19T13:23:27+00:00",
+    "generator": "cmd/update_taxonomy.py"
+  },
+  "actor_categories": {
+    "state_sponsored": {
+      "Belarus": {
+        "tags": [
+          "apt-belarus"
+        ],
+        "mitre_groups": [
+          "MoustachedBouncer"
+        ],
+        "priority_ttps": [
+          "T1027.002",
+          "T1059.001",
+          "T1059.007",
+          "T1068",
+          "T1074.002",
+          "T1090",
+          "T1113",
+          "T1659"
+        ],
+        "target_industries": [
+          "Government"
+        ],
+        "target_geographies": [
+          "Eastern Europe",
+          "Europe",
+          "Germany",
+          "Latvia",
+          "Lithuania",
+          "Northeast Africa",
+          "Poland",
+          "South Asia",
+          "Ukraine"
+        ]
+      },
+      "China": {
+        "tags": [
+          "apt-china"
+        ],
+        "mitre_groups": [
+          "APT1",
+          "APT12",
+          "APT16",
+          "APT17",
+          "APT18",
+          "APT19",
+          "APT3",
+          "APT30",
+          "APT41",
+          "APT5",
+          "Aoqin Dragon",
+          "BRONZE BUTLER",
+          "BlackTech",
+          "Cinnamon Tempest",
+          "Daggerfly",
+          "DragonOK",
+          "Earth Lusca",
+          "Elderwood",
+          "GALLIUM",
+          "HAFNIUM",
+          "IndigoZebra",
+          "Ke3chang",
+          "Leviathan",
+          "Lotus Blossom",
+          "Mofang",
+          "Mustang Panda",
+          "Naikon",
+          "Night Dragon",
+          "Putter Panda",
+          "Rancor",
+          "Salt Typhoon",
+          "Scarlet Mimic",
+          "Suckfly",
+          "TA459",
+          "Threat Group-3390",
+          "Tonto Team",
+          "Tropic Trooper",
+          "UNC3886",
+          "Volt Typhoon",
+          "ZIRCONIUM",
+          "admin@338",
+          "menuPass"
+        ],
+        "priority_ttps": [
+          "T1001.003",
+          "T1003",
+          "T1003.001",
+          "T1003.002",
+          "T1003.003",
+          "T1003.004",
+          "T1003.006",
+          "T1005",
+          "T1006",
+          "T1007",
+          "T1008",
+          "T1010",
+          "T1012",
+          "T1014",
+          "T1016",
+          "T1016.001",
+          "T1018",
+          "T1020",
+          "T1021.001",
+          "T1021.002",
+          "T1021.004",
+          "T1021.006",
+          "T1027",
+          "T1027.001",
+          "T1027.002",
+          "T1027.003",
+          "T1027.005",
+          "T1027.007",
+          "T1027.010",
+          "T1027.012",
+          "T1027.013",
+          "T1027.015",
+          "T1027.016",
+          "T1030",
+          "T1033",
+          "T1036",
+          "T1036.002",
+          "T1036.003",
+          "T1036.004",
+          "T1036.005",
+          "T1036.007",
+          "T1036.008",
+          "T1036.010",
+          "T1037",
+          "T1037.004",
+          "T1039",
+          "T1040",
+          "T1041",
+          "T1046",
+          "T1047",
+          "T1048.003",
+          "T1049",
+          "T1052.001",
+          "T1053.002",
+          "T1053.003",
+          "T1053.005",
+          "T1055",
+          "T1055.001",
+          "T1055.012",
+          "T1056.001",
+          "T1057",
+          "T1059",
+          "T1059.001",
+          "T1059.003",
+          "T1059.004",
+          "T1059.005",
+          "T1059.006",
+          "T1059.007",
+          "T1059.012",
+          "T1068",
+          "T1069",
+          "T1069.001",
+          "T1069.002",
+          "T1070",
+          "T1070.001",
+          "T1070.002",
+          "T1070.003",
+          "T1070.004",
+          "T1070.005",
+          "T1070.006",
+          "T1070.007",
+          "T1071.001",
+          "T1071.002",
+          "T1071.004",
+          "T1072",
+          "T1074",
+          "T1074.001",
+          "T1074.002",
+          "T1078",
+          "T1078.001",
+          "T1078.002",
+          "T1078.003",
+          "T1078.004",
+          "T1080",
+          "T1082",
+          "T1083",
+          "T1087.001",
+          "T1087.002",
+          "T1090",
+          "T1090.001",
+          "T1090.002",
+          "T1090.003",
+          "T1091",
+          "T1095",
+          "T1098",
+          "T1098.004",
+          "T1098.007",
+          "T1102",
+          "T1102.001",
+          "T1102.002",
+          "T1102.003",
+          "T1104",
+          "T1105",
+          "T1106",
+          "T1110",
+          "T1110.002",
+          "T1110.003",
+          "T1112",
+          "T1113",
+          "T1114.001",
+          "T1114.002",
+          "T1119",
+          "T1120",
+          "T1124",
+          "T1129",
+          "T1132.001",
+          "T1133",
+          "T1134",
+          "T1135",
+          "T1136",
+          "T1136.001",
+          "T1136.002",
+          "T1137.006",
+          "T1140",
+          "T1176.002",
+          "T1189",
+          "T1190",
+          "T1195.002",
+          "T1197",
+          "T1199",
+          "T1203",
+          "T1204.001",
+          "T1204.002",
+          "T1205",
+          "T1205.001",
+          "T1210",
+          "T1212",
+          "T1213.002",
+          "T1213.003",
+          "T1217",
+          "T1218",
+          "T1218.001",
+          "T1218.004",
+          "T1218.005",
+          "T1218.007",
+          "T1218.010",
+          "T1218.011",
+          "T1219.001",
+          "T1219.002",
+          "T1221",
+          "T1480.001",
+          "T1482",
+          "T1484.001",
+          "T1486",
+          "T1496.001",
+          "T1497.001",
+          "T1505.003",
+          "T1505.006",
+          "T1518",
+          "T1518.001",
+          "T1530",
+          "T1534",
+          "T1539",
+          "T1542.003",
+          "T1543.003",
+          "T1546.003",
+          "T1546.008",
+          "T1547.001",
+          "T1547.004",
+          "T1547.009",
+          "T1547.012",
+          "T1548",
+          "T1548.002",
+          "T1550.001",
+          "T1550.002",
+          "T1550.003",
+          "T1552",
+          "T1552.001",
+          "T1552.004",
+          "T1553.002",
+          "T1554",
+          "T1555",
+          "T1555.003",
+          "T1555.005",
+          "T1555.006",
+          "T1557",
+          "T1558.001",
+          "T1559.002",
+          "T1560",
+          "T1560.001",
+          "T1560.002",
+          "T1560.003",
+          "T1562.001",
+          "T1562.002",
+          "T1562.003",
+          "T1562.004",
+          "T1562.006",
+          "T1564.001",
+          "T1564.003",
+          "T1564.011",
+          "T1566.001",
+          "T1566.002",
+          "T1567.002",
+          "T1568.001",
+          "T1568.002",
+          "T1568.003",
+          "T1569.002",
+          "T1570",
+          "T1572",
+          "T1573",
+          "T1573.001",
+          "T1573.002",
+          "T1574.001",
+          "T1574.005",
+          "T1574.006",
+          "T1583.001",
+          "T1583.003",
+          "T1583.004",
+          "T1583.005",
+          "T1583.006",
+          "T1584.001",
+          "T1584.003",
+          "T1584.004",
+          "T1584.005",
+          "T1584.006",
+          "T1584.008",
+          "T1585",
+          "T1585.001",
+          "T1585.002",
+          "T1586.001",
+          "T1586.002",
+          "T1587.001",
+          "T1587.002",
+          "T1587.004",
+          "T1588.001",
+          "T1588.002",
+          "T1588.003",
+          "T1588.004",
+          "T1588.006",
+          "T1589",
+          "T1589.001",
+          "T1589.002",
+          "T1590",
+          "T1590.004",
+          "T1590.005",
+          "T1590.006",
+          "T1591",
+          "T1591.004",
+          "T1592",
+          "T1592.004",
+          "T1593",
+          "T1593.003",
+          "T1594",
+          "T1595.002",
+          "T1595.003",
+          "T1596.005",
+          "T1598",
+          "T1598.003",
+          "T1599",
+          "T1602.002",
+          "T1608",
+          "T1608.001",
+          "T1608.002",
+          "T1608.004",
+          "T1614",
+          "T1614.001",
+          "T1622",
+          "T1654",
+          "T1656",
+          "T1657",
+          "T1665",
+          "T1673",
+          "T1675",
+          "T1678",
+          "T1680",
+          "T1681"
+        ],
+        "target_industries": [
+          "Aerospace",
+          "Automotive",
+          "Aviation",
+          "Biomedical",
+          "Business",
+          "Civil engineering",
+          "Civil society",
+          "Construction",
+          "Covid-19 research organizations",
+          "Cryptocurrency",
+          "Defense Contractor",
+          "Defense industrial base",
+          "Dissident",
+          "Education",
+          "Electronics Manufacturers",
+          "Energy",
+          "Energy Company",
+          "Financial",
+          "Gambling Websites",
+          "Gambling companies",
+          "Gaming",
+          "Government",
+          "Government Institutions",
+          "Healthcare",
+          "High-Tech",
+          "Individuals",
+          "Information Technology",
+          "Information technology",
+          "Intergovernmental",
+          "Logistics",
+          "Media and Entertainment",
+          "Medical",
+          "Military",
+          "Pharmaceuticals",
+          "Private Sector",
+          "Private sector",
+          "Pro-democracy and human rights political organizations",
+          "Religious Organizations",
+          "Religious organization",
+          "Retail",
+          "Semiconductor Industry",
+          "Services",
+          "Telecommunications",
+          "Transportation systems",
+          "Travel",
+          "Universities"
+        ],
+        "target_geographies": [
+          "Afghanistan",
+          "Asia",
+          "Asia Pacific Economic Cooperation",
+          "Australia",
+          "Belarus",
+          "Belgium",
+          "Brazil",
+          "Cambodia",
+          "Canada",
+          "Central Asia",
+          "Chile",
+          "China",
+          "Denmark",
+          "East Asia",
+          "Eastern Europe",
+          "Egypt",
+          "European Union",
+          "Finland",
+          "France",
+          "Germany",
+          "Hong Kong",
+          "India",
+          "Indonesia",
+          "Iran",
+          "Iraq",
+          "Israel",
+          "Italy",
+          "Japan",
+          "Kazakhstan",
+          "Kuwait",
+          "Kyrgyzstan",
+          "Laos",
+          "Libya",
+          "Lithuania",
+          "Luxembourg",
+          "Macao",
+          "Malaysia",
+          "Middle East",
+          "Mongolia",
+          "Morocco",
+          "Myanmar",
+          "Nepal",
+          "Netherlands",
+          "Nigeria",
+          "Norway",
+          "Oman",
+          "Pakistan",
+          "Philippines",
+          "Russia",
+          "Russian Federation",
+          "Saudi Arabia",
+          "Singapore",
+          "Solomon Islands",
+          "South Africa",
+          "South America",
+          "South Korea",
+          "South Sudan",
+          "Southeast Asia",
+          "Southeast Asian",
+          "Southern Africa",
+          "Spain",
+          "Sri Lanka",
+          "Sudan",
+          "Sweden",
+          "Switzerland",
+          "Taiwan",
+          "Tajikistan",
+          "Thailand",
+          "The Middle East",
+          "The Philippines",
+          "Turkey",
+          "U.S. satellite and aerospace sector",
+          "Uighurs",
+          "Ukraine",
+          "United Arab Emirates",
+          "United Kingdom",
+          "United States",
+          "Vietnam",
+          "Yemen"
+        ]
+      },
+      "France": {
+        "tags": [
+          "apt-france"
+        ],
+        "mitre_groups": [],
+        "priority_ttps": [],
+        "target_industries": [
+          "Government",
+          "Private sector"
+        ],
+        "target_geographies": [
+          "Algeria",
+          "China",
+          "Germany",
+          "Greece",
+          "Iran",
+          "Ivory Coast",
+          "Malaysia",
+          "Netherlands",
+          "Norway",
+          "Russia",
+          "Spain",
+          "Syria",
+          "Turkey",
+          "United Kingdom",
+          "United States"
+        ]
+      },
+      "India": {
+        "tags": [
+          "apt-india"
+        ],
+        "mitre_groups": [
+          "BITTER",
+          "Patchwork",
+          "Sidewinder"
+        ],
+        "priority_ttps": [
+          "T1005",
+          "T1016",
+          "T1020",
+          "T1021.001",
+          "T1027.001",
+          "T1027.002",
+          "T1027.005",
+          "T1027.010",
+          "T1027.013",
+          "T1033",
+          "T1036.004",
+          "T1036.005",
+          "T1053.005",
+          "T1055.012",
+          "T1057",
+          "T1059.001",
+          "T1059.003",
+          "T1059.005",
+          "T1059.007",
+          "T1068",
+          "T1070.004",
+          "T1071.001",
+          "T1074.001",
+          "T1082",
+          "T1083",
+          "T1095",
+          "T1102.001",
+          "T1105",
+          "T1112",
+          "T1119",
+          "T1124",
+          "T1132.001",
+          "T1189",
+          "T1197",
+          "T1203",
+          "T1204.001",
+          "T1204.002",
+          "T1218.005",
+          "T1518",
+          "T1518.001",
+          "T1547.001",
+          "T1548.002",
+          "T1553.002",
+          "T1555.003",
+          "T1559.002",
+          "T1560",
+          "T1566.001",
+          "T1566.002",
+          "T1568",
+          "T1573",
+          "T1574.001",
+          "T1583.001",
+          "T1587.002",
+          "T1588.002",
+          "T1598.002",
+          "T1598.003",
+          "T1608.001",
+          "T1680"
+        ],
+        "target_industries": [
+          "Government",
+          "Military",
+          "Private Sector",
+          "Private sector"
+        ],
+        "target_geographies": [
+          "Afghanistan",
+          "Bangladesh",
+          "China",
+          "Germany",
+          "Nepal",
+          "Pakistan",
+          "Sri Lanka"
+        ]
+      },
+      "Iran": {
+        "tags": [
+          "apt-iran"
+        ],
+        "mitre_groups": [
+          "APT33",
+          "APT39",
+          "APT42",
+          "Agrius",
+          "Ajax Security Team",
+          "CURIUM",
+          "Charming Kitten",
+          "Cleaver",
+          "CopyKittens",
+          "Ferocious Kitten",
+          "Fox Kitten",
+          "HEXANE",
+          "Magic Hound",
+          "Moses Staff",
+          "MuddyWater",
+          "OilRig",
+          "Sandworm Team",
+          "Silent Librarian"
+        ],
+        "priority_ttps": [
+          "T1003",
+          "T1003.001",
+          "T1003.002",
+          "T1003.003",
+          "T1003.004",
+          "T1003.005",
+          "T1005",
+          "T1007",
+          "T1008",
+          "T1010",
+          "T1012",
+          "T1016",
+          "T1016.001",
+          "T1016.002",
+          "T1018",
+          "T1021.001",
+          "T1021.002",
+          "T1021.004",
+          "T1021.005",
+          "T1025",
+          "T1027",
+          "T1027.002",
+          "T1027.003",
+          "T1027.004",
+          "T1027.005",
+          "T1027.010",
+          "T1027.013",
+          "T1033",
+          "T1036",
+          "T1036.002",
+          "T1036.004",
+          "T1036.005",
+          "T1036.010",
+          "T1039",
+          "T1040",
+          "T1041",
+          "T1046",
+          "T1047",
+          "T1048.002",
+          "T1048.003",
+          "T1049",
+          "T1053.005",
+          "T1056",
+          "T1056.001",
+          "T1057",
+          "T1059",
+          "T1059.001",
+          "T1059.003",
+          "T1059.005",
+          "T1059.006",
+          "T1059.007",
+          "T1059.010",
+          "T1068",
+          "T1069.001",
+          "T1069.002",
+          "T1070",
+          "T1070.003",
+          "T1070.004",
+          "T1070.008",
+          "T1071",
+          "T1071.001",
+          "T1071.004",
+          "T1072",
+          "T1074.001",
+          "T1078",
+          "T1078.001",
+          "T1078.002",
+          "T1078.004",
+          "T1082",
+          "T1083",
+          "T1087.001",
+          "T1087.002",
+          "T1087.003",
+          "T1090",
+          "T1090.001",
+          "T1090.002",
+          "T1098.002",
+          "T1098.007",
+          "T1102",
+          "T1102.002",
+          "T1104",
+          "T1105",
+          "T1106",
+          "T1110",
+          "T1110.003",
+          "T1111",
+          "T1112",
+          "T1113",
+          "T1114",
+          "T1114.001",
+          "T1114.002",
+          "T1114.003",
+          "T1115",
+          "T1119",
+          "T1120",
+          "T1124",
+          "T1132.001",
+          "T1133",
+          "T1135",
+          "T1136.001",
+          "T1137.001",
+          "T1137.004",
+          "T1140",
+          "T1189",
+          "T1190",
+          "T1195",
+          "T1195.002",
+          "T1197",
+          "T1199",
+          "T1201",
+          "T1203",
+          "T1204.001",
+          "T1204.002",
+          "T1210",
+          "T1213.005",
+          "T1213.006",
+          "T1217",
+          "T1218.001",
+          "T1218.003",
+          "T1218.005",
+          "T1218.011",
+          "T1219",
+          "T1482",
+          "T1485",
+          "T1486",
+          "T1489",
+          "T1490",
+          "T1491.002",
+          "T1497.001",
+          "T1499",
+          "T1505.003",
+          "T1518",
+          "T1518.001",
+          "T1530",
+          "T1534",
+          "T1539",
+          "T1543.003",
+          "T1546.003",
+          "T1546.008",
+          "T1546.010",
+          "T1547",
+          "T1547.001",
+          "T1547.009",
+          "T1548.002",
+          "T1552.001",
+          "T1552.006",
+          "T1553.002",
+          "T1553.006",
+          "T1555",
+          "T1555.003",
+          "T1555.004",
+          "T1555.005",
+          "T1556.002",
+          "T1557.002",
+          "T1559.001",
+          "T1559.002",
+          "T1560.001",
+          "T1560.003",
+          "T1561.002",
+          "T1562",
+          "T1562.001",
+          "T1562.002",
+          "T1562.004",
+          "T1564.003",
+          "T1566.001",
+          "T1566.002",
+          "T1566.003",
+          "T1567",
+          "T1567.002",
+          "T1569.002",
+          "T1570",
+          "T1571",
+          "T1572",
+          "T1573",
+          "T1573.001",
+          "T1573.002",
+          "T1574.001",
+          "T1583",
+          "T1583.001",
+          "T1583.002",
+          "T1583.003",
+          "T1583.004",
+          "T1583.006",
+          "T1584.001",
+          "T1584.004",
+          "T1584.005",
+          "T1584.006",
+          "T1585",
+          "T1585.001",
+          "T1585.002",
+          "T1586.001",
+          "T1586.002",
+          "T1587.001",
+          "T1588.002",
+          "T1588.003",
+          "T1588.004",
+          "T1588.006",
+          "T1589",
+          "T1589.001",
+          "T1589.002",
+          "T1589.003",
+          "T1590.001",
+          "T1590.005",
+          "T1591.001",
+          "T1591.002",
+          "T1591.004",
+          "T1592.002",
+          "T1593",
+          "T1594",
+          "T1595.002",
+          "T1598.003",
+          "T1608.001",
+          "T1608.004",
+          "T1608.005",
+          "T1656"
+        ],
+        "target_industries": [
+          "Civil Society",
+          "Civil society",
+          "Defense",
+          "Education",
+          "Energy",
+          "Finance",
+          "Government",
+          "Healthcare",
+          "High-Tech",
+          "Legal",
+          "Manufacturing",
+          "Media",
+          "Military",
+          "NGOs",
+          "Pharmaceuticals",
+          "Private sector",
+          "Rail",
+          "Telecomms",
+          "Telecoms",
+          "Transportation"
+        ],
+        "target_geographies": [
+          "AT&T",
+          "Afghanistan",
+          "Australia",
+          "BB&T",
+          "Bahrain",
+          "Bank of America",
+          "Canada",
+          "Capital One",
+          "China",
+          "Citigroup",
+          "Denmark",
+          "Egypt",
+          "Europe",
+          "Fifth Third Bank",
+          "France",
+          "Georgia",
+          "Germany",
+          "HSBC",
+          "India",
+          "Iran",
+          "Iranian internet activists",
+          "Iraq",
+          "Israel",
+          "Italy",
+          "Jordan",
+          "Kuwait",
+          "Lebanon",
+          "Mexico",
+          "Middle East",
+          "NYSE",
+          "PNC",
+          "Pakistan",
+          "Qatar",
+          "Russia",
+          "Saudi Arabia",
+          "South Korea",
+          "Sweden",
+          "Syria",
+          "Turkey",
+          "U.S. government/defense sector websites",
+          "US Bancorp",
+          "United Arab Emirates",
+          "United Kingdom",
+          "United States",
+          "Venezuela",
+          "Wells Fargo",
+          "Yemen"
+        ]
+      },
+      "Israel": {
+        "tags": [
+          "apt-israel"
+        ],
+        "mitre_groups": [],
+        "priority_ttps": [],
+        "target_industries": [
+          "Government",
+          "Military",
+          "Private sector"
+        ],
+        "target_geographies": [
+          "Iran",
+          "Sudan"
+        ]
+      },
+      "Lebanon": {
+        "tags": [
+          "apt-lebanon"
+        ],
+        "mitre_groups": [
+          "POLONIUM"
+        ],
+        "priority_ttps": [
+          "T1078",
+          "T1090",
+          "T1102.002",
+          "T1199",
+          "T1567.002",
+          "T1583.006",
+          "T1588.002"
+        ],
+        "target_industries": [
+          "Civil Society",
+          "Critical manufacturing",
+          "Defense",
+          "Defense industrial base",
+          "Financial services",
+          "Food and agriculture",
+          "Government agencies and services",
+          "Healthcare",
+          "Information technology",
+          "Military",
+          "NGOs",
+          "Pharmaceuticals",
+          "Transportation systems"
+        ],
+        "target_geographies": [
+          "Israel"
+        ]
+      },
+      "North Korea": {
+        "tags": [
+          "apt-north-korea"
+        ],
+        "mitre_groups": [
+          "APT37",
+          "Andariel",
+          "AppleJeus",
+          "Contagious Interview",
+          "Kimsuky",
+          "Lazarus Group"
+        ],
+        "priority_ttps": [
+          "T1001.003",
+          "T1003.001",
+          "T1005",
+          "T1007",
+          "T1008",
+          "T1010",
+          "T1012",
+          "T1016",
+          "T1021.001",
+          "T1021.002",
+          "T1021.004",
+          "T1027",
+          "T1027.001",
+          "T1027.002",
+          "T1027.003",
+          "T1027.007",
+          "T1027.009",
+          "T1027.010",
+          "T1027.012",
+          "T1027.013",
+          "T1027.016",
+          "T1033",
+          "T1036",
+          "T1036.001",
+          "T1036.003",
+          "T1036.004",
+          "T1036.005",
+          "T1036.007",
+          "T1040",
+          "T1041",
+          "T1046",
+          "T1047",
+          "T1048.003",
+          "T1049",
+          "T1053.005",
+          "T1055",
+          "T1055.001",
+          "T1055.012",
+          "T1056.001",
+          "T1057",
+          "T1059",
+          "T1059.001",
+          "T1059.003",
+          "T1059.004",
+          "T1059.005",
+          "T1059.006",
+          "T1059.007",
+          "T1070",
+          "T1070.003",
+          "T1070.004",
+          "T1070.006",
+          "T1071.001",
+          "T1071.002",
+          "T1071.003",
+          "T1074.001",
+          "T1078",
+          "T1078.003",
+          "T1082",
+          "T1083",
+          "T1090",
+          "T1090.001",
+          "T1090.002",
+          "T1098",
+          "T1098.007",
+          "T1102.001",
+          "T1102.002",
+          "T1104",
+          "T1105",
+          "T1106",
+          "T1110.003",
+          "T1111",
+          "T1112",
+          "T1113",
+          "T1114.002",
+          "T1114.003",
+          "T1120",
+          "T1123",
+          "T1124",
+          "T1132.001",
+          "T1133",
+          "T1134.002",
+          "T1136.001",
+          "T1140",
+          "T1176.001",
+          "T1185",
+          "T1189",
+          "T1190",
+          "T1202",
+          "T1203",
+          "T1204.001",
+          "T1204.002",
+          "T1204.004",
+          "T1204.005",
+          "T1205",
+          "T1218",
+          "T1218.005",
+          "T1218.010",
+          "T1218.011",
+          "T1219.002",
+          "T1480",
+          "T1485",
+          "T1489",
+          "T1491.001",
+          "T1497",
+          "T1505.003",
+          "T1518.001",
+          "T1529",
+          "T1534",
+          "T1539",
+          "T1542.003",
+          "T1543.001",
+          "T1543.003",
+          "T1546.001",
+          "T1546.004",
+          "T1547.001",
+          "T1547.009",
+          "T1547.013",
+          "T1548.002",
+          "T1550.002",
+          "T1552.001",
+          "T1553.002",
+          "T1555.001",
+          "T1555.003",
+          "T1557",
+          "T1557.001",
+          "T1559.002",
+          "T1560",
+          "T1560.001",
+          "T1560.002",
+          "T1560.003",
+          "T1561.001",
+          "T1561.002",
+          "T1562.001",
+          "T1562.004",
+          "T1564.001",
+          "T1564.002",
+          "T1564.003",
+          "T1566",
+          "T1566.001",
+          "T1566.002",
+          "T1566.003",
+          "T1567",
+          "T1567.002",
+          "T1571",
+          "T1573.001",
+          "T1574.001",
+          "T1574.013",
+          "T1583",
+          "T1583.001",
+          "T1583.003",
+          "T1583.004",
+          "T1583.006",
+          "T1584.001",
+          "T1584.004",
+          "T1585",
+          "T1585.001",
+          "T1585.002",
+          "T1586.002",
+          "T1587",
+          "T1587.001",
+          "T1588.001",
+          "T1588.002",
+          "T1588.003",
+          "T1588.004",
+          "T1588.005",
+          "T1588.007",
+          "T1589",
+          "T1589.002",
+          "T1589.003",
+          "T1590.005",
+          "T1591",
+          "T1592.002",
+          "T1593",
+          "T1593.001",
+          "T1593.002",
+          "T1593.003",
+          "T1594",
+          "T1596",
+          "T1598",
+          "T1598.003",
+          "T1608.001",
+          "T1620",
+          "T1656",
+          "T1657",
+          "T1680",
+          "T1681"
+        ],
+        "target_industries": [
+          "Government",
+          "Journalists",
+          "NGOs",
+          "Private sector"
+        ],
+        "target_geographies": [
+          "Australia",
+          "Bangladesh",
+          "Bangladesh Bank",
+          "Brazil",
+          "Canada",
+          "China",
+          "Cryptocurrency exchanges in South Korea",
+          "France",
+          "Germany",
+          "Guatemala",
+          "Hong Kong",
+          "India",
+          "Japan",
+          "Korea Institute for Defense Analyses",
+          "Ministry of Unification",
+          "North America",
+          "Russia",
+          "Sejong Institute",
+          "Sony Pictures Entertainment",
+          "South Africa",
+          "South Korea",
+          "Thailand",
+          "United Kingdom",
+          "United States",
+          "Vietnam"
+        ]
+      },
+      "Pakistan": {
+        "tags": [
+          "apt-pakistan"
+        ],
+        "mitre_groups": [
+          "Transparent Tribe"
+        ],
+        "priority_ttps": [
+          "T1027.013",
+          "T1036.005",
+          "T1059.005",
+          "T1189",
+          "T1203",
+          "T1204.001",
+          "T1204.002",
+          "T1564.001",
+          "T1566.001",
+          "T1566.002",
+          "T1568",
+          "T1583.001",
+          "T1584.001",
+          "T1608.004"
+        ],
+        "target_industries": [
+          "Civil society",
+          "Government",
+          "Military"
+        ],
+        "target_geographies": [
+          "Afghanistan",
+          "Australia",
+          "Germany",
+          "India",
+          "Iraq",
+          "Pakistan",
+          "United Arab Emirates",
+          "United States"
+        ]
+      },
+      "Palestine": {
+        "tags": [
+          "apt-palestine"
+        ],
+        "mitre_groups": [
+          "APT-C-23",
+          "Molerats"
+        ],
+        "priority_ttps": [
+          "T1027.015",
+          "T1053.005",
+          "T1057",
+          "T1059.001",
+          "T1059.005",
+          "T1059.007",
+          "T1105",
+          "T1140",
+          "T1204.001",
+          "T1204.002",
+          "T1218.007",
+          "T1547.001",
+          "T1553.002",
+          "T1555.003",
+          "T1566.001",
+          "T1566.002"
+        ],
+        "target_industries": [
+          "Civil Society",
+          "Defense",
+          "Education",
+          "Energy",
+          "Finance",
+          "Government",
+          "Healthcare",
+          "High-Tech",
+          "Legal",
+          "Media",
+          "Military",
+          "NGOs",
+          "Pharmaceuticals",
+          "Telecoms",
+          "Transportation"
+        ],
+        "target_geographies": [
+          "Europe",
+          "Israel",
+          "Middle East",
+          "Palestine",
+          "United States"
+        ]
+      },
+      "Russia": {
+        "tags": [
+          "apt-russia"
+        ],
+        "mitre_groups": [
+          "APT28",
+          "APT29",
+          "Dragonfly",
+          "Ember Bear",
+          "FIN13",
+          "FIN7",
+          "GCMAN",
+          "Gamaredon Group",
+          "Inception",
+          "Indrik Spider",
+          "Nomadic Octopus",
+          "Sandworm Team",
+          "Star Blizzard",
+          "TA505",
+          "TA577",
+          "Turla",
+          "Winter Vivern",
+          "Wizard Spider"
+        ],
+        "priority_ttps": [
+          "T1001",
+          "T1001.001",
+          "T1003",
+          "T1003.001",
+          "T1003.002",
+          "T1003.003",
+          "T1003.004",
+          "T1005",
+          "T1007",
+          "T1008",
+          "T1012",
+          "T1014",
+          "T1016",
+          "T1016.001",
+          "T1018",
+          "T1020",
+          "T1021",
+          "T1021.001",
+          "T1021.002",
+          "T1021.004",
+          "T1021.005",
+          "T1021.006",
+          "T1021.007",
+          "T1025",
+          "T1027",
+          "T1027.001",
+          "T1027.002",
+          "T1027.004",
+          "T1027.005",
+          "T1027.006",
+          "T1027.009",
+          "T1027.010",
+          "T1027.011",
+          "T1027.012",
+          "T1027.013",
+          "T1027.015",
+          "T1027.016",
+          "T1030",
+          "T1033",
+          "T1036",
+          "T1036.004",
+          "T1036.005",
+          "T1036.010",
+          "T1037",
+          "T1037.001",
+          "T1037.004",
+          "T1039",
+          "T1040",
+          "T1041",
+          "T1046",
+          "T1047",
+          "T1048.002",
+          "T1048.003",
+          "T1049",
+          "T1053.005",
+          "T1055",
+          "T1055.001",
+          "T1056.001",
+          "T1056.003",
+          "T1057",
+          "T1059",
+          "T1059.001",
+          "T1059.003",
+          "T1059.005",
+          "T1059.006",
+          "T1059.007",
+          "T1059.009",
+          "T1068",
+          "T1069",
+          "T1069.001",
+          "T1069.002",
+          "T1070.001",
+          "T1070.004",
+          "T1070.006",
+          "T1071.001",
+          "T1071.002",
+          "T1071.003",
+          "T1071.004",
+          "T1072",
+          "T1074",
+          "T1074.001",
+          "T1074.002",
+          "T1078",
+          "T1078.001",
+          "T1078.002",
+          "T1078.003",
+          "T1078.004",
+          "T1080",
+          "T1082",
+          "T1083",
+          "T1087",
+          "T1087.001",
+          "T1087.002",
+          "T1087.003",
+          "T1087.004",
+          "T1090",
+          "T1090.001",
+          "T1090.002",
+          "T1090.003",
+          "T1090.004",
+          "T1091",
+          "T1092",
+          "T1095",
+          "T1098.002",
+          "T1098.005",
+          "T1098.007",
+          "T1102",
+          "T1102.002",
+          "T1102.003",
+          "T1105",
+          "T1106",
+          "T1110",
+          "T1110.001",
+          "T1110.002",
+          "T1110.003",
+          "T1112",
+          "T1113",
+          "T1114",
+          "T1114.001",
+          "T1114.002",
+          "T1114.003",
+          "T1119",
+          "T1120",
+          "T1124",
+          "T1125",
+          "T1132.001",
+          "T1133",
+          "T1134.001",
+          "T1134.002",
+          "T1134.003",
+          "T1135",
+          "T1136",
+          "T1136.001",
+          "T1136.002",
+          "T1136.003",
+          "T1137",
+          "T1137.002",
+          "T1140",
+          "T1187",
+          "T1189",
+          "T1190",
+          "T1195",
+          "T1195.002",
+          "T1197",
+          "T1199",
+          "T1201",
+          "T1203",
+          "T1204.001",
+          "T1204.002",
+          "T1210",
+          "T1211",
+          "T1213",
+          "T1213.002",
+          "T1213.006",
+          "T1218.005",
+          "T1218.007",
+          "T1218.010",
+          "T1218.011",
+          "T1219",
+          "T1221",
+          "T1222.001",
+          "T1480",
+          "T1484.001",
+          "T1485",
+          "T1486",
+          "T1489",
+          "T1490",
+          "T1491.001",
+          "T1491.002",
+          "T1497.001",
+          "T1497.002",
+          "T1498",
+          "T1499",
+          "T1505.003",
+          "T1518",
+          "T1518.001",
+          "T1518.002",
+          "T1528",
+          "T1534",
+          "T1539",
+          "T1542.003",
+          "T1543.003",
+          "T1546.003",
+          "T1546.008",
+          "T1546.011",
+          "T1546.013",
+          "T1546.015",
+          "T1547.001",
+          "T1547.004",
+          "T1548.002",
+          "T1550.001",
+          "T1550.002",
+          "T1550.003",
+          "T1550.004",
+          "T1552.001",
+          "T1552.006",
+          "T1553.002",
+          "T1553.005",
+          "T1553.006",
+          "T1555.003",
+          "T1555.004",
+          "T1555.005",
+          "T1556",
+          "T1556.007",
+          "T1557.001",
+          "T1557.004",
+          "T1558.003",
+          "T1559.001",
+          "T1559.002",
+          "T1560",
+          "T1560.001",
+          "T1561.001",
+          "T1561.002",
+          "T1562.001",
+          "T1562.004",
+          "T1562.008",
+          "T1564.001",
+          "T1564.002",
+          "T1564.003",
+          "T1564.012",
+          "T1565",
+          "T1566.001",
+          "T1566.002",
+          "T1566.003",
+          "T1567",
+          "T1567.002",
+          "T1568",
+          "T1568.001",
+          "T1569.002",
+          "T1570",
+          "T1571",
+          "T1572",
+          "T1573",
+          "T1573.001",
+          "T1574.001",
+          "T1583",
+          "T1583.001",
+          "T1583.003",
+          "T1583.004",
+          "T1583.006",
+          "T1584.003",
+          "T1584.004",
+          "T1584.005",
+          "T1584.006",
+          "T1584.008",
+          "T1585",
+          "T1585.001",
+          "T1585.002",
+          "T1586.001",
+          "T1586.002",
+          "T1586.003",
+          "T1587.001",
+          "T1587.003",
+          "T1588.001",
+          "T1588.002",
+          "T1588.003",
+          "T1588.005",
+          "T1588.006",
+          "T1589",
+          "T1589.001",
+          "T1589.002",
+          "T1589.003",
+          "T1590",
+          "T1590.001",
+          "T1590.004",
+          "T1591",
+          "T1591.002",
+          "T1591.004",
+          "T1592.002",
+          "T1593",
+          "T1594",
+          "T1595.001",
+          "T1595.002",
+          "T1596",
+          "T1598",
+          "T1598.002",
+          "T1598.003",
+          "T1608.001",
+          "T1608.004",
+          "T1608.005",
+          "T1615",
+          "T1620",
+          "T1621",
+          "T1649",
+          "T1651",
+          "T1654",
+          "T1657",
+          "T1665",
+          "T1669",
+          "T1674"
+        ],
+        "target_industries": [
+          "Defense",
+          "Education",
+          "Finance",
+          "Financial",
+          "Government",
+          "Health",
+          "Healthcare",
+          "Hospitality",
+          "Military",
+          "Private sector",
+          "Retail",
+          "Telecommunications"
+        ],
+        "target_geographies": [
+          "Afghanistan",
+          "Armenia",
+          "Asia Pacific Economic Cooperation",
+          "Australia",
+          "Austria",
+          "Azerbaijan",
+          "Bahamas",
+          "Belarus",
+          "Belgium",
+          "Brazil",
+          "Canada",
+          "China",
+          "Costa Rica",
+          "Czech Republic",
+          "European Commission",
+          "France",
+          "Georgia",
+          "Germany",
+          "Greece",
+          "Hungary",
+          "India",
+          "International Association of Athletics Federations",
+          "Iran",
+          "Iraq",
+          "Ireland",
+          "Israel",
+          "Italy",
+          "Japan",
+          "Jordan",
+          "Kazakhstan",
+          "Kenya",
+          "Kyrgyzstan",
+          "Lithuania",
+          "Malaysia",
+          "Mexico",
+          "Mongolia",
+          "NATO",
+          "Netherlands",
+          "New Zealand",
+          "OSCE",
+          "Pakistan",
+          "Poland",
+          "Portugal",
+          "Romania",
+          "Russia",
+          "Saudi Arabia",
+          "Serbia",
+          "Singapore",
+          "South Africa",
+          "South Korea",
+          "Spain",
+          "Suriname",
+          "Switzerland",
+          "Taiwan",
+          "Tajikistan",
+          "Thailand",
+          "Turkey",
+          "Turkmenistan",
+          "Ukraine",
+          "United Kingdom",
+          "United States",
+          "Uzbekistan",
+          "Vietnam",
+          "World Anti-Doping Agency"
+        ]
+      },
+      "South Korea": {
+        "tags": [
+          "apt-south-korea"
+        ],
+        "mitre_groups": [
+          "Darkhotel",
+          "Higaisa"
+        ],
+        "priority_ttps": [
+          "T1001.003",
+          "T1016",
+          "T1027.001",
+          "T1027.013",
+          "T1027.015",
+          "T1029",
+          "T1036.004",
+          "T1036.005",
+          "T1041",
+          "T1053.005",
+          "T1056.001",
+          "T1057",
+          "T1059.003",
+          "T1059.005",
+          "T1059.007",
+          "T1071.001",
+          "T1080",
+          "T1082",
+          "T1083",
+          "T1090.001",
+          "T1091",
+          "T1105",
+          "T1106",
+          "T1124",
+          "T1140",
+          "T1189",
+          "T1203",
+          "T1204.002",
+          "T1220",
+          "T1497",
+          "T1497.001",
+          "T1497.002",
+          "T1518.001",
+          "T1547.001",
+          "T1553.002",
+          "T1564.003",
+          "T1566.001",
+          "T1573.001",
+          "T1574.001",
+          "T1680"
+        ],
+        "target_industries": [
+          "Government",
+          "Private sector"
+        ],
+        "target_geographies": [
+          "China",
+          "Japan",
+          "Nepal",
+          "North Korea",
+          "Poland",
+          "Russia",
+          "Singapore",
+          "South Korea",
+          "Switzerland",
+          "Taiwan"
+        ]
+      },
+      "Spain": {
+        "tags": [
+          "apt-spain"
+        ],
+        "mitre_groups": [],
+        "priority_ttps": [],
+        "target_industries": [
+          "Government",
+          "Private sector"
+        ],
+        "target_geographies": [
+          "Brazil",
+          "France",
+          "Germany",
+          "Iran",
+          "Libya",
+          "Morocco",
+          "Poland",
+          "South Africa",
+          "Spain",
+          "Switzerland",
+          "Tunisia",
+          "United Kingdom",
+          "United States",
+          "Venezuela"
+        ]
+      },
+      "United Arab Emirates": {
+        "tags": [
+          "apt-united-arab-emirates"
+        ],
+        "mitre_groups": [
+          "Stealth Falcon"
+        ],
+        "priority_ttps": [
+          "T1005",
+          "T1012",
+          "T1016",
+          "T1033",
+          "T1041",
+          "T1047",
+          "T1053.005",
+          "T1057",
+          "T1059",
+          "T1059.001",
+          "T1071.001",
+          "T1082",
+          "T1555",
+          "T1555.003",
+          "T1555.004",
+          "T1573.001"
+        ],
+        "target_industries": [
+          "Civil society"
+        ],
+        "target_geographies": [
+          "United Arab Emirates",
+          "United Kingdom"
+        ]
+      },
+      "United States": {
+        "tags": [
+          "apt-united-states"
+        ],
+        "mitre_groups": [
+          "Strider"
+        ],
+        "priority_ttps": [
+          "T1090.001",
+          "T1556.002",
+          "T1564.005"
+        ],
+        "target_industries": [
+          "Government",
+          "Military",
+          "Private Sector",
+          "Private sector"
+        ],
+        "target_geographies": [
+          "Afghanistan",
+          "Algeria",
+          "Belgium",
+          "China",
+          "Global",
+          "India",
+          "Iran",
+          "Kenya",
+          "Lebanon",
+          "Libya",
+          "Mali",
+          "Pakistan",
+          "Russia",
+          "Rwanda",
+          "Sweden",
+          "Syria",
+          "United Arab Emirates",
+          "United Kingdom",
+          "Yemen"
+        ]
+      },
+      "Vietnam": {
+        "tags": [
+          "apt-vietnam"
+        ],
+        "mitre_groups": [
+          "APT32"
+        ],
+        "priority_ttps": [
+          "T1003",
+          "T1003.001",
+          "T1012",
+          "T1016",
+          "T1018",
+          "T1021.002",
+          "T1027.010",
+          "T1027.011",
+          "T1027.013",
+          "T1027.016",
+          "T1033",
+          "T1036",
+          "T1036.003",
+          "T1036.004",
+          "T1036.005",
+          "T1041",
+          "T1046",
+          "T1047",
+          "T1048.003",
+          "T1049",
+          "T1053.005",
+          "T1055",
+          "T1056.001",
+          "T1059",
+          "T1059.001",
+          "T1059.003",
+          "T1059.005",
+          "T1059.007",
+          "T1068",
+          "T1070.001",
+          "T1070.004",
+          "T1070.006",
+          "T1071.001",
+          "T1071.003",
+          "T1072",
+          "T1078.003",
+          "T1082",
+          "T1083",
+          "T1087.001",
+          "T1102",
+          "T1105",
+          "T1112",
+          "T1135",
+          "T1137",
+          "T1189",
+          "T1203",
+          "T1204.001",
+          "T1204.002",
+          "T1216.001",
+          "T1218.005",
+          "T1218.010",
+          "T1218.011",
+          "T1222.002",
+          "T1505.003",
+          "T1543.003",
+          "T1547.001",
+          "T1550.002",
+          "T1550.003",
+          "T1552.002",
+          "T1560",
+          "T1564.001",
+          "T1564.003",
+          "T1564.004",
+          "T1566.001",
+          "T1566.002",
+          "T1569.002",
+          "T1570",
+          "T1571",
+          "T1574.001",
+          "T1583.001",
+          "T1583.006",
+          "T1585.001",
+          "T1588.002",
+          "T1589",
+          "T1589.002",
+          "T1598.003",
+          "T1608.001",
+          "T1608.004"
+        ],
+        "target_industries": [
+          "Civil society",
+          "Government",
+          "Private sector"
+        ],
+        "target_geographies": [
+          "Association of Southeast Asian Nations",
+          "China",
+          "Germany",
+          "Philippines",
+          "United States",
+          "Vietnam"
+        ]
+      }
+    },
+    "espionage": {
+      "tags": [
+        "espionage"
+      ],
+      "mitre_groups": [
+        "APT-C-36",
+        "APT29",
+        "Machete",
+        "OilRig",
+        "Sowbug",
+        "Thrip"
+      ],
+      "priority_ttps": [
+        "T1003",
+        "T1003.001",
+        "T1003.002",
+        "T1003.004",
+        "T1003.005",
+        "T1005",
+        "T1007",
+        "T1008",
+        "T1012",
+        "T1016",
+        "T1016.001",
+        "T1021.001",
+        "T1021.004",
+        "T1021.007",
+        "T1025",
+        "T1027",
+        "T1027.001",
+        "T1027.002",
+        "T1027.005",
+        "T1027.006",
+        "T1027.013",
+        "T1033",
+        "T1036",
+        "T1036.004",
+        "T1036.005",
+        "T1037",
+        "T1037.004",
+        "T1039",
+        "T1046",
+        "T1047",
+        "T1048.003",
+        "T1049",
+        "T1053.005",
+        "T1056.001",
+        "T1057",
+        "T1059",
+        "T1059.001",
+        "T1059.003",
+        "T1059.005",
+        "T1059.006",
+        "T1059.009",
+        "T1068",
+        "T1069.001",
+        "T1069.002",
+        "T1070.004",
+        "T1070.006",
+        "T1071.001",
+        "T1071.004",
+        "T1078",
+        "T1078.002",
+        "T1078.003",
+        "T1078.004",
+        "T1082",
+        "T1083",
+        "T1087.001",
+        "T1087.002",
+        "T1087.004",
+        "T1090.002",
+        "T1090.003",
+        "T1090.004",
+        "T1098.002",
+        "T1098.005",
+        "T1105",
+        "T1110",
+        "T1110.001",
+        "T1110.003",
+        "T1112",
+        "T1113",
+        "T1114.002",
+        "T1115",
+        "T1119",
+        "T1120",
+        "T1133",
+        "T1135",
+        "T1136.003",
+        "T1137.004",
+        "T1140",
+        "T1189",
+        "T1190",
+        "T1195",
+        "T1199",
+        "T1201",
+        "T1203",
+        "T1204.001",
+        "T1204.002",
+        "T1218.001",
+        "T1218.005",
+        "T1218.007",
+        "T1219",
+        "T1219.002",
+        "T1497.001",
+        "T1505.003",
+        "T1528",
+        "T1543.003",
+        "T1546.003",
+        "T1546.008",
+        "T1547.001",
+        "T1548.002",
+        "T1550.003",
+        "T1552.001",
+        "T1553.002",
+        "T1553.005",
+        "T1555",
+        "T1555.003",
+        "T1555.004",
+        "T1556.002",
+        "T1556.007",
+        "T1560.001",
+        "T1562.004",
+        "T1562.008",
+        "T1566.001",
+        "T1566.002",
+        "T1566.003",
+        "T1568",
+        "T1571",
+        "T1572",
+        "T1573",
+        "T1573.002",
+        "T1583.001",
+        "T1583.006",
+        "T1586.002",
+        "T1586.003",
+        "T1587.001",
+        "T1587.003",
+        "T1588.002",
+        "T1588.003",
+        "T1595.002",
+        "T1608.001",
+        "T1621",
+        "T1649",
+        "T1651",
+        "T1665"
+      ],
+      "target_industries": [
+        "Civil society",
+        "Finance",
+        "Financial",
+        "Government",
+        "Manufacturing",
+        "Military",
+        "Petroleum",
+        "Private sector",
+        "Scientific Research"
+      ],
+      "target_geographies": [
+        "Afghanistan",
+        "Argentina",
+        "Australia",
+        "Belgium",
+        "Brazil",
+        "Brunei",
+        "Canada",
+        "Chile",
+        "China",
+        "Colombia",
+        "Cuba",
+        "Denmark",
+        "Djibouti",
+        "Ecuador",
+        "Egypt",
+        "France",
+        "Germany",
+        "India",
+        "Iran",
+        "Iraq",
+        "Israel",
+        "Jordan",
+        "Kurdistan",
+        "Kuwait",
+        "Lebonon",
+        "Malaysia",
+        "Morocco",
+        "Oman",
+        "Pakistan",
+        "Palestine",
+        "Panama",
+        "Peru",
+        "Qatar",
+        "Russia",
+        "Saudi Arabia",
+        "Serbia",
+        "Somalia",
+        "South Korea",
+        "Spain",
+        "Sweden",
+        "Syria",
+        "Ukraine",
+        "United Arab Emirates",
+        "United Kingdom",
+        "United States",
+        "Venezuela"
+      ]
+    },
+    "financial_crime": {
+      "tags": [
+        "financial-crime"
+      ],
+      "mitre_groups": [],
+      "priority_ttps": [],
+      "target_industries": [],
+      "target_geographies": []
+    },
+    "sabotage": {
+      "tags": [
+        "sabotage"
+      ],
+      "mitre_groups": [],
+      "priority_ttps": [],
+      "target_industries": [
+        "Critical manufacturing",
+        "Financial",
+        "Government",
+        "Military",
+        "Telecommunications",
+        "Transportation",
+        "Transportation systems"
+      ],
+      "target_geographies": [
+        "Czech Republic",
+        "Denmark",
+        "Estonia",
+        "Iran",
+        "Lithuania",
+        "NATO",
+        "Norway",
+        "Poland",
+        "Sweden",
+        "Ukraine",
+        "United States"
+      ]
+    }
+  },
+  "geography_threat_map": {
+    "AT&T": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "Afghanistan": {
+      "notable_groups": [
+        "APT28",
+        "Ajax Security Team",
+        "Inception",
+        "Sidewinder",
+        "ToddyCat"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-india",
+        "apt-iran",
+        "apt-pakistan",
+        "apt-russia",
+        "apt-united-states"
+      ]
+    },
+    "Albania": {
+      "notable_groups": [
+        "BackdoorDiplomacy"
+      ],
+      "apt_tags": []
+    },
+    "Algeria": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-france",
+        "apt-united-states"
+      ]
+    },
+    "Argentina": {
+      "notable_groups": [
+        "Sowbug"
+      ],
+      "apt_tags": []
+    },
+    "Armenia": {
+      "notable_groups": [
+        "APT28",
+        "Inception"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Asia": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Asia Pacific Economic Cooperation": {
+      "notable_groups": [
+        "APT28",
+        "Leviathan"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-russia"
+      ]
+    },
+    "Association of Southeast Asian Nations": {
+      "notable_groups": [
+        "APT32"
+      ],
+      "apt_tags": [
+        "apt-vietnam"
+      ]
+    },
+    "Australia": {
+      "notable_groups": [
+        "APT42",
+        "Aoqin Dragon",
+        "Earth Lusca",
+        "Elderwood",
+        "Lazarus Group",
+        "TA505",
+        "Threat Group-3390",
+        "Wizard Spider",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran",
+        "apt-north-korea",
+        "apt-pakistan",
+        "apt-russia"
+      ]
+    },
+    "Austria": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Azerbaijan": {
+      "notable_groups": [
+        "Inception",
+        "Sandworm Team"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "BB&T": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "Bahamas": {
+      "notable_groups": [
+        "Wizard Spider"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Bahrain": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "Bangladesh": {
+      "notable_groups": [
+        "Lazarus Group",
+        "Patchwork"
+      ],
+      "apt_tags": [
+        "apt-india",
+        "apt-north-korea"
+      ]
+    },
+    "Bangladesh Bank": {
+      "notable_groups": [
+        "Lazarus Group"
+      ],
+      "apt_tags": [
+        "apt-north-korea"
+      ]
+    },
+    "Bank of America": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "Belarus": {
+      "notable_groups": [
+        "Inception",
+        "Sandworm Team",
+        "Turla"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-russia"
+      ]
+    },
+    "Belgium": {
+      "notable_groups": [
+        "APT1",
+        "APT17",
+        "APT28",
+        "APT29",
+        "Inception",
+        "Leviathan",
+        "Machete",
+        "Strider"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-russia",
+        "apt-united-states"
+      ]
+    },
+    "Brazil": {
+      "notable_groups": [
+        "APT29",
+        "Lazarus Group",
+        "Machete",
+        "Sowbug",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-north-korea",
+        "apt-russia",
+        "apt-spain"
+      ]
+    },
+    "Brunei": {
+      "notable_groups": [
+        "Sowbug"
+      ],
+      "apt_tags": []
+    },
+    "Cambodia": {
+      "notable_groups": [
+        "Aoqin Dragon",
+        "Leviathan",
+        "Naikon",
+        "Rancor"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Cameroon": {
+      "notable_groups": [],
+      "apt_tags": []
+    },
+    "Canada": {
+      "notable_groups": [
+        "APT1",
+        "Ajax Security Team",
+        "Cleaver",
+        "Elderwood",
+        "Lazarus Group",
+        "Mofang",
+        "TA505",
+        "Threat Group-3390",
+        "Wizard Spider",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran",
+        "apt-north-korea",
+        "apt-russia"
+      ]
+    },
+    "Capital One": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "Central African Republic": {
+      "notable_groups": [],
+      "apt_tags": []
+    },
+    "Central Asia": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Chile": {
+      "notable_groups": [
+        "APT-C-36"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "China": {
+      "notable_groups": [
+        "APT17",
+        "APT28",
+        "APT29",
+        "APT32",
+        "APT41",
+        "BRONZE BUTLER",
+        "Cleaver",
+        "Darkhotel",
+        "Dragonfly",
+        "Earth Lusca",
+        "Elderwood",
+        "Gelsemium",
+        "Higaisa",
+        "Lazarus Group",
+        "Machete",
+        "Naikon",
+        "Sidewinder",
+        "Strider",
+        "Threat Group-3390"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-france",
+        "apt-india",
+        "apt-iran",
+        "apt-north-korea",
+        "apt-russia",
+        "apt-south-korea",
+        "apt-united-states",
+        "apt-vietnam"
+      ]
+    },
+    "Citigroup": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "Colombia": {
+      "notable_groups": [
+        "APT-C-36",
+        "Machete"
+      ],
+      "apt_tags": []
+    },
+    "Costa Rica": {
+      "notable_groups": [
+        "Wizard Spider"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Croatia": {
+      "notable_groups": [
+        "BackdoorDiplomacy"
+      ],
+      "apt_tags": []
+    },
+    "Cryptocurrency exchanges in South Korea": {
+      "notable_groups": [
+        "Lazarus Group"
+      ],
+      "apt_tags": [
+        "apt-north-korea"
+      ]
+    },
+    "Cuba": {
+      "notable_groups": [
+        "Machete"
+      ],
+      "apt_tags": []
+    },
+    "Czech Republic": {
+      "notable_groups": [
+        "Inception",
+        "TA505"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Denmark": {
+      "notable_groups": [
+        "Elderwood"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran"
+      ]
+    },
+    "Djibouti": {
+      "notable_groups": [],
+      "apt_tags": []
+    },
+    "East Asia": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Eastern Europe": {
+      "notable_groups": [
+        "MoustachedBouncer",
+        "Tonto Team"
+      ],
+      "apt_tags": [
+        "apt-belarus",
+        "apt-china"
+      ]
+    },
+    "Ecuador": {
+      "notable_groups": [
+        "APT-C-36",
+        "Machete",
+        "Sowbug"
+      ],
+      "apt_tags": []
+    },
+    "Egypt": {
+      "notable_groups": [
+        "Ajax Security Team",
+        "Gelsemium"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran"
+      ]
+    },
+    "Estonia": {
+      "notable_groups": [],
+      "apt_tags": []
+    },
+    "Europe": {
+      "notable_groups": [
+        "APT-C-23",
+        "APT42",
+        "CURIUM",
+        "Molerats",
+        "MoustachedBouncer"
+      ],
+      "apt_tags": [
+        "apt-belarus",
+        "apt-iran",
+        "apt-palestine"
+      ]
+    },
+    "European Commission": {
+      "notable_groups": [
+        "APT28"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "European Union": {
+      "notable_groups": [
+        "Ke3chang"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Fifth Third Bank": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "Finland": {
+      "notable_groups": [
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "France": {
+      "notable_groups": [
+        "APT1",
+        "APT28",
+        "APT41",
+        "Cleaver",
+        "Dragonfly",
+        "Earth Lusca",
+        "Lazarus Group",
+        "Machete",
+        "Threat Group-3390",
+        "Turla",
+        "Wizard Spider",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran",
+        "apt-north-korea",
+        "apt-russia",
+        "apt-spain"
+      ]
+    },
+    "Gaza": {
+      "notable_groups": [
+        "Gelsemium"
+      ],
+      "apt_tags": []
+    },
+    "Georgia": {
+      "notable_groups": [
+        "APT28",
+        "APT29",
+        "BackdoorDiplomacy",
+        "MuddyWater",
+        "Sandworm Team"
+      ],
+      "apt_tags": [
+        "apt-iran",
+        "apt-russia"
+      ]
+    },
+    "Germany": {
+      "notable_groups": [
+        "APT17",
+        "APT28",
+        "APT29",
+        "APT32",
+        "BITTER",
+        "Cleaver",
+        "CopyKittens",
+        "Dragonfly",
+        "Earth Lusca",
+        "Gamaredon Group",
+        "Ke3chang",
+        "Kimsuky",
+        "Lazarus Group",
+        "Leviathan",
+        "Machete",
+        "Mofang",
+        "Mustang Panda",
+        "Patchwork",
+        "Sea Turtle",
+        "TA505",
+        "Turla",
+        "Winter Vivern",
+        "Wizard Spider"
+      ],
+      "apt_tags": [
+        "apt-belarus",
+        "apt-china",
+        "apt-france",
+        "apt-india",
+        "apt-iran",
+        "apt-north-korea",
+        "apt-pakistan",
+        "apt-russia",
+        "apt-spain",
+        "apt-vietnam"
+      ]
+    },
+    "Global": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-united-states"
+      ]
+    },
+    "Greece": {
+      "notable_groups": [
+        "Inception"
+      ],
+      "apt_tags": [
+        "apt-france",
+        "apt-russia"
+      ]
+    },
+    "Guatemala": {
+      "notable_groups": [
+        "Lazarus Group"
+      ],
+      "apt_tags": [
+        "apt-north-korea"
+      ]
+    },
+    "HSBC": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "Hong Kong": {
+      "notable_groups": [
+        "APT3",
+        "APT41",
+        "Aoqin Dragon",
+        "Daggerfly",
+        "Earth Lusca",
+        "Elderwood",
+        "Lazarus Group",
+        "Leviathan",
+        "Lotus Blossom",
+        "admin@338"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-north-korea"
+      ]
+    },
+    "Hungary": {
+      "notable_groups": [
+        "APT28",
+        "TA505"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "India": {
+      "notable_groups": [
+        "APT1",
+        "APT29",
+        "APT30",
+        "APT41",
+        "Cleaver",
+        "Daggerfly",
+        "Elderwood",
+        "Inception",
+        "Ke3chang",
+        "Lazarus Group",
+        "Mofang",
+        "MuddyWater",
+        "Naikon",
+        "TA505",
+        "Threat Group-3390",
+        "ToddyCat",
+        "Turla",
+        "Wizard Spider",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran",
+        "apt-north-korea",
+        "apt-pakistan",
+        "apt-russia",
+        "apt-united-states"
+      ]
+    },
+    "Indonesia": {
+      "notable_groups": [
+        "APT17",
+        "Lotus Blossom",
+        "Naikon",
+        "ToddyCat"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "International Association of Athletics Federations": {
+      "notable_groups": [
+        "APT28"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Iran": {
+      "notable_groups": [
+        "Ajax Security Team",
+        "BackdoorDiplomacy",
+        "Gelsemium",
+        "Inception",
+        "Sandworm Team",
+        "Strider",
+        "Threat Group-3390",
+        "ToddyCat",
+        "Turla"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-france",
+        "apt-iran",
+        "apt-israel",
+        "apt-russia",
+        "apt-spain",
+        "apt-united-states"
+      ]
+    },
+    "Iranian internet activists": {
+      "notable_groups": [
+        "Ajax Security Team"
+      ],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "Iraq": {
+      "notable_groups": [
+        "Ajax Security Team",
+        "Charming Kitten",
+        "Gelsemium",
+        "MuddyWater",
+        "OilRig",
+        "Turla"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran",
+        "apt-pakistan",
+        "apt-russia"
+      ]
+    },
+    "Ireland": {
+      "notable_groups": [
+        "Dragonfly",
+        "Wizard Spider"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Israel": {
+      "notable_groups": [
+        "APT-C-23",
+        "APT1",
+        "APT42",
+        "Ajax Security Team",
+        "CURIUM",
+        "Charming Kitten",
+        "Cleaver",
+        "CopyKittens",
+        "Gelsemium",
+        "HEXANE",
+        "Molerats",
+        "MuddyWater",
+        "OilRig",
+        "POLONIUM",
+        "Sandworm Team",
+        "Threat Group-3390"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran",
+        "apt-lebanon",
+        "apt-palestine",
+        "apt-russia"
+      ]
+    },
+    "Italy": {
+      "notable_groups": [
+        "APT17",
+        "APT41",
+        "Dragonfly",
+        "Inception",
+        "Wizard Spider"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran",
+        "apt-russia"
+      ]
+    },
+    "Ivory Coast": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-france"
+      ]
+    },
+    "Japan": {
+      "notable_groups": [
+        "APT1",
+        "APT12",
+        "APT16",
+        "APT17",
+        "APT28",
+        "APT29",
+        "APT37",
+        "APT41",
+        "BRONZE BUTLER",
+        "Darkhotel",
+        "Dragonfly",
+        "Earth Lusca",
+        "Gelsemium",
+        "Higaisa",
+        "Lazarus Group",
+        "Lotus Blossom",
+        "TA505",
+        "Threat Group-3390",
+        "Tonto Team",
+        "Wizard Spider",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-north-korea",
+        "apt-russia",
+        "apt-south-korea"
+      ]
+    },
+    "Jordan": {
+      "notable_groups": [
+        "APT28",
+        "Ajax Security Team",
+        "CopyKittens",
+        "Gelsemium"
+      ],
+      "apt_tags": [
+        "apt-iran",
+        "apt-russia"
+      ]
+    },
+    "Kazakhstan": {
+      "notable_groups": [
+        "APT28",
+        "APT29",
+        "Inception",
+        "Sandworm Team",
+        "Turla"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-russia"
+      ]
+    },
+    "Kenya": {
+      "notable_groups": [
+        "Inception"
+      ],
+      "apt_tags": [
+        "apt-russia",
+        "apt-united-states"
+      ]
+    },
+    "Korea Institute for Defense Analyses": {
+      "notable_groups": [
+        "Kimsuky"
+      ],
+      "apt_tags": [
+        "apt-north-korea"
+      ]
+    },
+    "Kurdistan": {
+      "notable_groups": [],
+      "apt_tags": []
+    },
+    "Kuwait": {
+      "notable_groups": [
+        "Ajax Security Team",
+        "Cleaver",
+        "Gelsemium",
+        "OilRig"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran"
+      ]
+    },
+    "Kyrgyzstan": {
+      "notable_groups": [
+        "Sandworm Team",
+        "ToddyCat"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-russia"
+      ]
+    },
+    "Laos": {
+      "notable_groups": [
+        "Naikon"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Latvia": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-belarus"
+      ]
+    },
+    "Lebanon": {
+      "notable_groups": [
+        "Gelsemium",
+        "OilRig"
+      ],
+      "apt_tags": [
+        "apt-iran",
+        "apt-united-states"
+      ]
+    },
+    "Lebonon": {
+      "notable_groups": [],
+      "apt_tags": []
+    },
+    "Libya": {
+      "notable_groups": [
+        "BackdoorDiplomacy"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-spain",
+        "apt-united-states"
+      ]
+    },
+    "Lithuania": {
+      "notable_groups": [
+        "Sandworm Team"
+      ],
+      "apt_tags": [
+        "apt-belarus",
+        "apt-china",
+        "apt-russia"
+      ]
+    },
+    "Luxembourg": {
+      "notable_groups": [
+        "APT1"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Macao": {
+      "notable_groups": [
+        "Daggerfly"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Malaysia": {
+      "notable_groups": [
+        "APT30",
+        "Daggerfly",
+        "Inception",
+        "Leviathan",
+        "Machete",
+        "Naikon",
+        "Sowbug",
+        "ToddyCat"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-france",
+        "apt-russia"
+      ]
+    },
+    "Mali": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-united-states"
+      ]
+    },
+    "Mexico": {
+      "notable_groups": [
+        "APT29",
+        "Cleaver",
+        "Wizard Spider"
+      ],
+      "apt_tags": [
+        "apt-iran",
+        "apt-russia"
+      ]
+    },
+    "Middle East": {
+      "notable_groups": [
+        "APT-C-23",
+        "APT42",
+        "CURIUM",
+        "HEXANE",
+        "Molerats",
+        "OilRig"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran",
+        "apt-palestine"
+      ]
+    },
+    "Ministry of Unification": {
+      "notable_groups": [
+        "Kimsuky"
+      ],
+      "apt_tags": [
+        "apt-north-korea"
+      ]
+    },
+    "Moldova": {
+      "notable_groups": [],
+      "apt_tags": []
+    },
+    "Mongolia": {
+      "notable_groups": [
+        "APT28",
+        "Earth Lusca",
+        "Gelsemium"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-russia"
+      ]
+    },
+    "Morocco": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-china",
+        "apt-spain"
+      ]
+    },
+    "Myanmar": {
+      "notable_groups": [
+        "APT41",
+        "Mofang",
+        "Naikon"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "NATO": {
+      "notable_groups": [
+        "APT28"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "NYSE": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "Namibia": {
+      "notable_groups": [
+        "BackdoorDiplomacy"
+      ],
+      "apt_tags": []
+    },
+    "Nepal": {
+      "notable_groups": [
+        "Earth Lusca",
+        "Higaisa",
+        "Sidewinder"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-india",
+        "apt-south-korea"
+      ]
+    },
+    "Netherlands": {
+      "notable_groups": [
+        "APT17",
+        "APT41",
+        "Turla"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-france",
+        "apt-russia"
+      ]
+    },
+    "New Zealand": {
+      "notable_groups": [
+        "APT29",
+        "Wizard Spider"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Nigeria": {
+      "notable_groups": [
+        "Daggerfly",
+        "Earth Lusca"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "North America": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-north-korea"
+      ]
+    },
+    "North Korea": {
+      "notable_groups": [
+        "Gelsemium",
+        "Higaisa"
+      ],
+      "apt_tags": [
+        "apt-south-korea"
+      ]
+    },
+    "Northeast Africa": {
+      "notable_groups": [
+        "MoustachedBouncer"
+      ],
+      "apt_tags": [
+        "apt-belarus"
+      ]
+    },
+    "Norway": {
+      "notable_groups": [
+        "APT1",
+        "Leviathan",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-france"
+      ]
+    },
+    "OSCE": {
+      "notable_groups": [
+        "APT28"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Oman": {
+      "notable_groups": [
+        "Gelsemium"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "PNC": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "Pakistan": {
+      "notable_groups": [
+        "APT28",
+        "Cleaver",
+        "MuddyWater",
+        "OilRig",
+        "Patchwork",
+        "Sidewinder",
+        "ToddyCat"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-india",
+        "apt-iran",
+        "apt-pakistan",
+        "apt-russia",
+        "apt-united-states"
+      ]
+    },
+    "Palestine": {
+      "notable_groups": [
+        "APT-C-23",
+        "Molerats"
+      ],
+      "apt_tags": [
+        "apt-palestine"
+      ]
+    },
+    "Panama": {
+      "notable_groups": [
+        "APT-C-36"
+      ],
+      "apt_tags": []
+    },
+    "Peru": {
+      "notable_groups": [
+        "Machete",
+        "Sowbug"
+      ],
+      "apt_tags": []
+    },
+    "Philippines": {
+      "notable_groups": [
+        "APT32",
+        "Earth Lusca",
+        "Leviathan",
+        "Lotus Blossom",
+        "Naikon"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-vietnam"
+      ]
+    },
+    "Poland": {
+      "notable_groups": [
+        "APT28",
+        "BackdoorDiplomacy",
+        "Dragonfly",
+        "Higaisa",
+        "Sandworm Team",
+        "Turla"
+      ],
+      "apt_tags": [
+        "apt-belarus",
+        "apt-russia",
+        "apt-south-korea",
+        "apt-spain"
+      ]
+    },
+    "Portugal": {
+      "notable_groups": [
+        "APT29"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Qatar": {
+      "notable_groups": [
+        "BackdoorDiplomacy",
+        "Cleaver",
+        "OilRig"
+      ],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "Romania": {
+      "notable_groups": [
+        "APT29",
+        "TA505",
+        "Turla"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Russia": {
+      "notable_groups": [
+        "APT17",
+        "Darkhotel",
+        "Higaisa",
+        "Inception",
+        "Machete",
+        "Sandworm Team",
+        "Strider",
+        "Threat Group-3390",
+        "ToddyCat",
+        "Turla"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-france",
+        "apt-iran",
+        "apt-north-korea",
+        "apt-russia",
+        "apt-south-korea",
+        "apt-united-states"
+      ]
+    },
+    "Russian Federation": {
+      "notable_groups": [
+        "BRONZE BUTLER"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Rwanda": {
+      "notable_groups": [
+        "Strider"
+      ],
+      "apt_tags": [
+        "apt-united-states"
+      ]
+    },
+    "Saudi Arabia": {
+      "notable_groups": [
+        "APT30",
+        "APT33",
+        "Ajax Security Team",
+        "BackdoorDiplomacy",
+        "Charming Kitten",
+        "Cleaver",
+        "CopyKittens",
+        "Gelsemium",
+        "Leviathan",
+        "MuddyWater",
+        "Naikon",
+        "OilRig",
+        "Turla"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran",
+        "apt-russia"
+      ]
+    },
+    "Sejong Institute": {
+      "notable_groups": [
+        "Kimsuky"
+      ],
+      "apt_tags": [
+        "apt-north-korea"
+      ]
+    },
+    "Senegal": {
+      "notable_groups": [],
+      "apt_tags": []
+    },
+    "Serbia": {
+      "notable_groups": [
+        "TA505"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Singapore": {
+      "notable_groups": [
+        "APT1",
+        "APT41",
+        "Aoqin Dragon",
+        "Higaisa",
+        "Mofang",
+        "Naikon",
+        "Rancor",
+        "TA505"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-russia",
+        "apt-south-korea"
+      ]
+    },
+    "Slovakia": {
+      "notable_groups": [
+        "ToddyCat"
+      ],
+      "apt_tags": []
+    },
+    "Solomon Islands": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Somalia": {
+      "notable_groups": [],
+      "apt_tags": []
+    },
+    "Sony Pictures Entertainment": {
+      "notable_groups": [
+        "Lazarus Group"
+      ],
+      "apt_tags": [
+        "apt-north-korea"
+      ]
+    },
+    "South Africa": {
+      "notable_groups": [
+        "APT1",
+        "APT41",
+        "Inception",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-north-korea",
+        "apt-russia",
+        "apt-spain"
+      ]
+    },
+    "South America": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "South Asia": {
+      "notable_groups": [
+        "MoustachedBouncer"
+      ],
+      "apt_tags": [
+        "apt-belarus"
+      ]
+    },
+    "South Korea": {
+      "notable_groups": [
+        "APT29",
+        "APT30",
+        "APT33",
+        "APT37",
+        "APT41",
+        "BRONZE BUTLER",
+        "Cleaver",
+        "Darkhotel",
+        "Gelsemium",
+        "Lazarus Group",
+        "Mofang",
+        "Naikon",
+        "TA505",
+        "Threat Group-3390",
+        "Tonto Team",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran",
+        "apt-north-korea",
+        "apt-russia",
+        "apt-south-korea"
+      ]
+    },
+    "South Sudan": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Southeast Asia": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Southeast Asian": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Southern Africa": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Spain": {
+      "notable_groups": [
+        "APT-C-36",
+        "Dragonfly",
+        "Machete",
+        "TA505",
+        "Wizard Spider"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-france",
+        "apt-russia",
+        "apt-spain"
+      ]
+    },
+    "Sri Lanka": {
+      "notable_groups": [
+        "BackdoorDiplomacy",
+        "Patchwork"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-india"
+      ]
+    },
+    "Sudan": {
+      "notable_groups": [
+        "BackdoorDiplomacy"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-israel"
+      ]
+    },
+    "Suriname": {
+      "notable_groups": [
+        "Inception"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Sweden": {
+      "notable_groups": [
+        "Machete",
+        "Strider",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran",
+        "apt-united-states"
+      ]
+    },
+    "Switzerland": {
+      "notable_groups": [
+        "APT1",
+        "APT17",
+        "APT41",
+        "Elderwood",
+        "Higaisa",
+        "Leviathan",
+        "Wizard Spider",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-russia",
+        "apt-south-korea",
+        "apt-spain"
+      ]
+    },
+    "Syria": {
+      "notable_groups": [
+        "Ajax Security Team",
+        "Gelsemium"
+      ],
+      "apt_tags": [
+        "apt-france",
+        "apt-iran",
+        "apt-united-states"
+      ]
+    },
+    "Taiwan": {
+      "notable_groups": [
+        "APT1",
+        "APT12",
+        "APT16",
+        "Daggerfly",
+        "Darkhotel",
+        "Earth Lusca",
+        "Elderwood",
+        "Lotus Blossom",
+        "Threat Group-3390",
+        "ToddyCat",
+        "Tonto Team",
+        "Wizard Spider"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-russia",
+        "apt-south-korea"
+      ]
+    },
+    "Tajikistan": {
+      "notable_groups": [
+        "APT28",
+        "Turla"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-russia"
+      ]
+    },
+    "Thailand": {
+      "notable_groups": [
+        "APT30",
+        "APT41",
+        "Earth Lusca",
+        "Lazarus Group",
+        "Naikon",
+        "TA505",
+        "Threat Group-3390",
+        "ToddyCat",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-north-korea",
+        "apt-russia"
+      ]
+    },
+    "The Middle East": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "The Philippines": {
+      "notable_groups": [
+        "Leviathan"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Togo": {
+      "notable_groups": [],
+      "apt_tags": []
+    },
+    "Tunisia": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-spain"
+      ]
+    },
+    "Turkey": {
+      "notable_groups": [
+        "APT28",
+        "APT29",
+        "APT41",
+        "Ajax Security Team",
+        "Cleaver",
+        "Dragonfly",
+        "Gelsemium",
+        "MuddyWater",
+        "OilRig",
+        "TA505",
+        "Threat Group-3390"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-france",
+        "apt-iran",
+        "apt-russia"
+      ]
+    },
+    "Turkmenistan": {
+      "notable_groups": [
+        "Inception"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "U.S. government/defense sector websites": {
+      "notable_groups": [
+        "Charming Kitten"
+      ],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "U.S. satellite and aerospace sector": {
+      "notable_groups": [
+        "Putter Panda"
+      ],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "US Bancorp": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "Uighurs": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-china"
+      ]
+    },
+    "Ukraine": {
+      "notable_groups": [
+        "APT28",
+        "APT29",
+        "Ember Bear",
+        "Gamaredon Group",
+        "Inception",
+        "Sandworm Team",
+        "Wizard Spider"
+      ],
+      "apt_tags": [
+        "apt-belarus",
+        "apt-china",
+        "apt-russia"
+      ]
+    },
+    "United Arab Emirates": {
+      "notable_groups": [
+        "APT1",
+        "Ajax Security Team",
+        "Earth Lusca",
+        "MuddyWater",
+        "Stealth Falcon"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran",
+        "apt-pakistan",
+        "apt-united-arab-emirates",
+        "apt-united-states"
+      ]
+    },
+    "United Kingdom": {
+      "notable_groups": [
+        "APT1",
+        "APT17",
+        "APT28",
+        "APT3",
+        "APT41",
+        "Ajax Security Team",
+        "Charming Kitten",
+        "Cleaver",
+        "Elderwood",
+        "Inception",
+        "Ke3chang",
+        "Lazarus Group",
+        "Leviathan",
+        "OilRig",
+        "Stealth Falcon",
+        "TA505",
+        "Threat Group-3390",
+        "ToddyCat",
+        "Wizard Spider",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-france",
+        "apt-iran",
+        "apt-north-korea",
+        "apt-russia",
+        "apt-spain",
+        "apt-united-arab-emirates",
+        "apt-united-states"
+      ]
+    },
+    "United States": {
+      "notable_groups": [
+        "APT-C-23",
+        "APT1",
+        "APT17",
+        "APT18",
+        "APT19",
+        "APT28",
+        "APT29",
+        "APT3",
+        "APT30",
+        "APT32",
+        "APT33",
+        "APT41",
+        "APT42",
+        "Ajax Security Team",
+        "CURIUM",
+        "Cleaver",
+        "CopyKittens",
+        "DragonOK",
+        "Dragonfly",
+        "Earth Lusca",
+        "Elderwood",
+        "Inception",
+        "Lazarus Group",
+        "Leviathan",
+        "Machete",
+        "Mofang",
+        "Molerats",
+        "MuddyWater",
+        "Mustang Panda",
+        "Naikon",
+        "OilRig",
+        "TA505",
+        "Threat Group-3390",
+        "Thrip",
+        "Tonto Team",
+        "Turla",
+        "Wizard Spider",
+        "admin@338",
+        "menuPass"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-france",
+        "apt-iran",
+        "apt-north-korea",
+        "apt-pakistan",
+        "apt-palestine",
+        "apt-russia",
+        "apt-spain",
+        "apt-vietnam"
+      ]
+    },
+    "Uzbekistan": {
+      "notable_groups": [
+        "BackdoorDiplomacy",
+        "ToddyCat",
+        "Turla"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Venezuela": {
+      "notable_groups": [
+        "Ajax Security Team",
+        "Machete"
+      ],
+      "apt_tags": [
+        "apt-iran",
+        "apt-spain"
+      ]
+    },
+    "Vietnam": {
+      "notable_groups": [
+        "APT30",
+        "APT32",
+        "APT37",
+        "Aoqin Dragon",
+        "Earth Lusca",
+        "Inception",
+        "Lotus Blossom",
+        "Naikon",
+        "ToddyCat"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-north-korea",
+        "apt-russia",
+        "apt-vietnam"
+      ]
+    },
+    "Wells Fargo": {
+      "notable_groups": [],
+      "apt_tags": [
+        "apt-iran"
+      ]
+    },
+    "World Anti-Doping Agency": {
+      "notable_groups": [
+        "APT28"
+      ],
+      "apt_tags": [
+        "apt-russia"
+      ]
+    },
+    "Yemen": {
+      "notable_groups": [
+        "Ajax Security Team",
+        "Gelsemium"
+      ],
+      "apt_tags": [
+        "apt-china",
+        "apt-iran",
+        "apt-united-states"
+      ]
+    }
+  }
+}
