@@ -27,6 +27,7 @@ import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 
 import structlog
 
@@ -550,6 +551,7 @@ def build_stix_bundle_from_extraction(
     relevance_score: float | None = None,
     relevance_rationale: str | None = None,
     now: datetime | None = None,
+    config: Config | None = None,
 ) -> dict:
     """Construct a STIX 2.1 bundle from an ``Extraction``.
 
@@ -646,6 +648,19 @@ def build_stix_bundle_from_extraction(
         bundle["x_trace_relevance_score"] = relevance_score
     if relevance_rationale:
         bundle["x_trace_relevance_rationale"] = relevance_rationale
+
+    # 0.5.0: augment external_references[*].hashes (SHA-256) for entries
+    # that have a URL but no hash, removing the OASIS {302} warnings.
+    cfg = config or load_config()
+    if cfg.external_ref_hash_enabled:
+        from trace_engine.stix.external_ref_hash import augment_external_references
+
+        augment_external_references(
+            objects,
+            cache_path=Path(cfg.external_ref_hash_cache_path),
+            ttl_days=cfg.external_ref_hash_ttl_days,
+            user_agent=cfg.crawl_user_agent,
+        )
     return bundle
 
 

@@ -42,6 +42,25 @@ class Config:
         default_factory=lambda: int(os.environ.get("TRACE_EXTRACTION_CHUNK_CHARS", "12000"))
     )
 
+    # External-reference SHA-256 augmentation (0.5.0). Removes the OASIS
+    # validator's {302} "URL but no hash" warning by fetching each external
+    # reference URL and recording the SHA-256 of the response bytes. Cached
+    # to a JSON file with TTL so consecutive bundles don't re-fetch.
+    external_ref_hash_enabled: bool = field(
+        default_factory=lambda: (
+            os.environ.get("TRACE_EXTERNAL_REF_HASH_ENABLED", "true").lower()
+            not in ("0", "false", "no", "off")
+        )
+    )
+    external_ref_hash_cache_path: str = field(
+        default_factory=lambda: os.environ.get(
+            "TRACE_EXTERNAL_REF_HASH_CACHE", "output/external_ref_hash_cache.json"
+        )
+    )
+    external_ref_hash_ttl_days: int = field(
+        default_factory=lambda: int(os.environ.get("TRACE_EXTERNAL_REF_HASH_TTL_DAYS", "30"))
+    )
+
     # Crawler
     crawl_user_agent: str = field(
         default_factory=lambda: os.environ.get(

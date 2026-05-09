@@ -6,6 +6,58 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [0.5.0] — 2026-05-09
+
+### Added — SHA-256 augmentation for `external_references`
+
+The OASIS validator emits `{302} External reference '<source>' has a
+URL but no hash` for every entry that includes `url` without `hashes`.
+On a typical FIN7 bundle that's a dozen+ warnings against ATT&CK
+references. 0.5.0 fetches each external-reference URL once, hashes
+the response body with SHA-256, and writes
+`hashes: {"SHA-256": "<hex>"}` back into the entry.
+
+- New module `src/trace_engine/stix/external_ref_hash.py` implements
+  `augment_external_references(objects, cache_path, ttl_days,
+  user_agent, enabled)`.
+- On-disk JSON cache (default `output/external_ref_hash_cache.json`,
+  configurable via `TRACE_EXTERNAL_REF_HASH_CACHE`) keyed by URL,
+  storing `{sha256, fetched_at, status}`. Subsequent bundles reuse
+  cached hashes without a network round-trip.
+- TTL default 30 days
+  (`Config.external_ref_hash_ttl_days`, env
+  `TRACE_EXTERNAL_REF_HASH_TTL_DAYS`). MITRE ATT&CK pages are stable
+  enough that monthly refresh is safe.
+- Offline fallback: cache miss + fetch failure leaves the reference
+  unchanged. The `{302}` warning re-appears for that one reference
+  but the bundle remains usable. We deliberately prefer
+  "warning + good bundle" over "failed bundle assembly".
+- Lazy `httpx.Client` construction — bundles that hit the cache for
+  every URL never open a network handle.
+- Master switch
+  `Config.external_ref_hash_enabled` (env
+  `TRACE_EXTERNAL_REF_HASH_ENABLED=false`) for air-gapped use.
+
+`build_stix_bundle_from_extraction` now accepts an optional
+`config: Config | None` parameter so tests and air-gapped callers can
+disable the augmentation step explicitly without environment fiddling.
+
+### Tests
+
+- 8 new cases in `tests/test_external_ref_hash.py` covering disabled
+  switch, no-URL skip, hashes-already-present skip, cache-miss fetch,
+  cache-hit no-network, stale-cache re-fetch, offline fallback, and
+  no-external-references-shortcircuit.
+
+### Compliance
+
+Combined with 0.3.2 and 0.4.0, the FIN7-class bundle now validates
+clean: zero {103} UUIDv4 errors, zero required-property errors, zero
+{401} envelope warnings, and zero {302} hash warnings on cached or
+freshly-fetched ATT&CK references.
+
+---
+
 ## [0.4.0] — 2026-05-09
 
 ### Changed (BREAKING) — Bundle envelope drops deprecated fields
