@@ -6,6 +6,41 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [0.3.2] — 2026-05-09
+
+### Fixed — STIX 2.1 type-specific required-property defaults
+
+Real-URL FIN7 verification on TRACE 0.3.1 produced a 93-object bundle
+that the OASIS validator rejected with 10 hard errors:
+
+- 7 × `malware` objects missing required `is_family` boolean.
+- 3 × `indicator` objects missing required `valid_from` timestamp (and
+  also `pattern_type`).
+
+The L3 prompt asks the LLM for domain knowledge — it does not know
+which STIX wire-format fields are mandatory per object type. The
+bundle assembler now fills in conservative defaults via
+`_apply_required_property_defaults`:
+
+- `malware.is_family` defaults to `false` (instance, not family) —
+  incident reports usually describe a single deployment.
+- `indicator.valid_from` defaults to the bundle timestamp.
+- `indicator.pattern_type` defaults to `"stix"` — STIX patterning is
+  the only language reliably emitted by the L3 prompt.
+
+`setdefault` semantics: anything the LLM did supply wins. A YARA
+indicator with explicit `pattern_type: "yara"` is preserved.
+
+### Tests
+
+- 6 new cases in `tests/test_stix_extractor.py::TestRequiredPropertyDefaults`
+  covering malware default, malware LLM override, indicator
+  `valid_from` default, indicator `pattern_type` default, indicator
+  LLM override, and confirmation that other types receive no extra
+  defaults.
+
+---
+
 ## [0.3.1] — 2026-05-09
 
 ### Fixed — Per-chunk output truncation on dense reports

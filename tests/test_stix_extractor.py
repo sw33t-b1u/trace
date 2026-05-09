@@ -449,3 +449,78 @@ class TestSalvageTruncatedExtraction:
         assert isinstance(result, dict)
         assert len(result["entities"]) == 1
         assert result["entities"][0]["local_id"] == "a"
+
+
+# ---------------------------------------------------------------------------
+# STIX 2.1 type-specific required-property defaults (0.3.2)
+# ---------------------------------------------------------------------------
+
+
+class TestRequiredPropertyDefaults:
+    def test_malware_gets_is_family_false_default(self):
+        ext = Extraction(entities=[_ent("m", "malware", "Mimikatz")])
+        bundle = build_stix_bundle_from_extraction(ext)
+        malware = next(o for o in bundle["objects"] if o["type"] == "malware")
+        assert malware["is_family"] is False
+
+    def test_malware_keeps_llm_supplied_is_family_true(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="m",
+                    type="malware",
+                    properties={"name": "Emotet", "is_family": True},
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        malware = next(o for o in bundle["objects"] if o["type"] == "malware")
+        assert malware["is_family"] is True
+
+    def test_indicator_gets_valid_from_default_to_bundle_ts(self):
+        ext = Extraction(entities=[_ent("i", "indicator", "ip-1.2.3.4")])
+        bundle = build_stix_bundle_from_extraction(ext)
+        indicator = next(o for o in bundle["objects"] if o["type"] == "indicator")
+        assert indicator["valid_from"] == bundle["created"]
+
+    def test_indicator_gets_pattern_type_stix_default(self):
+        ext = Extraction(entities=[_ent("i", "indicator", "domain-example")])
+        bundle = build_stix_bundle_from_extraction(ext)
+        indicator = next(o for o in bundle["objects"] if o["type"] == "indicator")
+        assert indicator["pattern_type"] == "stix"
+
+    def test_indicator_keeps_llm_supplied_pattern_type(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="indicator",
+                    properties={
+                        "name": "yara-rule",
+                        "pattern": "rule X { strings: $a = \"abc\" condition: $a }",
+                        "pattern_type": "yara",
+                        "valid_from": "2026-01-01T00:00:00.000Z",
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        indicator = next(o for o in bundle["objects"] if o["type"] == "indicator")
+        assert indicator["pattern_type"] == "yara"
+        assert indicator["valid_from"] == "2026-01-01T00:00:00.000Z"
+
+    def test_other_types_get_no_extra_defaults(self):
+        # tool / threat-actor / intrusion-set / attack-pattern / vulnerability
+        # have no extra required properties beyond name (which the LLM emits).
+        ext = Extraction(
+            entities=[
+                _ent("t", "tool", "Cobalt Strike"),
+                _ent("a", "intrusion-set", "FIN7"),
+                _ent("p", "attack-pattern", "Spearphishing"),
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        for obj in bundle["objects"]:
+            assert "is_family" not in obj
+            assert "valid_from" not in obj
+            assert "pattern_type" not in obj

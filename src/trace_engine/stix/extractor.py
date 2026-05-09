@@ -569,6 +569,10 @@ def build_stix_bundle_from_extraction(
             if key in obj:
                 continue
             obj[key] = value
+        # STIX 2.1 type-specific required-property defaults. The LLM is asked
+        # for domain knowledge only — it does not know which STIX wire-format
+        # fields are mandatory per type, so the bundle assembler fills them in.
+        _apply_required_property_defaults(obj, ts)
         objects.append(obj)
 
     dropped = 0
@@ -610,3 +614,26 @@ def build_stix_bundle_from_extraction(
     if relevance_rationale:
         bundle["x_trace_relevance_rationale"] = relevance_rationale
     return bundle
+
+
+def _apply_required_property_defaults(obj: dict, ts: str) -> None:
+    """Fill in STIX 2.1 type-specific required properties the LLM didn't emit.
+
+    Defaults are chosen conservatively — ``setdefault`` so anything the LLM
+    explicitly supplied wins. Only mandatory properties per the STIX 2.1
+    spec are added here; vocabulary corrections, optional metadata, and
+    best-practice fields are left to the validator's warning level.
+    """
+    stype = obj.get("type")
+    if stype == "malware":
+        # Required by STIX 2.1 §4.7. `is_family` is a boolean discriminator
+        # between malware family and instance — default to False (instance)
+        # since incident reports usually describe a single deployment.
+        obj.setdefault("is_family", False)
+    elif stype == "indicator":
+        # Required by STIX 2.1 §4.7. `valid_from` defaults to the bundle
+        # timestamp (the report's collection time is the earliest known
+        # validity). `pattern_type` defaults to "stix" — STIX patterning
+        # is the only language reliably emitted by the L3 prompt.
+        obj.setdefault("valid_from", ts)
+        obj.setdefault("pattern_type", "stix")
