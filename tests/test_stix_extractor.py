@@ -1227,3 +1227,104 @@ class TestIndicatorNameDescriptionDefaults:
         bundle = build_stix_bundle_from_extraction(ext)
         ind = next(o for o in bundle["objects"] if o["type"] == "indicator")
         assert ind["description"] == "Custom description"
+
+
+# ---------------------------------------------------------------------------
+# 1.0.2 — vulnerability.aliases demotion + tighter exploits source set
+# ---------------------------------------------------------------------------
+
+
+class TestVulnerabilityAliasesDemotion:
+    def test_aliases_moves_to_labels(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="v",
+                    type="vulnerability",
+                    properties={
+                        "name": "CVE-2021-26855",
+                        "aliases": ["ProxyLogon", "Microsoft Exchange RCE"],
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        vuln = next(o for o in bundle["objects"] if o["type"] == "vulnerability")
+        assert "aliases" not in vuln
+        assert "ProxyLogon" in vuln["labels"]
+        assert "Microsoft Exchange RCE" in vuln["labels"]
+
+    def test_existing_labels_preserved_with_aliases_merge(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="v",
+                    type="vulnerability",
+                    properties={
+                        "name": "CVE-2017-0144",
+                        "aliases": ["EternalBlue"],
+                        "labels": ["smb", "EternalBlue"],
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        vuln = next(o for o in bundle["objects"] if o["type"] == "vulnerability")
+        assert "aliases" not in vuln
+        # Existing labels preserved; "EternalBlue" not duplicated.
+        assert vuln["labels"] == ["smb", "EternalBlue"]
+
+
+class TestExploitsSourceTightening:
+    def test_malware_exploits_vulnerability_kept(self):
+        ext = Extraction(
+            entities=[
+                _ent("m", "malware", "WannaCry"),
+                _ent("v", "vulnerability", "CVE-2017-0144"),
+            ],
+            relationships=[ExtractedRelationship("m", "v", "exploits")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert len(rels) == 1
+        assert rels[0]["relationship_type"] == "exploits"
+
+    def test_intrusion_set_exploits_vulnerability_dropped(self):
+        # 1.0.2: actor sources are no longer in the exploits table.
+        # The relationship_type_mismatch_dropped guard fires.
+        ext = Extraction(
+            entities=[
+                _ent("a", "intrusion-set", "FIN7"),
+                _ent("v", "vulnerability", "CVE-2024-1234"),
+            ],
+            relationships=[ExtractedRelationship("a", "v", "exploits")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert rels == []
+
+    def test_intrusion_set_targets_vulnerability_kept(self):
+        # The semantically equivalent path the LLM should pick now.
+        ext = Extraction(
+            entities=[
+                _ent("a", "intrusion-set", "FIN7"),
+                _ent("v", "vulnerability", "CVE-2024-1234"),
+            ],
+            relationships=[ExtractedRelationship("a", "v", "targets")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert len(rels) == 1
+        assert rels[0]["relationship_type"] == "targets"
+
+    def test_threat_actor_exploits_vulnerability_dropped(self):
+        ext = Extraction(
+            entities=[
+                _ent("a", "threat-actor", "Apt29"),
+                _ent("v", "vulnerability", "CVE-2024-1234"),
+            ],
+            relationships=[ExtractedRelationship("a", "v", "exploits")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert rels == []

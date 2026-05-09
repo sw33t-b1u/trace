@@ -6,6 +6,69 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.0.2] — 2026-05-09
+
+### Fixed — `{401}` vulnerability.aliases + `{202}` actor-source exploits
+
+Real-URL FIN7 verification on TRACE 1.0.1 produced `errors=0
+warnings=2`. Both warnings traced to LLM choices that the bundle
+assembler now corrects.
+
+#### `{401}` vulnerability.aliases → labels
+
+STIX 2.1 §4.18 vulnerability does not define `aliases`. The L3 LLM
+occasionally puts CVE alternate names ("ProxyLogon", "EternalBlue")
+under that key. Added a vulnerability branch in
+`_apply_required_property_defaults` that demotes the list into
+`labels` (open vocab on common SDO properties) so the alternate names
+survive without the {401} flag. Existing `labels` entries are
+preserved with order; merged values dedupe.
+
+New helper `_demote_list_to_labels` covers the list-shaped
+counterpart of 0.5.2's `_demote_property_to_labels`.
+
+#### `{202}` `intrusion-set / threat-actor / campaign exploits` → drop
+
+STIX 2.1 §4.13 lists `malware` as the only suggested source for
+`exploits`. Actor-side "exploits vulnerability" semantics are
+expressed via `targets` (`intrusion-set targets vulnerability`,
+already in the table). Tightened
+`_RELATIONSHIP_TYPE_TABLE`:
+
+```python
+# Before
+("malware", "exploits"): frozenset({"vulnerability"}),
+("intrusion-set", "exploits"): frozenset({"vulnerability"}),
+("threat-actor", "exploits"): frozenset({"vulnerability"}),
+("campaign", "exploits"): frozenset({"vulnerability"}),
+
+# After
+("malware", "exploits"): frozenset({"vulnerability"}),
+```
+
+LLM-emitted `intrusion-set exploits vuln` falls through the existing
+`relationship_type_mismatch_dropped` guard. The L3 prompt already
+points actors at `targets`, so a follow-up prompt edit is unnecessary.
+
+### Tests
+
+- 6 new cases:
+  - `TestVulnerabilityAliasesDemotion` (2): aliases moves to labels,
+    existing labels preserved with merge dedupe.
+  - `TestExploitsSourceTightening` (4): malware-exploits-vuln kept,
+    intrusion-set-exploits-vuln dropped, intrusion-set-targets-vuln
+    kept (the canonical replacement), threat-actor-exploits-vuln
+    dropped.
+
+### Compliance
+
+Combined with all prior 0.x.x and 1.0.x defenses, FIN7-class bundles
+now produce `errors=0` and only the documented SHOULD-level `{202}`
+accepted warnings remain (`tool uses {malware,tool}` and
+`attack-pattern uses attack-pattern`).
+
+---
+
 ## [1.0.1] — 2026-05-09
 
 ### Fixed — Residual {215} / {303} warnings on FIN7-class bundles

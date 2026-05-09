@@ -131,11 +131,13 @@ _RELATIONSHIP_TYPE_TABLE: dict[tuple[str, str], frozenset[str]] = {
     # `tool` → {malware, tool} are 0.5.2 accept exceptions (out of spec but
     # documented; see docs/data-model.md "Accepted OASIS validator warnings").
     ("tool", "uses"): frozenset({"attack-pattern", "infrastructure", "malware", "tool"}),
-    # exploits — target always vulnerability
+    # exploits — STIX 2.1 §4.13 lists `malware` as the only suggested source.
+    # Actor-side "exploits vulnerability" semantics are expressed via
+    # `targets` (intrusion-set / threat-actor / campaign targets
+    # vulnerability), which is already in the table below. LLM-emitted
+    # `intrusion-set exploits vulnerability` falls through the
+    # relationship_type_mismatch_dropped guard. (Tightened in 1.0.2.)
     ("malware", "exploits"): frozenset({"vulnerability"}),
-    ("intrusion-set", "exploits"): frozenset({"vulnerability"}),
-    ("threat-actor", "exploits"): frozenset({"vulnerability"}),
-    ("campaign", "exploits"): frozenset({"vulnerability"}),
     # indicates — only indicator can indicate; broad target set excluding indicator itself
     ("indicator", "indicates"): frozenset(
         {
@@ -974,6 +976,37 @@ def _apply_required_property_defaults(obj: dict, ts: str) -> None:
         # tool_types / malware_types. Out-of-vocab `sectors` values
         # ("fintech", "card-payments", etc.) move to `labels`.
         _filter_open_vocab(obj, "sectors", _STIX21_INDUSTRY_SECTOR_OV)
+    elif stype == "vulnerability":
+        # STIX 2.1 §4.18 vulnerability does not define `aliases`. The L3
+        # LLM occasionally puts CVE alternate names there ("EternalBlue",
+        # "ProxyLogon"). Demote to `labels` (open vocab on the common
+        # SDO properties) so the alternate names survive without the
+        # {401} custom-property flag. (1.0.2 fix.)
+        _demote_list_to_labels(obj, "aliases")
+
+
+def _demote_list_to_labels(obj: dict, field_name: str) -> None:
+    """Move a list-valued property entirely into ``labels``.
+
+    Used when the LLM puts a list under a key the STIX object type
+    does not define (e.g. ``aliases`` on ``vulnerability``). The field
+    is removed; non-empty string values join ``labels`` (deduped,
+    order-preserving).
+    """
+    raw = obj.pop(field_name, None)
+    if not isinstance(raw, list):
+        return
+    cleaned = [v for v in raw if isinstance(v, str) and v.strip()]
+    if not cleaned:
+        return
+    existing = obj.get("labels")
+    merged: list[str] = list(existing) if isinstance(existing, list) else []
+    seen = set(merged)
+    for v in cleaned:
+        if v not in seen:
+            merged.append(v)
+            seen.add(v)
+    obj["labels"] = merged
 
 
 def _derive_indicator_name(pattern: str) -> str:
