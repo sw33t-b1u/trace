@@ -115,7 +115,9 @@ class TestExtractEntities:
 def test_valid_entity_and_relationship_vocabularies_are_disjoint():
     # 'relationship' is no longer a valid entity type — only entities are.
     assert "relationship" not in _VALID_ENTITY_TYPES
-    assert _VALID_RELATIONSHIP_TYPES == frozenset({"uses", "exploits", "indicates"})
+    # 1.0.0 added `targets` for actor → identity edges.
+    assert _VALID_RELATIONSHIP_TYPES == frozenset({"uses", "exploits", "indicates", "targets"})
+    assert "identity" in _VALID_ENTITY_TYPES
 
 
 # ---------------------------------------------------------------------------
@@ -994,3 +996,112 @@ class TestRelationshipTypeTable:
         bundle = build_stix_bundle_from_extraction(ext)
         rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
         assert len(rels) == 1
+
+
+# ---------------------------------------------------------------------------
+# 1.0.0 — identity SDO + targets relationship
+# ---------------------------------------------------------------------------
+
+
+class TestIdentityEntity:
+    def test_identity_minimal_passes_through(self):
+        ext = Extraction(
+            entities=[ExtractedEntity(local_id="i", type="identity", properties={"name": "CFO"})]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        ident = next(o for o in bundle["objects"] if o["type"] == "identity")
+        assert ident["name"] == "CFO"
+        assert ident["spec_version"] == "2.1"
+
+    def test_identity_class_in_vocab_preserved(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="identity",
+                    properties={"name": "Acme Corp", "identity_class": "organization"},
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        ident = next(o for o in bundle["objects"] if o["type"] == "identity")
+        assert ident["identity_class"] == "organization"
+        assert "labels" not in ident
+
+    def test_identity_class_outside_vocab_demoted_to_labels(self):
+        # 'executive' is not in STIX 2.1 §6.7 identity-class-ov.
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="identity",
+                    properties={"name": "Jane Doe", "identity_class": "executive"},
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        ident = next(o for o in bundle["objects"] if o["type"] == "identity")
+        assert "identity_class" not in ident
+        assert "executive" in ident["labels"]
+
+
+class TestTargetsRelationship:
+    def test_actor_targets_identity_kept(self):
+        ext = Extraction(
+            entities=[
+                _ent("a", "intrusion-set", "FIN7"),
+                ExtractedEntity(local_id="i", type="identity", properties={"name": "CFO"}),
+            ],
+            relationships=[ExtractedRelationship("a", "i", "targets")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert len(rels) == 1
+        assert rels[0]["relationship_type"] == "targets"
+
+    def test_threat_actor_targets_vulnerability_kept(self):
+        ext = Extraction(
+            entities=[
+                _ent("a", "threat-actor", "Hacker"),
+                _ent("v", "vulnerability", "CVE-2024-1234"),
+            ],
+            relationships=[ExtractedRelationship("a", "v", "targets")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert len(rels) == 1
+
+    def test_identity_targets_actor_dropped(self):
+        # `targets` source must be in the §4.13 source set (actor /
+        # malware / tool / etc.). Identity → actor reverses the
+        # relationship and must be dropped.
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(local_id="i", type="identity", properties={"name": "CFO"}),
+                _ent("a", "intrusion-set", "FIN7"),
+            ],
+            relationships=[ExtractedRelationship("i", "a", "targets")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert rels == []
+
+    def test_indicator_targets_identity_dropped(self):
+        # `indicator` is not a valid `targets` source per §4.13.
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="ind",
+                    type="indicator",
+                    properties={
+                        "pattern": "[ipv4-addr:value = '1.2.3.4']",
+                        "pattern_type": "stix",
+                    },
+                ),
+                ExtractedEntity(local_id="i", type="identity", properties={"name": "CFO"}),
+            ],
+            relationships=[ExtractedRelationship("ind", "i", "targets")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert rels == []

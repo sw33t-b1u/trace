@@ -6,6 +6,96 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.0.0] — 2026-05-09
+
+### Added — `identity` SDO + `targets` relationship (paired with SAGE 0.5.0)
+
+Verizon DBIR 2025 (stolen credentials = #1 initial access at 22%) and
+CrowdStrike GTR 2025 (valid account abuse = #1 cloud vector at 35%)
+made the credential / org-targeting blind spot unavoidable. 1.0.0
+extends the L3 extraction vocabulary so reports about FIN7 spear-
+phishing the CFO, or APT29 targeting a specific finance department,
+land in SAGE's attack graph as a real edge instead of being lost in
+prose.
+
+#### Entity vocabulary
+
+- `_VALID_ENTITY_TYPES += "identity"` — STIX 2.1 §4.4 SDO. The
+  L3 prompt now describes when to extract identity records and how to
+  pick `identity_class` from the §6.7 vocabulary.
+
+#### Relationship vocabulary
+
+- `_VALID_RELATIONSHIP_TYPES += "targets"` — STIX 2.1 §4.13. Source
+  vocabulary: `attack-pattern, campaign, intrusion-set, malware,
+  threat-actor, tool`. Target vocabulary: `identity, location,
+  vulnerability, infrastructure`.
+
+`_RELATIONSHIP_TYPE_TABLE` extended with six `("<source>", "targets")`
+entries enumerating the suggested target types. Source/target pairs
+outside the table are dropped at bundle assembly time with the
+existing structured-log warning (`relationship_type_mismatch_dropped`).
+
+#### Open-vocab demotion for `identity_class`
+
+Same pattern as 0.5.1 (`tool_types`, `malware_types`) and 0.5.2
+(`sophistication`): when the LLM picks an identity class outside
+STIX 2.1 §6.7 (e.g., "executive"), demote it to `labels` (open vocab)
+and clear the field. Information survives, validator stays clean.
+
+`_demote_scalar_to_labels_if_outside` is the new helper for scalar
+properties with an open-vocab guard.
+
+### SAGE coordination
+
+- SAGE 0.5.0 ships in lockstep, adding the `Identity` Spanner table
+  and the `ActorTargetsIdentity` edge.
+- SAGE only stores `targets` edges sourced from `threat-actor` /
+  `intrusion-set`. Other valid sources (`malware`, `tool`,
+  `attack-pattern`, `campaign`) survive TRACE's bundle but are
+  dropped at SAGE's `map_relationship` with a structured-log warning.
+  This is documented as a 0.6.0+ extension point on the SAGE side.
+
+### L3 prompt update
+
+`stix_extraction.md` gained an `identity` section explaining when to
+extract (named victims, targeted roles, affected organisations) and
+how to pick `identity_class`. The relationship-type list now includes
+the `targets` row covering source / target combinations TRACE
+accepts.
+
+### Tests
+
+- Updated existing
+  `test_valid_entity_and_relationship_vocabularies_are_disjoint` —
+  asserts `targets` is now in the relationship vocabulary and
+  `identity` is in the entity vocabulary.
+- 7 new cases:
+  - `TestIdentityEntity` (3) — minimal identity, in-vocab class
+    preserved, out-of-vocab class demoted to labels.
+  - `TestTargetsRelationship` (4) — actor → identity kept, threat-
+    actor → vulnerability kept, identity → actor (reversed) dropped,
+    indicator → identity (invalid source) dropped.
+
+### BREAKING (vocabulary expansion)
+
+Any downstream consumer that filtered on the previous tight
+relationship-type set (`uses`, `exploits`, `indicates`) will now
+encounter `targets` records and `identity` objects. SAGE 0.5.0 is the
+canonical consumer; other consumers must add identity/targets handling
+or filter explicitly.
+
+### Future scope (deferred to 1.1.0+)
+
+- `user-account` SCO support via `observed-data` SDO — credential-
+  level granularity finer than the per-person Identity node.
+- `attributed-to` relationship for actor → identity attribution.
+- `impersonates` relationship for actor → identity (BEC use case).
+- BEACON-side identity-asset metadata to populate
+  `Identity → Asset HasAccess` edges in SAGE.
+
+---
+
 ## [0.8.0] — 2026-05-09
 
 ### Added — Concurrent batch crawl

@@ -105,6 +105,24 @@ Additional optional fields:
 ### vulnerability
 Use the CVE id as `name` when available.
 
+### identity (target: person / group / system / organization)
+Extract `identity` records when the report names a specific victim,
+targeted role, or affected organization. `name` is required.
+
+Additional optional fields:
+```json
+{
+  "identity_class": "individual | group | system | organization | class | unspecified",
+  "sectors": ["finance"],
+  "description": "<short one-liner>",
+  "roles": ["<role string>"]
+}
+```
+
+Use `individual` for named people, `group` for departments / teams,
+`system` for service accounts / shared mailboxes, `organization` for
+companies / agencies. When unsure, omit the field.
+
 ### indicator (IOC: IP, domain, file hash)
 
 Additional required fields when type is `indicator`:
@@ -134,6 +152,7 @@ labels.
 - threat-actor / intrusion-set **uses** malware
 - malware **exploits** vulnerability
 - indicator **indicates** attack-pattern / malware / intrusion-set / threat-actor
+- threat-actor / intrusion-set / malware / tool **targets** identity / vulnerability / location / infrastructure
 
 Use only these relationship types. Skip relationships that don't fit.
 

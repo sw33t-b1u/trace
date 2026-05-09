@@ -51,10 +51,28 @@ _VALID_ENTITY_TYPES: frozenset[str] = frozenset(
         "tool",
         "vulnerability",
         "indicator",
+        "identity",  # 1.0.0 — credential / org-targeting graph node, paired with SAGE 0.5.0
     }
 )
 
-_VALID_RELATIONSHIP_TYPES: frozenset[str] = frozenset({"uses", "exploits", "indicates"})
+# `targets` added in 1.0.0 alongside identity. STIX 2.1 §4.13 source
+# vocabulary: attack-pattern, campaign, intrusion-set, malware, threat-actor,
+# tool. Target vocabulary: identity, location, vulnerability, infrastructure.
+_VALID_RELATIONSHIP_TYPES: frozenset[str] = frozenset({"uses", "exploits", "indicates", "targets"})
+
+# STIX 2.1 §6.7 `identity-class-ov` open vocabulary. Demote LLM values
+# outside this set to `labels` (open vocab) — same pattern as the 0.5.1
+# malware_types / tool_types handling.
+_STIX21_IDENTITY_CLASS_OV: frozenset[str] = frozenset(
+    {
+        "individual",
+        "group",
+        "system",
+        "organization",
+        "class",
+        "unspecified",
+    }
+)
 
 # STIX 2.1 §4.13 relationship type table — `(source_type, relationship_type)`
 # → suggested target types. Drop relationships whose source/target combination
@@ -88,6 +106,24 @@ _RELATIONSHIP_TYPE_TABLE: dict[tuple[str, str], frozenset[str]] = {
             "tool",
         }
     ),
+    # targets (1.0.0) — STIX 2.1 §4.13. Source: attack-pattern, campaign,
+    # intrusion-set, malware, threat-actor, tool. Target: identity,
+    # location, vulnerability, infrastructure. SAGE 0.5.0 only stores
+    # actor-source edges (threat-actor / intrusion-set → identity);
+    # other source/target pairs survive bundle validation but get
+    # dropped in SAGE's mapper with a structured-log warning.
+    ("attack-pattern", "targets"): frozenset(
+        {"identity", "location", "vulnerability", "infrastructure"}
+    ),
+    ("campaign", "targets"): frozenset({"identity", "location", "vulnerability", "infrastructure"}),
+    ("intrusion-set", "targets"): frozenset(
+        {"identity", "location", "vulnerability", "infrastructure"}
+    ),
+    ("malware", "targets"): frozenset({"identity", "location", "vulnerability", "infrastructure"}),
+    ("threat-actor", "targets"): frozenset(
+        {"identity", "location", "vulnerability", "infrastructure"}
+    ),
+    ("tool", "targets"): frozenset({"identity", "location", "vulnerability", "infrastructure"}),
 }
 
 
@@ -880,6 +916,27 @@ def _apply_required_property_defaults(obj: dict, ts: str) -> None:
         # demote to `labels` (open vocab) — same pattern as the open-vocab
         # demotion in 0.5.1.
         _demote_property_to_labels(obj, "sophistication")
+    elif stype == "identity":
+        # STIX 2.1 §6.7 `identity-class-ov` is open vocab but the
+        # validator emits {2xx} on out-of-vocab values. Demote to
+        # `labels` (open vocab) when the LLM picks something exotic.
+        _demote_scalar_to_labels_if_outside(obj, "identity_class", _STIX21_IDENTITY_CLASS_OV)
+
+
+def _demote_scalar_to_labels_if_outside(obj: dict, field_name: str, vocab: frozenset[str]) -> None:
+    """Demote a scalar property to ``labels`` only when its value is
+    outside the supplied open-vocab set. Conforming values stay put.
+
+    Used for identity_class (STIX 2.1 §6.7) — the validator tolerates
+    out-of-vocab values but flags them; we keep the information in
+    `labels` and clear the misused field.
+    """
+    raw = obj.get(field_name)
+    if not isinstance(raw, str):
+        return
+    if raw in vocab:
+        return
+    _demote_property_to_labels(obj, field_name)
 
 
 def _demote_property_to_labels(obj: dict, field_name: str) -> None:
