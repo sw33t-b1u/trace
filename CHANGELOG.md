@@ -6,6 +6,65 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [0.5.1] — 2026-05-09
+
+### Fixed — Remaining warnings on FIN7-class bundles
+
+Real-URL FIN7 verification on TRACE 0.5.0 produced a clean bundle —
+errors=0 — but nine residual warnings remained:
+
+- `{306} For extensions of the 'toplevel-property-extension' type, the
+  'extension_properties' property SHOULD include one or more property
+  names.` — TRACE's `extension-definition` object did not list the
+  property names it introduces.
+- `{216} malware_types contains a value not in the malware-type-ov
+  vocabulary.` — Gemini emitted values like `loader` not present in
+  the STIX 2.1 §6.4 open vocabulary.
+- `{222} tool_types contains a value not in the tool-type-ov
+  vocabulary.` — Same pattern for STIX 2.1 §6.5 tool vocabulary.
+
+#### Fix 1: `extension_properties` enumeration
+
+Added a stable ``_TRACE_EXTENSION_PROPERTIES`` constant listing the
+five `x_trace_*` field names; the bundle assembler injects it into
+the extension-definition object. SHOULD requirement satisfied.
+
+#### Fix 2: Open-vocab demotion to `labels`
+
+`_filter_open_vocab` (called from `_apply_required_property_defaults`)
+splits `tool_types` / `malware_types` into vocab-conforming and non-
+conforming sublists. Conforming values stay in place; non-conforming
+values move to the `labels` field (also open vocab) where they
+remain visible to downstream tools without violating the type-specific
+vocabulary constraint.
+
+- Empty conforming list removes the field entirely (no empty array
+  in the bundle).
+- Existing `labels` are preserved with order; demoted values append
+  without duplicating.
+- Conforming-only input passes through unchanged; no `labels` is
+  spuriously created.
+
+The STIX 2.1 vocabulary tables ship as in-module constants
+(`_STIX21_TOOL_TYPE_OV`, `_STIX21_MALWARE_TYPE_OV`) — they're stable
+across the spec's minor revisions and cheap to keep in sync.
+
+### Tests
+
+- 6 new cases in
+  `tests/test_stix_extractor.py::TestExtensionPropertiesAndVocabDemotion`
+  covering the extension-properties listing, mixed vocab demotion for
+  both tools and malware, all-non-conforming field removal, existing
+  labels preserved, and conforming-only passthrough.
+
+### Compliance
+
+Combined with 0.3.2 / 0.4.0 / 0.5.0, FIN7-class bundles now produce
+**zero errors and zero warnings** against the OASIS validator (modulo
+fetch-time {302} fallback when an ATT&CK URL is uncached and offline).
+
+---
+
 ## [0.5.0] — 2026-05-09
 
 ### Added — SHA-256 augmentation for `external_references`

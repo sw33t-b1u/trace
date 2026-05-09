@@ -612,3 +612,119 @@ class TestBundleExtensionMigration:
         assert bundle["x_trace_matched_pir_ids"] == ["PIR-001"]
         assert bundle["x_trace_relevance_score"] == 0.9
         assert bundle["x_trace_relevance_rationale"] == "actor named"
+
+
+# ---------------------------------------------------------------------------
+# 0.5.1 — extension_properties + open-vocab demotion to labels
+# ---------------------------------------------------------------------------
+
+
+class TestExtensionPropertiesAndVocabDemotion:
+    def test_extension_definition_lists_extension_properties(self):
+        ext = Extraction(entities=[_ent("a", "tool", "X")])
+        bundle = build_stix_bundle_from_extraction(ext, source_url="u")
+        ext_obj = next(o for o in bundle["objects"] if o["type"] == "extension-definition")
+        assert "extension_properties" in ext_obj
+        assert "x_trace_source_url" in ext_obj["extension_properties"]
+        assert "x_trace_relevance_score" in ext_obj["extension_properties"]
+        # The five known x_trace_* fields are exactly listed.
+        assert set(ext_obj["extension_properties"]) == {
+            "x_trace_source_url",
+            "x_trace_collected_at",
+            "x_trace_matched_pir_ids",
+            "x_trace_relevance_score",
+            "x_trace_relevance_rationale",
+        }
+
+    def test_tool_types_vocab_violation_demoted_to_labels(self):
+        # 'loader' / 'framework' are NOT in STIX 2.1 tool-type-ov.
+        # 'remote-access' IS. Mixed input.
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="t",
+                    type="tool",
+                    properties={
+                        "name": "Cobalt Strike",
+                        "tool_types": ["loader", "remote-access", "framework"],
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        tool = next(o for o in bundle["objects"] if o["type"] == "tool")
+        assert tool["tool_types"] == ["remote-access"]
+        assert "loader" in tool["labels"]
+        assert "framework" in tool["labels"]
+
+    def test_malware_types_vocab_violation_demoted_to_labels(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="m",
+                    type="malware",
+                    properties={
+                        "name": "X",
+                        "malware_types": ["loader", "backdoor"],
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        malware = next(o for o in bundle["objects"] if o["type"] == "malware")
+        assert malware["malware_types"] == ["backdoor"]
+        assert "loader" in malware["labels"]
+
+    def test_all_values_non_conforming_removes_field(self):
+        # Field should be dropped entirely when nothing conforms; the
+        # values still survive in `labels`.
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="t",
+                    type="tool",
+                    properties={"name": "X", "tool_types": ["loader", "framework"]},
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        tool = next(o for o in bundle["objects"] if o["type"] == "tool")
+        assert "tool_types" not in tool
+        assert {"loader", "framework"}.issubset(set(tool["labels"]))
+
+    def test_existing_labels_preserved_and_extended(self):
+        # If the LLM already supplied `labels`, demoted values append
+        # without duplicating.
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="t",
+                    type="tool",
+                    properties={
+                        "name": "X",
+                        "tool_types": ["loader", "remote-access"],
+                        "labels": ["financially-motivated", "loader"],
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        tool = next(o for o in bundle["objects"] if o["type"] == "tool")
+        assert tool["tool_types"] == ["remote-access"]
+        # No duplicate "loader" introduced; original order preserved.
+        assert tool["labels"] == ["financially-motivated", "loader"]
+
+    def test_conforming_only_input_unchanged(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="m",
+                    type="malware",
+                    properties={"name": "Emotet", "malware_types": ["downloader", "trojan"]},
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        malware = next(o for o in bundle["objects"] if o["type"] == "malware")
+        assert malware["malware_types"] == ["downloader", "trojan"]
+        assert "labels" not in malware

@@ -70,6 +70,62 @@ _TRACE_EXTENSION_SCHEMA_URL: str = (
 )
 _TRACE_EXTENSION_VERSION: str = "1.0"
 
+# Property names introduced by the TRACE bundle metadata extension. Listed in
+# `extension-definition.extension_properties` per STIX 2.1 §7.3 (SHOULD)
+# so consumers know exactly which keys the extension defines.
+_TRACE_EXTENSION_PROPERTIES: list[str] = [
+    "x_trace_source_url",
+    "x_trace_collected_at",
+    "x_trace_matched_pir_ids",
+    "x_trace_relevance_score",
+    "x_trace_relevance_rationale",
+]
+
+# STIX 2.1 §6.5 `tool-type-ov` open vocabulary. Anything the LLM emits in
+# `tool_types` outside this set is demoted to `labels` (open vocab) so the
+# information survives but the validator's {222} warning goes away.
+_STIX21_TOOL_TYPE_OV: frozenset[str] = frozenset(
+    {
+        "denial-of-service",
+        "exploitation",
+        "information-gathering",
+        "network-capture",
+        "credential-exploitation",
+        "remote-access",
+        "vulnerability-scanning",
+        "unknown",
+    }
+)
+
+# STIX 2.1 §6.4 `malware-type-ov` open vocabulary. Same demotion to `labels`
+# for any LLM-emitted value outside this set ({216} warning).
+_STIX21_MALWARE_TYPE_OV: frozenset[str] = frozenset(
+    {
+        "adware",
+        "backdoor",
+        "bot",
+        "bootkit",
+        "ddos",
+        "downloader",
+        "dropper",
+        "exploit-kit",
+        "keylogger",
+        "ransomware",
+        "remote-access-trojan",
+        "resource-exploitation",
+        "rogue-security-software",
+        "rootkit",
+        "screen-capture",
+        "spyware",
+        "trojan",
+        "unknown",
+        "virus",
+        "webshell",
+        "wiper",
+        "worm",
+    }
+)
+
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -688,16 +744,18 @@ def _build_trace_extension_definition(ts: str) -> dict:
         "schema": _TRACE_EXTENSION_SCHEMA_URL,
         "version": _TRACE_EXTENSION_VERSION,
         "extension_types": ["toplevel-property-extension"],
+        "extension_properties": list(_TRACE_EXTENSION_PROPERTIES),
     }
 
 
 def _apply_required_property_defaults(obj: dict, ts: str) -> None:
-    """Fill in STIX 2.1 type-specific required properties the LLM didn't emit.
+    """Fill in STIX 2.1 type-specific required properties the LLM didn't emit,
+    and demote vocabulary-violation values from open-vocab fields into
+    ``labels`` (also open-vocab) so information survives without tripping
+    the OASIS validator's {216}/{222} warnings.
 
-    Defaults are chosen conservatively — ``setdefault`` so anything the LLM
-    explicitly supplied wins. Only mandatory properties per the STIX 2.1
-    spec are added here; vocabulary corrections, optional metadata, and
-    best-practice fields are left to the validator's warning level.
+    Defaults are conservative — ``setdefault`` so anything the LLM
+    explicitly supplied wins.
     """
     stype = obj.get("type")
     if stype == "malware":
@@ -705,6 +763,7 @@ def _apply_required_property_defaults(obj: dict, ts: str) -> None:
         # between malware family and instance — default to False (instance)
         # since incident reports usually describe a single deployment.
         obj.setdefault("is_family", False)
+        _filter_open_vocab(obj, "malware_types", _STIX21_MALWARE_TYPE_OV)
     elif stype == "indicator":
         # Required by STIX 2.1 §4.7. `valid_from` defaults to the bundle
         # timestamp (the report's collection time is the earliest known
@@ -712,3 +771,38 @@ def _apply_required_property_defaults(obj: dict, ts: str) -> None:
         # is the only language reliably emitted by the L3 prompt.
         obj.setdefault("valid_from", ts)
         obj.setdefault("pattern_type", "stix")
+    elif stype == "tool":
+        _filter_open_vocab(obj, "tool_types", _STIX21_TOOL_TYPE_OV)
+
+
+def _filter_open_vocab(obj: dict, field_name: str, vocab: frozenset[str]) -> None:
+    """Split ``obj[field_name]`` into vocab-conforming and non-conforming
+    values. Conforming stays in place; the rest is appended to ``labels``
+    (deduped, order-preserving). Empty conforming list removes the field
+    entirely so the bundle does not carry an empty array.
+    """
+    raw = obj.get(field_name)
+    if not isinstance(raw, list) or not raw:
+        return
+    conforming: list[str] = []
+    extras: list[str] = []
+    for v in raw:
+        if not isinstance(v, str):
+            continue
+        if v in vocab:
+            conforming.append(v)
+        else:
+            extras.append(v)
+    if conforming:
+        obj[field_name] = conforming
+    else:
+        obj.pop(field_name, None)
+    if extras:
+        existing = obj.get("labels")
+        merged: list[str] = list(existing) if isinstance(existing, list) else []
+        seen = set(merged)
+        for e in extras:
+            if e not in seen:
+                merged.append(e)
+                seen.add(e)
+        obj["labels"] = merged
