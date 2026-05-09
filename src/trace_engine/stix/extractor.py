@@ -74,6 +74,48 @@ _STIX21_IDENTITY_CLASS_OV: frozenset[str] = frozenset(
     }
 )
 
+# STIX 2.1 §6.6 `industry-sector-ov` open vocabulary. Same demote-to-labels
+# pattern for `identity.sectors` values outside this set ({215} warning).
+# 1.0.1 added when real-URL extraction emitted "fintech" / "electronic money"
+# / "card-payments" etc. that the validator flagged.
+_STIX21_INDUSTRY_SECTOR_OV: frozenset[str] = frozenset(
+    {
+        "agriculture",
+        "aerospace",
+        "automotive",
+        "chemical",
+        "commercial",
+        "communications",
+        "construction",
+        "defense",
+        "education",
+        "energy",
+        "entertainment",
+        "financial-services",
+        "government",
+        "emergency-services",
+        "government-local",
+        "government-national",
+        "government-public-services",
+        "government-regional",
+        "healthcare",
+        "hospitality-leisure",
+        "infrastructure",
+        "dams",
+        "nuclear",
+        "water",
+        "manufacturing",
+        "mining",
+        "non-profit",
+        "pharmaceuticals",
+        "retail",
+        "technology",
+        "telecommunications",
+        "transportation",
+        "utilities",
+    }
+)
+
 # STIX 2.1 §4.13 relationship type table — `(source_type, relationship_type)`
 # → suggested target types. Drop relationships whose source/target combination
 # is outside the suggested set. Two TRACE-specific accept exceptions retained
@@ -908,6 +950,13 @@ def _apply_required_property_defaults(obj: dict, ts: str) -> None:
         # is the only language reliably emitted by the L3 prompt.
         obj.setdefault("valid_from", ts)
         obj.setdefault("pattern_type", "stix")
+        # STIX 2.1 §4.7 SHOULD: indicator must include both `name` and
+        # `description`. The L3 LLM commonly returns `pattern` only.
+        # Synthesise a short name from the pattern and a generic
+        # description. (Validator {303} fix in 1.0.1.)
+        if "name" not in obj:
+            obj["name"] = _derive_indicator_name(obj.get("pattern", ""))
+        obj.setdefault("description", "Indicator extracted from CTI report")
     elif stype == "tool":
         _filter_open_vocab(obj, "tool_types", _STIX21_TOOL_TYPE_OV)
     elif stype == "intrusion-set":
@@ -921,6 +970,35 @@ def _apply_required_property_defaults(obj: dict, ts: str) -> None:
         # validator emits {2xx} on out-of-vocab values. Demote to
         # `labels` (open vocab) when the LLM picks something exotic.
         _demote_scalar_to_labels_if_outside(obj, "identity_class", _STIX21_IDENTITY_CLASS_OV)
+        # STIX 2.1 §6.6 `industry-sector-ov` — same pattern as
+        # tool_types / malware_types. Out-of-vocab `sectors` values
+        # ("fintech", "card-payments", etc.) move to `labels`.
+        _filter_open_vocab(obj, "sectors", _STIX21_INDUSTRY_SECTOR_OV)
+
+
+def _derive_indicator_name(pattern: str) -> str:
+    """Synthesise a short indicator name from a STIX pattern.
+
+    STIX 2.1 §4.7 SHOULD that indicators carry both `name` and
+    `description`. The L3 LLM frequently emits indicators with only
+    `pattern`. This function picks a readable label out of the
+    pattern's main SCO so the validator stops flagging {303} and
+    downstream consumers see something meaningful.
+    """
+    if not isinstance(pattern, str) or not pattern.strip():
+        return "Indicator"
+    # `[type:property = 'value']` — extract `type` and the first
+    # quoted value if present.
+    match = re.search(r"\[\s*([\w-]+)\s*:[\w.\-]+\s*=\s*'([^']{1,80})'", pattern)
+    if match is None:
+        # No quoted value (e.g. integer literal); fall back to type only.
+        type_match = re.search(r"\[\s*([\w-]+)\s*:", pattern)
+        if type_match is not None:
+            return f"Indicator: {type_match.group(1)}"
+        return "Indicator"
+    sco_type = match.group(1)
+    value = match.group(2)
+    return f"{sco_type}: {value}"
 
 
 def _demote_scalar_to_labels_if_outside(obj: dict, field_name: str, vocab: frozenset[str]) -> None:

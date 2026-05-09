@@ -6,6 +6,67 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.0.1] — 2026-05-09
+
+### Fixed — Residual {215} / {303} warnings on FIN7-class bundles
+
+Real-URL FIN7 verification on TRACE 1.0.0 produced a 177-object bundle
+that validated `errors=0 warnings=19`. Three warning categories
+remained, two of them mechanically fixable.
+
+#### {215} `identity.sectors` outside `industry-sector-ov`
+
+Same demote-to-labels pattern as 0.5.1 / 0.5.2:
+`_STIX21_INDUSTRY_SECTOR_OV` constant added (33 STIX 2.1 §6.6 values),
+`_filter_open_vocab` invoked in the identity branch of
+`_apply_required_property_defaults`. Out-of-vocab values like
+`fintech`, `card-payments`, `electronic-money` move to `labels`;
+in-vocab values stay in `sectors`.
+
+#### {303} indicator missing `name` / `description`
+
+STIX 2.1 §4.7 SHOULD: indicators carry both. The L3 LLM frequently
+emits `pattern` only. Added defaults in
+`_apply_required_property_defaults`:
+
+- `name` → `_derive_indicator_name(pattern)` synthesises a short
+  label from the SCO type and first quoted value
+  (`[ipv4-addr:value = '198.51.100.1']` → `ipv4-addr: 198.51.100.1`).
+  Falls back to `Indicator: <type>` when the pattern uses quoted
+  property names like `hashes.'SHA-256'` that don't match the simple
+  pattern parser.
+- `description` → `"Indicator extracted from CTI report"` (generic
+  fallback). Existing values from the LLM win via `setdefault`.
+
+### Documented — `attack-pattern uses attack-pattern` accepted
+
+`{202}` warnings for this combination are now in the
+"Accepted OASIS validator warnings" section of
+`docs/data-model.{md,ja.md}`. The relationship is the canonical way
+to express MITRE ATT&CK sub-technique chaining; dropping it would
+erase the technique hierarchy from the attack graph. Same SHOULD-level
+acceptance as the 0.5.2 `tool uses {malware,tool}` cases.
+
+### Tests
+
+- 7 new cases in `tests/test_stix_extractor.py`:
+  - `TestIdentitySectorsDemotion` (2): in-vocab preserved,
+    out-of-vocab demoted to labels.
+  - `TestIndicatorNameDescriptionDefaults` (4): IPv4 pattern → name
+    derived, file-hash pattern → type fallback name, existing name
+    preserved, existing description preserved.
+- Existing `TestRequiredPropertyDefaults::test_indicator_gets_pattern_type_default`
+  still passes — the new name/description defaults don't override
+  prior LLM output.
+
+### Compliance
+
+Combined with 0.3.2 / 0.4.0 / 0.5.x / 0.6.x / 0.7.0 / 0.8.0 / 1.0.0,
+FIN7-class bundles now produce `errors=0` and only the documented
+SHOULD-level `{202}` accepted warnings remain.
+
+---
+
 ## [1.0.0] — 2026-05-09
 
 ### Added — `identity` SDO + `targets` relationship (paired with SAGE 0.5.0)

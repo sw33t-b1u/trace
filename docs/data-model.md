@@ -132,6 +132,7 @@ threat-intel semantics. Users who want to gate on them can run
 | Code | Pattern | Why accepted |
 |------|---------|--------------|
 | `{202}` | `tool` source with `uses` relationship targeting `malware` or `tool` | STIX 2.1 §4.13 defines suggested target sets for each `(source_type, relationship_type)` pair. The combinations `tool uses malware` and `tool uses tool` are not in the suggested set, but the semantics ("attack tool A leverages malware/tool B") are well-defined and frequently observed in incident reports. Major STIX consumers (MISP, OpenCTI) ingest these without complaint. Dropping the relationship would lose attack-graph edges. |
+| `{202}` | `attack-pattern` source with `uses` relationship targeting `attack-pattern` | The relationship is the canonical way to express MITRE ATT&CK sub-technique chaining (e.g., T1234 uses T1234.001) and technique composition. The validator's suggested-target table omits this combination, but the relationship is widespread in real ATT&CK-aligned bundles and is recognised by major STIX consumers. Dropping it would erase the technique hierarchy from the attack graph. Accepted in TRACE 1.0.1 with the same SHOULD-level rationale as the `tool uses` cases. |
 
 ### TRACE bundle metadata extension (L4)
 

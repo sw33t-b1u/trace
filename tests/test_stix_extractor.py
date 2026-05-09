@@ -1105,3 +1105,125 @@ class TestTargetsRelationship:
         bundle = build_stix_bundle_from_extraction(ext)
         rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
         assert rels == []
+
+
+# ---------------------------------------------------------------------------
+# 1.0.1 — sectors vocab demotion + indicator name/description defaults
+# ---------------------------------------------------------------------------
+
+
+class TestIdentitySectorsDemotion:
+    def test_in_vocab_sectors_preserved(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="identity",
+                    properties={"name": "Acme Bank", "sectors": ["financial-services"]},
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        ident = next(o for o in bundle["objects"] if o["type"] == "identity")
+        assert ident["sectors"] == ["financial-services"]
+        assert "labels" not in ident
+
+    def test_out_of_vocab_sectors_demoted_to_labels(self):
+        # 'fintech' / 'card-payments' are not in STIX 2.1 §6.6
+        # industry-sector-ov.
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="identity",
+                    properties={
+                        "name": "Edy Co.",
+                        "sectors": ["financial-services", "fintech", "card-payments"],
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        ident = next(o for o in bundle["objects"] if o["type"] == "identity")
+        assert ident["sectors"] == ["financial-services"]
+        assert "fintech" in ident["labels"]
+        assert "card-payments" in ident["labels"]
+
+
+class TestIndicatorNameDescriptionDefaults:
+    def test_indicator_without_name_gets_derived_from_ipv4_pattern(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="indicator",
+                    properties={
+                        "pattern": "[ipv4-addr:value = '198.51.100.1']",
+                        "pattern_type": "stix",
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        ind = next(o for o in bundle["objects"] if o["type"] == "indicator")
+        assert ind["name"] == "ipv4-addr: 198.51.100.1"
+        assert ind["description"]  # non-empty
+
+    def test_indicator_without_name_gets_derived_from_file_hash_pattern(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="indicator",
+                    properties={
+                        "pattern": (
+                            "[file:hashes.'SHA-256' = "
+                            "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']"
+                        ),
+                        "pattern_type": "stix",
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        ind = next(o for o in bundle["objects"] if o["type"] == "indicator")
+        # The hash pattern uses a quoted property `hashes.'SHA-256'`,
+        # so the regex falls back to type-only and produces e.g.
+        # "Indicator: file".
+        assert "file" in ind["name"]
+
+    def test_indicator_existing_name_preserved(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="indicator",
+                    properties={
+                        "name": "FIN7 C2 IPv4",
+                        "pattern": "[ipv4-addr:value = '198.51.100.1']",
+                        "pattern_type": "stix",
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        ind = next(o for o in bundle["objects"] if o["type"] == "indicator")
+        assert ind["name"] == "FIN7 C2 IPv4"
+
+    def test_indicator_existing_description_preserved(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="indicator",
+                    properties={
+                        "pattern": "[ipv4-addr:value = '1.2.3.4']",
+                        "pattern_type": "stix",
+                        "description": "Custom description",
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        ind = next(o for o in bundle["objects"] if o["type"] == "indicator")
+        assert ind["description"] == "Custom description"
