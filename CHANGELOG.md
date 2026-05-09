@@ -6,6 +6,82 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [0.4.0] — 2026-05-09
+
+### Changed (BREAKING) — Bundle envelope drops deprecated fields
+
+STIX 2.1 §3 deprecated `spec_version` and `created` on the bundle
+envelope (they live on each object instead). TRACE 0.x kept them on
+the envelope to satisfy a SAGE-side check, which produced two
+non-compliant `{401}` warnings on every bundle. SAGE's parser
+(`SAGE/src/sage/stix/parser.py`) actually iterates `bundle.objects[]`
+and reads per-object `spec_version`, so the fields were never necessary.
+
+- Removed `bundle.spec_version` and `bundle.created` from the envelope.
+- Removed the local `BUNDLE_SPEC_VERSION` check from
+  `validate/stix/validator.py`.
+- Per-object `spec_version` and `created`/`modified` continue to be
+  emitted on every entity, relationship, and the new
+  `extension-definition` object.
+
+Any downstream consumer that read the envelope `spec_version` /
+`created` directly must read them from `bundle.objects[*]` instead.
+
+### Changed (BREAKING) — `x_trace_*` metadata wrapped in STIX extension
+
+The previous bare-`x_trace_*` properties triggered five `{401}`
+custom-property warnings per bundle. Migrated to a STIX 2.1 §7.3
+toplevel-property extension:
+
+- A new `extension-definition` object with **stable id**
+  `extension-definition--c1e4d6a7-2f3b-4e8c-9a5f-1b8d7e6c4a3f` is
+  prepended to `objects[]` whenever any `x_trace_*` metadata is
+  supplied. The id is hardcoded so consumers can recognise the
+  extension across emissions without per-bundle discovery.
+- `bundle.extensions[<ext-id>] = { extension_type:
+  "toplevel-property-extension" }` is added at the bundle root.
+- `x_trace_source_url`, `x_trace_collected_at`,
+  `x_trace_matched_pir_ids`, `x_trace_relevance_score`, and
+  `x_trace_relevance_rationale` continue to live at the bundle root —
+  now permitted under the extension.
+- Bundles emitted without any L4 metadata (raw extraction, no PIR or
+  source URL) skip the extension definition entirely.
+
+Combined with 0.3.2, FIN7-class bundles now validate clean against the
+OASIS validator: no {103} UUIDv4 errors, no required-property errors,
+no {401} custom-property warnings on the envelope.
+
+### Documentation
+
+- `docs/data-model.{md,ja.md}` rewritten "TRACE bundle metadata
+  extension (L4)" section explaining the extension definition and
+  the rationale for the fixed id.
+- `docs/crawl_design.{md,ja.md}` §4a / §5 updated to describe the new
+  bundle assembly steps (extension-definition prepend, `extensions`
+  map, envelope deprecation).
+
+### SAGE coordination
+
+SAGE's parser already reads per-object `spec_version` and ignores the
+envelope, so no SAGE-side change is required. SAGE consumes the
+extension-definition object as a regular STIX object — it is not in
+the supported-types list and will be skipped, which is the desired
+behaviour.
+
+### Tests
+
+- 6 new cases in `tests/test_stix_extractor.py::TestBundleExtensionMigration`
+  covering envelope field omission, conditional extension emission,
+  stable id across emissions, required-fields presence, and `x_trace_*`
+  retention at bundle root.
+- `tests/test_validate_stix.py::test_wrong_spec_version_caught` removed
+  (the local check it asserted no longer exists).
+- `tests/test_stix_pir_context.py` updated: bundle-envelope
+  `spec_version` assertion replaced with extension-object
+  `spec_version` assertion.
+
+---
+
 ## [0.3.2] — 2026-05-09
 
 ### Fixed — STIX 2.1 type-specific required-property defaults

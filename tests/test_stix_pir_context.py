@@ -68,11 +68,16 @@ def test_bundle_metadata_includes_x_trace_fields() -> None:
     assert bundle["x_trace_matched_pir_ids"] == ["PIR-TEST-001"]
     assert bundle["x_trace_relevance_score"] == 0.82
     assert bundle["x_trace_relevance_rationale"] == "actor named in report"
-    assert bundle["spec_version"] == "2.1"
+    # 0.4.0: bundle envelope no longer carries spec_version. The
+    # extension-definition object inside `objects` declares STIX 2.1 conformance.
+    assert "spec_version" not in bundle
+    ext_obj = next(o for o in bundle["objects"] if o["type"] == "extension-definition")
+    assert ext_obj["spec_version"] == "2.1"
 
 
 def test_bundle_without_metadata_is_legacy_shape() -> None:
     bundle = build_stix_bundle_from_extraction(Extraction())
     assert "x_trace_source_url" not in bundle
     assert "x_trace_matched_pir_ids" not in bundle
-    assert bundle["spec_version"] == "2.1"
+    # No metadata → no extension-definition object emitted.
+    assert all(o["type"] != "extension-definition" for o in bundle["objects"])

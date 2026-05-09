@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import UTC
 from unittest.mock import patch
 
 from trace_engine.config import Config
@@ -130,11 +131,14 @@ def _ent(local_id: str, type_: str, name: str | None = None, **extra) -> Extract
 
 class TestBuildBundle:
     def test_empty_extraction_yields_minimal_bundle(self):
+        # 0.4.0: bundle envelope no longer carries `spec_version` or `created`
+        # (STIX 2.1 deprecated those at envelope level).
         bundle = build_stix_bundle_from_extraction(Extraction())
         assert bundle["type"] == "bundle"
-        assert bundle["spec_version"] == "2.1"
         assert bundle["id"].startswith("bundle--")
         assert bundle["objects"] == []
+        assert "spec_version" not in bundle
+        assert "created" not in bundle
 
     def test_entities_become_stix_objects_with_v4_ids(self):
         extraction = Extraction(
@@ -154,7 +158,6 @@ class TestBuildBundle:
         bundle = build_stix_bundle_from_extraction(ext)
         ts = {obj["created"] for obj in bundle["objects"]}
         assert len(ts) == 1
-        assert bundle["created"] in ts
 
     def test_relationships_resolved_via_local_id_map(self):
         ext = Extraction(
@@ -477,11 +480,12 @@ class TestRequiredPropertyDefaults:
         malware = next(o for o in bundle["objects"] if o["type"] == "malware")
         assert malware["is_family"] is True
 
-    def test_indicator_gets_valid_from_default_to_bundle_ts(self):
+    def test_indicator_gets_valid_from_default_to_object_ts(self):
         ext = Extraction(entities=[_ent("i", "indicator", "ip-1.2.3.4")])
         bundle = build_stix_bundle_from_extraction(ext)
         indicator = next(o for o in bundle["objects"] if o["type"] == "indicator")
-        assert indicator["valid_from"] == bundle["created"]
+        # All non-extension objects share one timestamp; valid_from equals it.
+        assert indicator["valid_from"] == indicator["created"]
 
     def test_indicator_gets_pattern_type_stix_default(self):
         ext = Extraction(entities=[_ent("i", "indicator", "domain-example")])
@@ -497,7 +501,7 @@ class TestRequiredPropertyDefaults:
                     type="indicator",
                     properties={
                         "name": "yara-rule",
-                        "pattern": "rule X { strings: $a = \"abc\" condition: $a }",
+                        "pattern": 'rule X { strings: $a = "abc" condition: $a }',
                         "pattern_type": "yara",
                         "valid_from": "2026-01-01T00:00:00.000Z",
                     },
@@ -524,3 +528,87 @@ class TestRequiredPropertyDefaults:
             assert "is_family" not in obj
             assert "valid_from" not in obj
             assert "pattern_type" not in obj
+
+
+# ---------------------------------------------------------------------------
+# 0.4.0 extension migration
+# ---------------------------------------------------------------------------
+
+
+class TestBundleExtensionMigration:
+    def test_envelope_omits_deprecated_fields(self):
+        ext = Extraction(entities=[_ent("a", "tool", "X")])
+        bundle = build_stix_bundle_from_extraction(ext)
+        # STIX 2.1 deprecated these at the bundle envelope.
+        assert "spec_version" not in bundle
+        assert "created" not in bundle
+        # `type`, `id`, `objects` remain.
+        assert bundle["type"] == "bundle"
+        assert "id" in bundle
+        assert "objects" in bundle
+
+    def test_no_extension_definition_when_no_x_trace_metadata(self):
+        ext = Extraction(entities=[_ent("a", "tool", "X")])
+        bundle = build_stix_bundle_from_extraction(ext)
+        types = [o["type"] for o in bundle["objects"]]
+        assert "extension-definition" not in types
+        assert "extensions" not in bundle
+
+    def test_extension_definition_included_when_x_trace_metadata_present(self):
+        ext = Extraction(entities=[_ent("a", "tool", "X")])
+        bundle = build_stix_bundle_from_extraction(
+            ext,
+            source_url="https://example.com/post",
+            matched_pir_ids=["PIR-001"],
+            relevance_score=0.9,
+        )
+        ext_objects = [o for o in bundle["objects"] if o["type"] == "extension-definition"]
+        assert len(ext_objects) == 1
+        ext_obj = ext_objects[0]
+        assert ext_obj["spec_version"] == "2.1"
+        assert "toplevel-property-extension" in ext_obj["extension_types"]
+        # Bundle declares it uses the extension.
+        assert "extensions" in bundle
+        assert ext_obj["id"] in bundle["extensions"]
+        assert (
+            bundle["extensions"][ext_obj["id"]]["extension_type"] == "toplevel-property-extension"
+        )
+
+    def test_extension_id_is_stable_across_emissions(self):
+        # Two bundles produced at different times must reference the same
+        # extension definition id — that's what makes consumers able to
+        # recognise the extension without per-bundle discovery.
+        from datetime import datetime as _dt
+
+        ext = Extraction(entities=[_ent("a", "tool", "X")])
+        b1 = build_stix_bundle_from_extraction(
+            ext, source_url="u1", now=_dt(2026, 1, 1, tzinfo=UTC)
+        )
+        b2 = build_stix_bundle_from_extraction(
+            ext, source_url="u2", now=_dt(2026, 6, 1, tzinfo=UTC)
+        )
+        ext_id_1 = next(o["id"] for o in b1["objects"] if o["type"] == "extension-definition")
+        ext_id_2 = next(o["id"] for o in b2["objects"] if o["type"] == "extension-definition")
+        assert ext_id_1 == ext_id_2
+
+    def test_extension_definition_carries_required_fields(self):
+        ext = Extraction(entities=[_ent("a", "tool", "X")])
+        bundle = build_stix_bundle_from_extraction(ext, source_url="u")
+        ext_obj = next(o for o in bundle["objects"] if o["type"] == "extension-definition")
+        # STIX 2.1 §7.3 required fields.
+        for field_name in ("name", "schema", "version", "extension_types"):
+            assert field_name in ext_obj, f"missing required field: {field_name}"
+
+    def test_x_trace_fields_remain_at_bundle_root_when_extension_active(self):
+        ext = Extraction(entities=[_ent("a", "tool", "X")])
+        bundle = build_stix_bundle_from_extraction(
+            ext,
+            source_url="https://example.com/post",
+            matched_pir_ids=["PIR-001"],
+            relevance_score=0.9,
+            relevance_rationale="actor named",
+        )
+        assert bundle["x_trace_source_url"] == "https://example.com/post"
+        assert bundle["x_trace_matched_pir_ids"] == ["PIR-001"]
+        assert bundle["x_trace_relevance_score"] == 0.9
+        assert bundle["x_trace_relevance_rationale"] == "actor named"

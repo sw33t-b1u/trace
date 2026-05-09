@@ -176,24 +176,41 @@ deterministic Python. It:
 
 1. Mints a fresh `<type>--<uuid4>` per entity and records a
    `local_id → STIX id` map.
-2. Stamps every object (and the bundle envelope) with one shared `created`
+2. Stamps every object (entities, relationships, and the
+   `extension-definition` for L4 metadata) with one shared `created`
    timestamp in `YYYY-MM-DDTHH:mm:ss.000Z` form, plus
-   `spec_version = "2.1"`.
+   `spec_version = "2.1"`. Per STIX 2.1 the bundle envelope itself
+   carries no `spec_version` / `created` (they live on each object).
 3. For each relationship, mints `relationship--<uuid4>` and rewrites
    `source_ref` / `target_ref` from `local_id` to the new STIX ids. Any
    relationship whose endpoint isn't in the map (LLM hallucinated a
    `local_id`) is dropped with a structured-log warning.
-4. Adds the L4 `x_trace_*` envelope properties (see §5).
+4. Applies STIX 2.1 type-specific required-property defaults
+   (`malware.is_family = false`, `indicator.{valid_from, pattern_type}`)
+   when the LLM did not emit them.
+5. When any L4 metadata is supplied, prepends a stable-id
+   `extension-definition` to `objects[]` and adds an `extensions` map
+   on the bundle root (toplevel-property-extension). The `x_trace_*`
+   fields then sit at the bundle root under that extension. See §5.
 
 This split is what guarantees bundles always pass the OASIS validator's
-`{103}` UUIDv4 check and timestamp format check — the LLM never gets to
-emit those fields.
+`{103}` UUIDv4 check, timestamp format check, type-specific
+required-property check, and {401} custom-property check — the LLM
+never gets to emit any of those fields directly.
 
 ---
 
-## 5. L4 bundle envelope
+## 5. L4 bundle envelope (extension-wrapped)
 
-`build_stix_bundle` adds these properties to the bundle root:
+`build_stix_bundle_from_extraction` carries L4 metadata through a STIX
+2.1 §7.3 toplevel-property extension. When at least one of the fields
+below is set, the assembler:
+
+- Prepends an `extension-definition` object (id stable across emissions
+  — see `data-model.md`) to `objects[]`.
+- Adds `bundle.extensions = { <ext-id>: { extension_type:
+  "toplevel-property-extension" } }`.
+- Sets the `x_trace_*` fields at bundle root.
 
 | Property | Set by |
 |----------|--------|
@@ -203,8 +220,8 @@ emit those fields.
 | `x_trace_relevance_score` | L2 verdict |
 | `x_trace_relevance_rationale` | L2 verdict |
 
-SAGE silently ignores unknown `x_*` keys, so adding more is
-forward-compatible.
+Bundles without metadata (raw extraction with no PIR / source URL) skip
+the extension definition entirely.
 
 ---
 

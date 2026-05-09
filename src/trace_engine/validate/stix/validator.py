@@ -6,11 +6,16 @@ Two layers:
    normalizes its ``ObjectValidationResults`` into ``ValidationFinding`` records.
 2. ``check_stix_bundle`` — TRACE-local checks the OASIS validator does not
    cover: object-id uniqueness within the bundle,
-   ``relationship.{source_ref,target_ref}`` resolution, ``kill_chain_name ==
-   "mitre-attack"`` for any STIX object that carries kill chain phases, and
-   ``bundle.spec_version == "2.1"`` (BEACON/TRACE convention — STIX 2.1
-   technically dropped this field from the bundle envelope, but downstream
-   SAGE relies on it being present).
+   ``relationship.{source_ref,target_ref}`` resolution, and
+   ``kill_chain_name == "mitre-attack"`` for any STIX object that carries
+   kill chain phases.
+
+As of TRACE 0.4.0 the bundle envelope no longer carries ``spec_version`` or
+``created`` (STIX 2.1 deprecated those at the envelope level — they live on
+each object instead). The previous ``BUNDLE_SPEC_VERSION`` local check was
+removed in lockstep. SAGE's parser (``SAGE/src/sage/stix/parser.py``)
+iterates ``bundle.objects[]`` and reads per-object ``spec_version``, so the
+removal is safe.
 """
 
 from __future__ import annotations
@@ -70,17 +75,6 @@ def check_stix_bundle(bundle: dict[str, Any]) -> list[ValidationFinding]:
                 code="BUNDLE_TYPE",
                 location="bundle.type",
                 message=f"expected 'bundle', got {bundle.get('type')!r}",
-            )
-        )
-
-    spec = bundle.get("spec_version")
-    if spec != "2.1":
-        findings.append(
-            ValidationFinding(
-                severity="error",
-                code="BUNDLE_SPEC_VERSION",
-                location="bundle.spec_version",
-                message=f"expected '2.1', got {spec!r}",
             )
         )
 

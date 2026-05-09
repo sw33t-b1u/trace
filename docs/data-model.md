@@ -116,17 +116,30 @@ local checks that the OASIS validator does not cover.
 | Code | Severity | Trigger |
 |------|----------|---------|
 | `BUNDLE_TYPE` | error | top-level `type != "bundle"` |
-| `BUNDLE_SPEC_VERSION` | error | `bundle.spec_version != "2.1"` (TRACE intentionally emits this even though STIX 2.1 deprecated it at the bundle envelope; SAGE relies on it — the OASIS validator surfaces a `{401}` warning that we accept) |
+| ~~`BUNDLE_SPEC_VERSION`~~ | — | Removed in 0.4.0. The bundle envelope no longer carries `spec_version` (STIX 2.1 deprecated it at envelope level — per-object only). SAGE's parser reads per-object `spec_version` from `bundle.objects[]`. |
 | `STIX_ID_NOT_UNIQUE` | error | duplicate `id` within `objects[]` |
 | `REL_REF_MISSING` | error | `relationship` lacks `source_ref` or `target_ref` |
 | `REL_REF_UNRESOLVED` | error | `relationship.{source_ref,target_ref}` does not match any `objects[*].id` |
 | `KILL_CHAIN_NAME` | warning | `kill_chain_phases[*].kill_chain_name != "mitre-attack"` (SAGE drops these) |
 
-### TRACE-specific bundle envelope (L4 metadata)
+### TRACE bundle metadata extension (L4)
 
-`build_stix_bundle_from_extraction` adds these to the **bundle root** when
-supplied. SAGE ignores unknown `x_*` properties so this is
-forward-compatible.
+`build_stix_bundle_from_extraction` carries TRACE-specific metadata via a
+**STIX 2.1 §7.3 toplevel-property extension** — not as bare `x_*`
+properties. This eliminates the {401} validator warnings that bare
+custom properties trigger.
+
+When at least one metadata field would be set, the assembler:
+
+1. Inserts a stable-id `extension-definition` object at the head of
+   `objects[]` (id pinned to `extension-definition--c1e4d6a7-2f3b-4e8c-9a5f-1b8d7e6c4a3f` — same id every emission).
+2. Adds an `extensions` map at the bundle root pointing to that
+   definition with `extension_type: "toplevel-property-extension"`.
+3. Emits the `x_trace_*` fields at the bundle root (now permitted under
+   the extension).
+
+Bundles without metadata (e.g., raw extraction with no PIR / source URL)
+omit the extension definition entirely.
 
 | Property | When | Meaning |
 |----------|------|---------|
@@ -135,6 +148,13 @@ forward-compatible.
 | `x_trace_matched_pir_ids` | L2 gate ran | list of PIR ids the article was deemed relevant to |
 | `x_trace_relevance_score` | L2 gate ran | float `[0.0, 1.0]` |
 | `x_trace_relevance_rationale` | L2 gate ran | short LLM-authored justification (or `parse_failed`/`call_failed` when the gate fell open) |
+
+#### Why the extension id is fixed
+
+STIX 2.1 §7.3 expects `extension-definition` ids to be stable across
+emissions so consumers can recognise the extension without per-bundle
+discovery. TRACE pins one UUIDv4 (generated once, hardcoded) — every
+TRACE bundle references the same definition id.
 
 ### Bundle assembly: LLM extracts, code builds
 

@@ -23,13 +23,6 @@ def test_valid_bundle_local_checks_clean(valid_bundle: dict) -> None:
     assert check_stix_bundle(valid_bundle) == []
 
 
-def test_wrong_spec_version_caught(valid_bundle: dict) -> None:
-    bundle = copy.deepcopy(valid_bundle)
-    bundle["spec_version"] = "2.0"
-    findings = check_stix_bundle(bundle)
-    assert any(f.code == "BUNDLE_SPEC_VERSION" for f in findings)
-
-
 def test_wrong_bundle_type_caught(valid_bundle: dict) -> None:
     bundle = copy.deepcopy(valid_bundle)
     bundle["type"] = "envelope"

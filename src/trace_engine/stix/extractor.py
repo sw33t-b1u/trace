@@ -55,6 +55,20 @@ _VALID_ENTITY_TYPES: frozenset[str] = frozenset(
 
 _VALID_RELATIONSHIP_TYPES: frozenset[str] = frozenset({"uses", "exploits", "indicates"})
 
+# STIX 2.1 §7.3 toplevel-property extension definition for TRACE-emitted
+# bundle metadata (``x_trace_source_url``, ``x_trace_collected_at``,
+# ``x_trace_matched_pir_ids``, ``x_trace_relevance_score``,
+# ``x_trace_relevance_rationale``). The id is **stable across emissions** —
+# every bundle TRACE produces references the same extension definition so
+# downstream STIX consumers can recognise the extension without per-bundle
+# discovery. Generated once via uuid4() and pinned; never regenerate.
+_TRACE_EXTENSION_ID: str = "extension-definition--c1e4d6a7-2f3b-4e8c-9a5f-1b8d7e6c4a3f"
+_TRACE_EXTENSION_SCHEMA_URL: str = (
+    "https://github.com/sw33t-b1u/sage/blob/main/TRACE/docs/data-model.md#"
+    "trace-bundle-metadata-extension"
+)
+_TRACE_EXTENSION_VERSION: str = "1.0"
+
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -597,13 +611,32 @@ def build_stix_bundle_from_extraction(
     if dropped:
         logger.warning("stix_relationships_dropped", count=dropped)
 
+    has_trace_metadata = (
+        source_url is not None
+        or matched_pir_ids is not None
+        or relevance_score is not None
+        or bool(relevance_rationale)
+    )
+
+    # Prepend the TRACE extension definition object so the bundle can carry
+    # `x_trace_*` properties without tripping STIX 2.1 §7.3 {401} warnings.
+    # The definition is stable (fixed id), self-contained, and only emitted
+    # when at least one `x_trace_*` field would be present.
+    if has_trace_metadata:
+        objects.insert(0, _build_trace_extension_definition(ts))
+
+    # STIX 2.1 deprecated `spec_version` and `created` on the bundle envelope
+    # (per-object only). SAGE's parser iterates `bundle.objects[]` and reads
+    # per-object spec_version, so the removal is safe.
     bundle: dict = {
         "type": "bundle",
         "id": f"bundle--{uuid.uuid4()}",
-        "spec_version": "2.1",
-        "created": ts,
         "objects": objects,
     }
+    if has_trace_metadata:
+        bundle["extensions"] = {
+            _TRACE_EXTENSION_ID: {"extension_type": "toplevel-property-extension"}
+        }
     if source_url is not None:
         bundle["x_trace_source_url"] = source_url
         bundle["x_trace_collected_at"] = collected_at or ts
@@ -614,6 +647,33 @@ def build_stix_bundle_from_extraction(
     if relevance_rationale:
         bundle["x_trace_relevance_rationale"] = relevance_rationale
     return bundle
+
+
+def _build_trace_extension_definition(ts: str) -> dict:
+    """Construct the STIX 2.1 extension-definition object for TRACE metadata.
+
+    Same id every time (see ``_TRACE_EXTENSION_ID``). ``created`` /
+    ``modified`` mirror the bundle timestamp so all objects share one
+    timestamp — the validator does not require extension-definition to be
+    immutable across emissions, only that the id is stable.
+    """
+    return {
+        "type": "extension-definition",
+        "id": _TRACE_EXTENSION_ID,
+        "spec_version": "2.1",
+        "created": ts,
+        "modified": ts,
+        "name": "TRACE bundle metadata extension",
+        "description": (
+            "TRACE-emitted top-level bundle properties: source URL, "
+            "collection timestamp, matched PIR ids, relevance score, and "
+            "relevance rationale. Consumers without the extension can "
+            "ignore these fields safely."
+        ),
+        "schema": _TRACE_EXTENSION_SCHEMA_URL,
+        "version": _TRACE_EXTENSION_VERSION,
+        "extension_types": ["toplevel-property-extension"],
+    }
 
 
 def _apply_required_property_defaults(obj: dict, ts: str) -> None:
