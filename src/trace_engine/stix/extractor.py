@@ -269,13 +269,34 @@ def _render_pir_context_block(pir_doc: PIRDocument | None) -> str:
     if pir_doc is None or not pir_doc.root:
         return ""
     lines: list[str] = [
-        "## PIR Context",
+        "## PIR Context (priority hint, NOT a filter)",
         "",
         (
-            "Use the following organizational PIRs as hints when deciding which "
-            "entities to surface. They are *guidance only* — do not invent "
-            "entities that are not in the report just to satisfy a PIR."
+            "**Read this carefully.** The PIRs below describe what the "
+            "organization most cares about — they help you decide which "
+            "entities are *most relevant*, but they are NOT a filter on "
+            "what to extract."
         ),
+        "",
+        "**Required behaviour:**",
+        "",
+        (
+            "- Extract every threat-actor, intrusion-set, malware, tool, "
+            "attack-pattern, vulnerability, and indicator that is *named* "
+            "or *clearly described* in the report, regardless of whether "
+            "it overlaps with any PIR below."
+        ),
+        (
+            "- Treat the PIRs as ranking input only: when the report is "
+            "long and you must choose what to describe in detail, prefer "
+            "entities that align with the PIRs."
+        ),
+        (
+            "- Do **not** drop a real entity just because no PIR mentions "
+            "it. Empty PIR coverage is acceptable; an under-extracted "
+            "bundle is not."
+        ),
+        ("- Do **not** invent entities that are not in the report just to satisfy a PIR."),
         "",
     ]
     for item in pir_doc.root:

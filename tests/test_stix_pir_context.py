@@ -41,6 +41,35 @@ def test_pir_context_appended_to_prompt(pir_doc: PIRDocument) -> None:
     assert "external-facing" in p
 
 
+def test_pir_context_block_explicitly_describes_priority_not_filter(
+    pir_doc: PIRDocument,
+) -> None:
+    """0.6.0 strengthens the PIR block to prevent over-conservative
+    extraction when only one PIR is supplied. The model must extract
+    every named entity in the report regardless of PIR overlap."""
+    captured: dict[str, str] = {}
+
+    def fake_call(task, prompt, **_kw):
+        captured["prompt"] = prompt
+        return "{}"
+
+    with patch("trace_engine.stix.extractor.call_llm", side_effect=fake_call):
+        extract_entities("CTI report body", pir_doc=pir_doc)
+
+    p = captured["prompt"]
+    # Header signals the role.
+    assert "PIR Context (priority hint, NOT a filter)" in p
+    # The "Required behaviour" block must explicitly forbid dropping
+    # entities on PIR mismatch.
+    assert "Required behaviour" in p
+    assert "regardless of whether" in p
+    assert "ranking input only" in p
+    # The exhaustiveness instruction must appear in the top-level prompt
+    # (not just the PIR block) so it is enforced even without PIRs.
+    assert "Be exhaustive" in p
+    assert "priority hint, not a filter" in p
+
+
 def test_pir_context_block_omitted_when_no_pir() -> None:
     captured: dict[str, str] = {}
 

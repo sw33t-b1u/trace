@@ -6,6 +6,48 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [0.6.0] — 2026-05-09
+
+### Changed — L3 prompt strengthened against PIR-induced under-extraction
+
+Real-URL verification with a single-PIR `pir_output.json`
+(`financial_crime` family only) showed the L3 LLM occasionally returning
+empty `{entities: [], relationships: []}` even when the source report
+clearly named threats. The behaviour traced back to the prior PIR
+context wording — "*guidance only — do not invent*" — being read as a
+filter signal, with the model dropping real entities that didn't
+overlap with the (sparse) PIR set.
+
+The prompt now states the policy explicitly in two places:
+
+- **`stix_extraction.md` header** gains a *Critical extraction policy*
+  block: be exhaustive, PIR is a priority hint not a filter, do not
+  invent.
+- **`_render_pir_context_block`** now emits a header
+  `## PIR Context (priority hint, NOT a filter)` plus a *Required
+  behaviour* list that:
+  - mandates extraction of every named entity regardless of PIR overlap,
+  - reframes PIRs as ranking input only (when long reports force a
+    choice in detail),
+  - retains the existing "do not invent" guardrail.
+
+Behaviour for callers:
+
+- No API change. `extract_entities(text, pir_doc=...)` signature
+  unchanged.
+- Empty-output regression risk on sparse-PIR runs is reduced; no
+  hallucination surface added (the *don't invent* guardrail moved with
+  the wording, not removed).
+
+### Tests
+
+- New
+  `tests/test_stix_pir_context.py::test_pir_context_block_explicitly_describes_priority_not_filter`
+  pins the strengthened wording so future prompt edits do not silently
+  weaken it.
+
+---
+
 ## [0.5.2] — 2026-05-09
 
 ### Fixed — `{401} sophistication` on intrusion-set
