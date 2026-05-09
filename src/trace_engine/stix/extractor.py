@@ -56,6 +56,49 @@ _VALID_ENTITY_TYPES: frozenset[str] = frozenset(
 
 _VALID_RELATIONSHIP_TYPES: frozenset[str] = frozenset({"uses", "exploits", "indicates"})
 
+# STIX 2.1 §4.13 relationship type table — `(source_type, relationship_type)`
+# → suggested target types. Drop relationships whose source/target combination
+# is outside the suggested set. Two TRACE-specific accept exceptions retained
+# from 0.5.2: `tool uses malware` and `tool uses tool` (semantically valid in
+# incident reports; major STIX consumers accept them).
+_RELATIONSHIP_TYPE_TABLE: dict[tuple[str, str], frozenset[str]] = {
+    # uses
+    ("attack-pattern", "uses"): frozenset({"attack-pattern", "infrastructure", "malware", "tool"}),
+    ("campaign", "uses"): frozenset({"attack-pattern", "infrastructure", "malware", "tool"}),
+    ("intrusion-set", "uses"): frozenset({"attack-pattern", "infrastructure", "malware", "tool"}),
+    ("malware", "uses"): frozenset({"attack-pattern", "infrastructure", "malware", "tool"}),
+    ("threat-actor", "uses"): frozenset({"attack-pattern", "infrastructure", "malware", "tool"}),
+    # `tool` → {malware, tool} are 0.5.2 accept exceptions (out of spec but
+    # documented; see docs/data-model.md "Accepted OASIS validator warnings").
+    ("tool", "uses"): frozenset({"attack-pattern", "infrastructure", "malware", "tool"}),
+    # exploits — target always vulnerability
+    ("malware", "exploits"): frozenset({"vulnerability"}),
+    ("intrusion-set", "exploits"): frozenset({"vulnerability"}),
+    ("threat-actor", "exploits"): frozenset({"vulnerability"}),
+    ("campaign", "exploits"): frozenset({"vulnerability"}),
+    # indicates — only indicator can indicate; broad target set excluding indicator itself
+    ("indicator", "indicates"): frozenset(
+        {
+            "attack-pattern",
+            "campaign",
+            "infrastructure",
+            "intrusion-set",
+            "malware",
+            "threat-actor",
+            "tool",
+        }
+    ),
+}
+
+
+# stix2patterns is a transitive dep of stix2-validator. Imported lazily at
+# module load so missing-dep environments still load extractor (the indicator
+# pattern check just becomes a no-op).
+try:
+    from stix2patterns.v21.pattern import Pattern as _StixPattern  # noqa: I001
+except ImportError:  # pragma: no cover
+    _StixPattern = None  # type: ignore[assignment]
+
 # STIX 2.1 §7.3 toplevel-property extension definition for TRACE-emitted
 # bundle metadata (``x_trace_source_url``, ``x_trace_collected_at``,
 # ``x_trace_matched_pir_ids``, ``x_trace_relevance_score``,
@@ -645,10 +688,11 @@ def build_stix_bundle_from_extraction(
 
     objects: list[dict] = []
     local_to_stix: dict[str, str] = {}
+    local_to_type: dict[str, str] = {}
 
+    indicators_dropped_invalid_pattern = 0
     for entity in extraction.entities:
         stix_id = f"{entity.type}--{uuid.uuid4()}"
-        local_to_stix[entity.local_id] = stix_id
         obj = {
             "type": entity.type,
             "id": stix_id,
@@ -666,14 +710,48 @@ def build_stix_bundle_from_extraction(
         # for domain knowledge only — it does not know which STIX wire-format
         # fields are mandatory per type, so the bundle assembler fills them in.
         _apply_required_property_defaults(obj, ts)
+        # Strip empty list properties before validator sees them. STIX 2.1
+        # disallows `aliases: []`, `labels: []`, etc.; the LLM occasionally
+        # emits them when nothing is known.
+        _scrub_empty_arrays(obj)
+        # Validate STIX patterning syntax for indicators; drop the indicator
+        # outright if the pattern fails to parse. Relationships pointing at
+        # the dropped indicator fall through the dangling-ref guard below.
+        if entity.type == "indicator" and not _validate_indicator_pattern(obj):
+            indicators_dropped_invalid_pattern += 1
+            logger.warning(
+                "indicator_dropped_invalid_pattern",
+                local_id=entity.local_id,
+                pattern=obj.get("pattern"),
+            )
+            continue
+        local_to_stix[entity.local_id] = stix_id
+        local_to_type[entity.local_id] = entity.type
         objects.append(obj)
+    if indicators_dropped_invalid_pattern:
+        logger.warning(
+            "indicators_dropped_invalid_pattern_total",
+            count=indicators_dropped_invalid_pattern,
+        )
 
-    dropped = 0
+    dropped_unresolved = 0
+    dropped_type_mismatch = 0
     for rel in extraction.relationships:
         src_id = local_to_stix.get(rel.source)
         tgt_id = local_to_stix.get(rel.target)
         if src_id is None or tgt_id is None:
-            dropped += 1
+            dropped_unresolved += 1
+            continue
+        src_type = local_to_type[rel.source]
+        tgt_type = local_to_type[rel.target]
+        if not _is_relationship_suggested(src_type, rel.relationship_type, tgt_type):
+            dropped_type_mismatch += 1
+            logger.warning(
+                "relationship_type_mismatch_dropped",
+                source_type=src_type,
+                relationship_type=rel.relationship_type,
+                target_type=tgt_type,
+            )
             continue
         objects.append(
             {
@@ -687,8 +765,10 @@ def build_stix_bundle_from_extraction(
                 "target_ref": tgt_id,
             }
         )
-    if dropped:
-        logger.warning("stix_relationships_dropped", count=dropped)
+    if dropped_unresolved:
+        logger.warning("stix_relationships_dropped", count=dropped_unresolved)
+    if dropped_type_mismatch:
+        logger.warning("stix_relationships_type_mismatch_dropped", count=dropped_type_mismatch)
 
     has_trace_metadata = (
         source_url is not None
@@ -822,6 +902,58 @@ def _demote_property_to_labels(obj: dict, field_name: str) -> None:
             existing.append(raw)
     else:
         obj["labels"] = [raw]
+
+
+def _scrub_empty_arrays(obj: dict) -> None:
+    """Strip keys whose value is an empty list. STIX 2.1 disallows empty
+    arrays for `labels`, `aliases`, `kill_chain_phases`, `external_references`
+    and most other list-valued fields; the LLM occasionally emits `[]` when
+    nothing is known. Removing the key entirely satisfies the validator.
+    """
+    for key in list(obj.keys()):
+        value = obj.get(key)
+        if isinstance(value, list) and len(value) == 0:
+            del obj[key]
+
+
+def _validate_indicator_pattern(obj: dict) -> bool:
+    """Return True when the indicator's `pattern` parses as STIX 2.1
+    patterning syntax (or the pattern is in another language, or the
+    parser is missing, or no pattern is present).
+
+    Returning False causes the caller to drop the indicator entirely;
+    relationships pointing at it fall through the dangling-ref guard.
+    Pattern parsing uses ``stix2patterns.v21.pattern.Pattern`` which is a
+    transitive dependency of ``stix2-validator``. Only ``pattern_type ==
+    "stix"`` is parsed; YARA, Snort, PCRE patterns are passed through
+    untouched (the OASIS validator handles their own syntax).
+    """
+    if _StixPattern is None:
+        return True
+    if obj.get("pattern_type", "stix") != "stix":
+        return True
+    pattern = obj.get("pattern")
+    if not isinstance(pattern, str) or not pattern.strip():
+        # No pattern → schema validator will surface the missing-required
+        # error; not our job here.
+        return True
+    try:
+        _StixPattern(pattern)
+    except Exception:  # noqa: BLE001 — stix2patterns raises ParseException; be defensive
+        return False
+    return True
+
+
+def _is_relationship_suggested(src_type: str, rel_type: str, tgt_type: str) -> bool:
+    """Check `(src_type, rel_type, tgt_type)` against the STIX 2.1 §4.13
+    suggested-relationship table. See `_RELATIONSHIP_TYPE_TABLE` for the
+    exact entries (including the two TRACE 0.5.2 accept exceptions for
+    `tool uses {malware,tool}`).
+    """
+    allowed = _RELATIONSHIP_TYPE_TABLE.get((src_type, rel_type))
+    if allowed is None:
+        return False
+    return tgt_type in allowed
 
 
 def _filter_open_vocab(obj: dict, field_name: str, vocab: frozenset[str]) -> None:

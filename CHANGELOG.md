@@ -6,6 +6,61 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [0.6.1] — 2026-05-09
+
+### Fixed — Defensive guards for the more permissive 0.6.0 prompt
+
+The 0.6.0 prompt strengthening lifted FIN7-class extraction from 40 to
+61 entities (+52%) but exposed three classes of LLM mistake the bundle
+assembler had not previously needed to defend against. Real-URL
+verification regressed validation from `errors=0 warnings=0` to
+`errors=5 warnings=4`. 0.6.1 adds three structural defenses; the
+validator now returns to `errors=0` (and {202} warnings limited to the
+two TRACE-accepted exceptions documented in 0.5.2).
+
+#### 1. Empty-array scrub
+
+`_scrub_empty_arrays` strips keys whose value is an empty list. STIX
+2.1 disallows `aliases: []` / `labels: []` / `kill_chain_phases: []`
+etc.; the LLM emitted these when nothing was known about the field.
+Removing the key entirely satisfies the validator.
+
+#### 2. STIX patterning syntax validation
+
+`_validate_indicator_pattern` parses the indicator's `pattern` with
+`stix2patterns.v21.pattern.Pattern` (transitive dep of
+`stix2-validator`). Indicators with malformed STIX patterns are
+dropped with a structured-log warning; relationships pointing at the
+dropped indicator fall through the existing dangling-ref guard.
+
+Only `pattern_type == "stix"` is parsed — YARA, Snort, PCRE patterns
+pass through untouched (the OASIS validator handles those languages).
+
+#### 3. Relationship type table (STIX 2.1 §4.13)
+
+`_RELATIONSHIP_TYPE_TABLE` enumerates the suggested
+`(source_type, relationship_type) → {target_types}` mapping for the
+three relationships TRACE emits (`uses`, `exploits`, `indicates`).
+`_is_relationship_suggested` filters out violators before bundle
+assembly with a structured-log warning. The two 0.5.2-accepted
+exceptions (`tool uses malware`, `tool uses tool`) are encoded as
+table allow-list entries.
+
+This drops common LLM mistakes:
+
+- `malware indicates X` → only indicator may indicate (drop)
+- `attack-pattern exploits X` → only malware/intrusion-set/threat-actor/campaign may exploit (drop)
+- `indicator indicates indicator` → indicator is not in the suggested target set for `indicates` (drop)
+
+### Tests
+
+- 11 new cases in `tests/test_stix_extractor.py` covering all three
+  defenses: empty-array scrub (preserved vs removed), pattern
+  validation (valid/malformed/YARA/dangling-rel cascade), and the
+  relationship type table (kept/dropped per source-target combo).
+
+---
+
 ## [0.6.0] — 2026-05-09
 
 ### Changed — L3 prompt strengthened against PIR-induced under-extraction

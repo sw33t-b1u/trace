@@ -786,3 +786,211 @@ class TestSophisticationDemotion:
         actor = next(o for o in bundle["objects"] if o["type"] == "threat-actor")
         assert actor.get("sophistication") == "advanced"
         assert "advanced" not in actor.get("labels", [])
+
+
+# ---------------------------------------------------------------------------
+# 0.6.1 — empty-array scrub, pattern validation, relationship type table
+# ---------------------------------------------------------------------------
+
+
+class TestEmptyArrayScrub:
+    def test_empty_aliases_removed(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="a",
+                    type="intrusion-set",
+                    properties={"name": "FIN7", "aliases": [], "labels": []},
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        actor = next(o for o in bundle["objects"] if o["type"] == "intrusion-set")
+        assert "aliases" not in actor
+        assert "labels" not in actor
+
+    def test_non_empty_lists_preserved(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="a",
+                    type="intrusion-set",
+                    properties={
+                        "name": "FIN7",
+                        "aliases": ["GOLD NIAGARA"],
+                        "labels": ["financially-motivated"],
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        actor = next(o for o in bundle["objects"] if o["type"] == "intrusion-set")
+        assert actor["aliases"] == ["GOLD NIAGARA"]
+        assert "financially-motivated" in actor["labels"]
+
+
+class TestIndicatorPatternValidation:
+    def test_valid_stix_pattern_kept(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="indicator",
+                    properties={
+                        "pattern": "[ipv4-addr:value = '198.51.100.1']",
+                        "pattern_type": "stix",
+                        "indicator_types": ["malicious-activity"],
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        indicators = [o for o in bundle["objects"] if o["type"] == "indicator"]
+        assert len(indicators) == 1
+
+    def test_malformed_stix_pattern_drops_indicator(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="indicator",
+                    properties={
+                        "pattern": "[file:hashes.SHA-256 = 'abc'",  # missing closing bracket
+                        "pattern_type": "stix",
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        indicators = [o for o in bundle["objects"] if o["type"] == "indicator"]
+        assert indicators == []
+
+    def test_yara_pattern_passes_through_untouched(self):
+        # We only validate stix patterns; YARA / Snort / PCRE are pass-through.
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="indicator",
+                    properties={
+                        "pattern": 'rule X { strings: $a = "abc" condition: $a }',
+                        "pattern_type": "yara",
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        indicators = [o for o in bundle["objects"] if o["type"] == "indicator"]
+        assert len(indicators) == 1
+
+    def test_relationships_to_dropped_indicator_fall_through(self):
+        # When the indicator is dropped, any `indicator indicates X`
+        # relationship pointing at it loses its source endpoint and is
+        # dropped through the existing dangling-ref guard.
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="indicator",
+                    properties={
+                        "pattern": "[broken",  # malformed
+                        "pattern_type": "stix",
+                    },
+                ),
+                _ent("m", "malware", "Emotet"),
+            ],
+            relationships=[ExtractedRelationship("i", "m", "indicates")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert rels == []
+
+
+class TestRelationshipTypeTable:
+    def test_intrusion_set_uses_malware_kept(self):
+        ext = Extraction(
+            entities=[_ent("a", "intrusion-set", "FIN7"), _ent("m", "malware", "X")],
+            relationships=[ExtractedRelationship("a", "m", "uses")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert len(rels) == 1
+
+    def test_tool_uses_malware_accepted_per_0_5_2(self):
+        # 0.5.2 explicitly accepted `tool uses malware` and `tool uses tool`.
+        ext = Extraction(
+            entities=[_ent("t", "tool", "Cobalt"), _ent("m", "malware", "X")],
+            relationships=[ExtractedRelationship("t", "m", "uses")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert len(rels) == 1
+
+    def test_malware_indicates_dropped(self):
+        # `indicates` source must be `indicator` only.
+        ext = Extraction(
+            entities=[_ent("m", "malware", "X"), _ent("a", "intrusion-set", "FIN7")],
+            relationships=[ExtractedRelationship("m", "a", "indicates")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert rels == []
+
+    def test_attack_pattern_exploits_dropped(self):
+        # `exploits` source must be malware/intrusion-set/threat-actor/campaign.
+        ext = Extraction(
+            entities=[
+                _ent("p", "attack-pattern", "Spearphishing"),
+                _ent("v", "vulnerability", "CVE-2024-1234"),
+            ],
+            relationships=[ExtractedRelationship("p", "v", "exploits")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert rels == []
+
+    def test_indicator_indicates_indicator_dropped(self):
+        # `indicates` target must not be indicator itself.
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i1",
+                    type="indicator",
+                    properties={
+                        "pattern": "[ipv4-addr:value = '1.2.3.4']",
+                        "pattern_type": "stix",
+                    },
+                ),
+                ExtractedEntity(
+                    local_id="i2",
+                    type="indicator",
+                    properties={
+                        "pattern": "[ipv4-addr:value = '5.6.7.8']",
+                        "pattern_type": "stix",
+                    },
+                ),
+            ],
+            relationships=[ExtractedRelationship("i1", "i2", "indicates")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert rels == []
+
+    def test_indicator_indicates_malware_kept(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="indicator",
+                    properties={
+                        "pattern": "[ipv4-addr:value = '1.2.3.4']",
+                        "pattern_type": "stix",
+                    },
+                ),
+                _ent("m", "malware", "X"),
+            ],
+            relationships=[ExtractedRelationship("i", "m", "indicates")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert len(rels) == 1
