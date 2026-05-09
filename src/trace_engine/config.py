@@ -36,6 +36,12 @@ class Config:
         default_factory=lambda: float(os.environ.get("TRACE_RELEVANCE_THRESHOLD", "0.5"))
     )
 
+    # L3 extraction — chunk long reports so a single LLM call doesn't blow
+    # past max_output_tokens. Paragraph-aligned splits, results merged in code.
+    extraction_chunk_chars: int = field(
+        default_factory=lambda: int(os.environ.get("TRACE_EXTRACTION_CHUNK_CHARS", "12000"))
+    )
+
     # Crawler
     crawl_user_agent: str = field(
         default_factory=lambda: os.environ.get(

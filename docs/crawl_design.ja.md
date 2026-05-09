@@ -141,6 +141,33 @@ sources:
 PIR コンテキストは **ヒント**であり**フィルタではない**（フィルタは L2 で
 完了）。プロンプトは "PIR を満たすためにエンティティを捏造するな" と明記する。
 
+### 長文記事のチャンク抽出
+
+Gemini の `max_output_tokens` 上限により、3 万字級の脅威レポートは JSON が
+途中で切れて parse 失敗するリスクがある。これを構造的に回避するため、
+`extract_entities` は記事を段落境界（`\n\n`）で
+`Config.extraction_chunk_chars`（既定 `12000`、環境変数
+`TRACE_EXTRACTION_CHUNK_CHARS`）以下のチャンクに分割し、L3 プロンプトを
+チャンクごとに 1 回呼び出す。
+
+- 単一段落が上限を超える場合は段落内で hard-cut。
+- 各チャンクの `local_id` は `c0_actor_1`, `c1_actor_1` のように
+  ネームスペース化され、別チャンクの同一エイリアスと衝突しない。
+- 1 チャンクが parse 失敗しても `chunk_index` 付きで警告ログを残し、
+  他チャンクの抽出結果は採用される。
+
+`_merge_extractions` がチャンクごとの結果をマージ:
+
+| ステップ | 挙動 |
+|---------|------|
+| エンティティ重複排除 | `indicator` 以外は `(type, name.strip().lower())`、`indicator` は `(type, pattern)`。後出しのプロパティは先出しに union。リストフィールド（`labels`, `aliases`, `kill_chain_phases`, `external_references`, `malware_types`, `tool_types`）は重複排除付き union。同名でも `type` が異なれば別エンティティ。 |
+| リレーションシップの再配線 | `source` / `target` をマージ後の alias マップ経由でリマップし、跨チャンク関係も解決。 |
+| リレーションシップ重複排除 | `(source, target, relationship_type)` 組み合わせの重複を圧縮。 |
+| 幻覚 endpoint | エイリアスマップに存在しない参照はドロップ。`extractions_merged` ログ行にカウント。 |
+
+短い記事（`len(text) <= chunk_chars`）はチャンクループをスキップし、
+0.3.0 以前の単発呼び出しと同一動作。
+
 ## 4a. L4 バンドル組立（コードが構築）
 
 `stix/extractor.build_stix_bundle_from_extraction(extraction, ...)` は

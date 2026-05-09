@@ -6,12 +6,16 @@ import json
 import re
 from unittest.mock import patch
 
+from trace_engine.config import Config
 from trace_engine.stix.extractor import (
     _VALID_ENTITY_TYPES,
     _VALID_RELATIONSHIP_TYPES,
     ExtractedEntity,
     ExtractedRelationship,
     Extraction,
+    _chunk_text,
+    _extract_json_from_text,
+    _merge_extractions,
     build_stix_bundle_from_extraction,
     extract_entities,
 )
@@ -225,3 +229,223 @@ class TestBuildBundle:
             "x_trace_relevance_rationale",
         ):
             assert key not in bundle
+
+
+# ---------------------------------------------------------------------------
+# Chunking
+# ---------------------------------------------------------------------------
+
+
+class TestChunkText:
+    def test_short_text_returns_single_chunk(self):
+        text = "Para A.\n\nPara B."
+        assert _chunk_text(text, max_chars=1000) == [text]
+
+    def test_paragraph_aligned_split(self):
+        text = "A" * 100 + "\n\n" + "B" * 100 + "\n\n" + "C" * 100
+        chunks = _chunk_text(text, max_chars=210)
+        # Each chunk fits 2 paragraphs (100 + 2 + 100 = 202 <= 210); 3rd goes alone.
+        assert len(chunks) == 2
+        assert all(len(c) <= 210 for c in chunks)
+        assert "A" * 100 in chunks[0]
+        assert "C" * 100 in chunks[1]
+
+    def test_paragraph_larger_than_limit_is_hard_split(self):
+        big = "X" * 500
+        chunks = _chunk_text(big, max_chars=200)
+        assert len(chunks) == 3
+        assert all(len(c) <= 200 for c in chunks)
+        assert "".join(chunks) == big
+
+    def test_max_chars_must_be_positive(self):
+        import pytest
+
+        with pytest.raises(ValueError):
+            _chunk_text("x", max_chars=0)
+
+
+# ---------------------------------------------------------------------------
+# Merging across chunks
+# ---------------------------------------------------------------------------
+
+
+class TestMergeExtractions:
+    def test_dedupes_entities_by_normalized_name(self):
+        # Same actor named in two chunks with different casing → one merged entity.
+        a = Extraction(entities=[_ent("c0_x", "intrusion-set", "FIN7")])
+        b = Extraction(entities=[_ent("c1_y", "intrusion-set", "fin7")])
+        merged = _merge_extractions([a, b])
+        assert len(merged.entities) == 1
+        assert merged.entities[0].properties["name"] == "FIN7"
+
+    def test_keeps_distinct_entities_with_same_name_different_type(self):
+        a = Extraction(entities=[_ent("c0_a", "tool", "Cobalt")])
+        b = Extraction(entities=[_ent("c1_b", "intrusion-set", "Cobalt")])
+        merged = _merge_extractions([a, b])
+        assert len(merged.entities) == 2
+
+    def test_unions_list_valued_properties(self):
+        a = Extraction(entities=[_ent("c0_x", "malware", "Emotet", labels=["banker"])])
+        b = Extraction(entities=[_ent("c1_y", "malware", "Emotet", labels=["banker", "loader"])])
+        merged = _merge_extractions([a, b])
+        assert len(merged.entities) == 1
+        assert sorted(merged.entities[0].properties["labels"]) == ["banker", "loader"]
+
+    def test_relationships_remapped_to_canonical_local_ids(self):
+        # Chunk 0 introduces FIN7 + Cobalt + uses(FIN7, Cobalt).
+        # Chunk 1 reintroduces FIN7 (different alias), adds new rel.
+        a = Extraction(
+            entities=[
+                _ent("c0_a", "intrusion-set", "FIN7"),
+                _ent("c0_t", "tool", "Cobalt"),
+            ],
+            relationships=[ExtractedRelationship("c0_a", "c0_t", "uses")],
+        )
+        b = Extraction(
+            entities=[
+                _ent("c1_a", "intrusion-set", "fin7"),
+                _ent("c1_v", "vulnerability", "CVE-2024-1234"),
+            ],
+            relationships=[ExtractedRelationship("c1_a", "c1_v", "exploits")],
+        )
+        merged = _merge_extractions([a, b])
+        # FIN7 merged → 3 unique entities total
+        assert len(merged.entities) == 3
+        # Both relationships preserved, both source-resolved to FIN7's canonical id
+        assert len(merged.relationships) == 2
+        actor_id = next(e.local_id for e in merged.entities if e.properties.get("name") == "FIN7")
+        assert {r.source for r in merged.relationships} == {actor_id}
+
+    def test_duplicate_relationships_deduped(self):
+        a = Extraction(
+            entities=[_ent("c0_a", "intrusion-set", "FIN7"), _ent("c0_t", "tool", "Cobalt")],
+            relationships=[ExtractedRelationship("c0_a", "c0_t", "uses")],
+        )
+        b = Extraction(
+            entities=[_ent("c1_a", "intrusion-set", "FIN7"), _ent("c1_t", "tool", "cobalt")],
+            relationships=[ExtractedRelationship("c1_a", "c1_t", "uses")],
+        )
+        merged = _merge_extractions([a, b])
+        assert len(merged.relationships) == 1
+
+
+# ---------------------------------------------------------------------------
+# extract_entities — chunked path
+# ---------------------------------------------------------------------------
+
+
+class TestExtractEntitiesChunked:
+    def _patch_chunked_responses(self, responses: list[dict]):
+        return patch(
+            "trace_engine.stix.extractor.call_llm",
+            side_effect=[json.dumps(r) for r in responses],
+        )
+
+    def test_long_article_chunked_and_merged(self):
+        cfg = Config(extraction_chunk_chars=200)
+        # 3 paragraphs, each 150 chars → 3 chunks at chunk_chars=200.
+        text = "\n\n".join(["A" * 150, "B" * 150, "C" * 150])
+
+        responses = [
+            {
+                "entities": [{"local_id": "actor_1", "type": "intrusion-set", "name": "FIN7"}],
+                "relationships": [],
+            },
+            {
+                "entities": [
+                    {"local_id": "actor_1", "type": "intrusion-set", "name": "fin7"},
+                    {"local_id": "tool_1", "type": "tool", "name": "Cobalt Strike"},
+                ],
+                "relationships": [
+                    {"source": "actor_1", "target": "tool_1", "relationship_type": "uses"}
+                ],
+            },
+            {
+                "entities": [{"local_id": "vuln_1", "type": "vulnerability", "name": "CVE-2024-1"}],
+                "relationships": [],
+            },
+        ]
+        with self._patch_chunked_responses(responses):
+            extraction = extract_entities(text, config=cfg)
+
+        # FIN7 dedupe + Cobalt + CVE = 3 entities
+        names = sorted(e.properties.get("name") for e in extraction.entities)
+        assert names == ["CVE-2024-1", "Cobalt Strike", "FIN7"]
+        assert len(extraction.relationships) == 1
+
+    def test_chunk_failure_does_not_kill_other_chunks(self):
+        cfg = Config(extraction_chunk_chars=200)
+        text = "\n\n".join(["A" * 150, "B" * 150])
+        responses_raw = [
+            "not json at all",  # first chunk fails
+            json.dumps(
+                {
+                    "entities": [{"local_id": "x", "type": "tool", "name": "Mimikatz"}],
+                    "relationships": [],
+                }
+            ),
+        ]
+        with patch("trace_engine.stix.extractor.call_llm", side_effect=responses_raw):
+            extraction = extract_entities(text, config=cfg)
+        assert len(extraction.entities) == 1
+        assert extraction.entities[0].properties["name"] == "Mimikatz"
+
+
+# ---------------------------------------------------------------------------
+# Bracket-balanced salvage of truncated LLM responses (max_output_tokens hit)
+# ---------------------------------------------------------------------------
+
+
+class TestSalvageTruncatedExtraction:
+    def test_truncated_mid_object_recovers_complete_entries(self):
+        # Outer JSON cut off after the second entity's closing brace, before
+        # the array's `]` / outer `}` — exact pattern observed in production
+        # when Gemini hits max_output_tokens.
+        truncated = (
+            '{\n  "entities": [\n'
+            '    {"local_id": "a", "type": "intrusion-set", "name": "FIN7"},\n'
+            '    {"local_id": "t", "type": "tool", "name": "Cobalt Strike"},\n'
+            '    {"local_id": "v", "type": "vulnerability", "name": "CVE-2024-'
+        )
+        result = _extract_json_from_text(truncated)
+        assert isinstance(result, dict)
+        assert [e["local_id"] for e in result["entities"]] == ["a", "t"]
+        assert result["relationships"] == []
+
+    def test_truncated_after_relationships_section(self):
+        truncated = (
+            '{"entities": [{"local_id": "a", "type": "intrusion-set"}],\n'
+            ' "relationships": [\n'
+            '    {"source": "a", "target": "b", "relationship_type": "uses"},\n'
+            '    {"source": "a", "target": "c", "relationship_t'
+        )
+        result = _extract_json_from_text(truncated)
+        assert isinstance(result, dict)
+        assert len(result["entities"]) == 1
+        assert len(result["relationships"]) == 1
+        assert result["relationships"][0]["source"] == "a"
+
+    def test_well_formed_json_still_parses_normally(self):
+        payload = {
+            "entities": [{"local_id": "a", "type": "tool", "name": "Mimikatz"}],
+            "relationships": [],
+        }
+        result = _extract_json_from_text(json.dumps(payload))
+        assert result == payload
+
+    def test_returns_none_when_no_recoverable_arrays(self):
+        # Random prose with no entities/relationships keys at all.
+        assert _extract_json_from_text("Not JSON, just narrative text.") is None
+
+    def test_handles_strings_with_braces_inside(self):
+        # Description containing a `}` should not confuse bracket counting.
+        truncated = (
+            '{"entities": [\n'
+            '    {"local_id": "a", "type": "tool", "name": "X",'
+            ' "description": "writes {key: value} pairs"},\n'
+            '    {"local_id": "b", "type": "malware", "name": "Y'
+        )
+        result = _extract_json_from_text(truncated)
+        assert isinstance(result, dict)
+        assert len(result["entities"]) == 1
+        assert result["entities"][0]["local_id"] == "a"

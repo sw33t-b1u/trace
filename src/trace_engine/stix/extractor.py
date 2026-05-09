@@ -30,6 +30,7 @@ from datetime import UTC, datetime
 
 import structlog
 
+from trace_engine.config import Config, load_config
 from trace_engine.llm.client import TaskType, call_llm, load_prompt
 from trace_engine.validate.schema import PIRDocument, PIRItem
 
@@ -92,6 +93,9 @@ def _extract_json_from_text(raw: str) -> list | dict | None:
       1. Parse the full response as-is.
       2. Extract the first ```json ... ``` Markdown block.
       3. Find the first '[' or '{' and parse from there.
+      4. Bracket-balanced salvage of ``entities`` / ``relationships`` arrays
+         when the outer JSON is truncated mid-stream (Gemini hits
+         ``max_output_tokens`` on dense reports even after chunking).
     """
     try:
         return json.loads(raw)
@@ -113,9 +117,76 @@ def _extract_json_from_text(raw: str) -> list | dict | None:
         try:
             return json.loads(raw[start:])
         except json.JSONDecodeError:
-            return None
+            pass
+
+    salvaged = _salvage_truncated_extraction(raw)
+    if salvaged is not None:
+        return salvaged
 
     return None
+
+
+def _salvage_truncated_extraction(raw: str) -> dict | None:
+    """Recover ``{entities, relationships}`` from a truncated LLM response.
+
+    When Gemini hits ``max_output_tokens`` mid-array we lose the closing
+    ``]}``, but the entity / relationship objects written so far are still
+    well-formed JSON. Walk each ``"entities":`` / ``"relationships":`` array
+    and extract whatever complete ``{...}`` records we can with bracket
+    balancing.
+    """
+    entities = _scan_object_array(raw, "entities")
+    relationships = _scan_object_array(raw, "relationships")
+    if not entities and not relationships:
+        return None
+    return {"entities": entities, "relationships": relationships}
+
+
+def _scan_object_array(raw: str, key: str) -> list[dict]:
+    pattern = re.compile(rf'"{re.escape(key)}"\s*:\s*\[')
+    match = pattern.search(raw)
+    if not match:
+        return []
+    i = match.end()
+    out: list[dict] = []
+    n = len(raw)
+    while i < n:
+        while i < n and raw[i] in " \t\r\n,":
+            i += 1
+        if i >= n or raw[i] == "]":
+            break
+        if raw[i] != "{":
+            break
+        depth = 0
+        in_str = False
+        escape = False
+        start = i
+        while i < n:
+            ch = raw[i]
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif in_str:
+                if ch == '"':
+                    in_str = False
+            elif ch == '"':
+                in_str = True
+            elif ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    i += 1
+                    try:
+                        out.append(json.loads(raw[start:i]))
+                    except json.JSONDecodeError:
+                        return out
+                    break
+            i += 1
+        else:
+            return out
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -172,7 +243,7 @@ def _safe_list_field(item: PIRItem, name: str) -> list[str]:
 def extract_entities(
     text: str,
     task: TaskType = _DEFAULT_TASK,
-    config=None,
+    config: Config | None = None,
     *,
     pir_doc: PIRDocument | None = None,
 ) -> Extraction:
@@ -183,35 +254,236 @@ def extract_entities(
     wire format (ids, timestamps, spec_version, ref translation) is the
     job of ``build_stix_bundle_from_extraction``.
 
-    Returns an empty ``Extraction`` if the response can't be parsed; the
-    caller can decide how to surface that (CLIs log + exit, batch records
-    `extraction_failed`).
+    Long articles are split into paragraph-aligned chunks
+    (``Config.extraction_chunk_chars``) so a single LLM call does not blow
+    past ``max_output_tokens``. Each chunk is extracted independently and
+    the results are merged: entities are deduplicated by
+    ``(type, normalized_name|pattern)``, list-valued properties are
+    unioned, and relationship endpoints are rewritten through the merged
+    ``local_id`` map. Chunk-level parse failures are logged and skipped —
+    other chunks still contribute their entities.
+
+    Returns an empty ``Extraction`` only when *every* chunk fails. CLIs
+    surface this as a 0-object bundle (and crawl_batch records
+    ``decision="extraction_failed"`` in state).
     """
+    cfg = config or load_config()
+    chunks = _chunk_text(text, max_chars=cfg.extraction_chunk_chars)
+
+    if len(chunks) == 1:
+        logger.info("extracting_entities", chars=len(text), task=task)
+        return _extract_chunk(chunks[0], task=task, config=cfg, pir_doc=pir_doc)
+
+    logger.info(
+        "extracting_entities_chunked",
+        total_chars=len(text),
+        chunks=len(chunks),
+        chunk_chars=cfg.extraction_chunk_chars,
+        task=task,
+    )
+    parts: list[Extraction] = []
+    for index, chunk in enumerate(chunks):
+        part = _extract_chunk(chunk, task=task, config=cfg, pir_doc=pir_doc, chunk_index=index)
+        logger.info(
+            "chunk_extracted",
+            chunk_index=index,
+            chars=len(chunk),
+            entities=len(part.entities),
+            relationships=len(part.relationships),
+        )
+        parts.append(part)
+
+    return _merge_extractions(parts)
+
+
+def _extract_chunk(
+    text: str,
+    *,
+    task: TaskType,
+    config: Config,
+    pir_doc: PIRDocument | None,
+    chunk_index: int | None = None,
+) -> Extraction:
     template = load_prompt("stix_extraction.md")
     prompt = template.replace("{{REPORT_TEXT}}", text).replace(
         "{{PIR_CONTEXT_BLOCK}}", _render_pir_context_block(pir_doc)
     )
 
-    logger.info("extracting_entities", chars=len(text), task=task)
-    raw = call_llm(task, prompt, config=config, json_mode=True, max_output_tokens=8192)
+    # Per-chunk output ceiling: Gemini 2.5 flash supports up to 65,535 output
+    # tokens. Each entity's nested structure (kill_chain_phases, external
+    # references, labels) is verbose, so 8192 tokens runs out mid-array on
+    # dense reports. 32768 leaves comfortable headroom while still bounding
+    # cost. Truncated responses past this limit fall through to
+    # `_extract_json_from_text`'s bracket-balanced salvage.
+    raw = call_llm(task, prompt, config=config, json_mode=True, max_output_tokens=32768)
 
     parsed = _extract_json_from_text(raw)
     if not isinstance(parsed, dict):
         logger.warning(
             "extraction_response_not_object",
+            chunk_index=chunk_index,
             response_type=type(parsed).__name__ if parsed is not None else "None",
+            raw_chars=len(raw),
             preview=raw[:200],
+            tail=raw[-200:] if len(raw) > 200 else "",
         )
         return Extraction()
 
     entities = _coerce_entities(parsed.get("entities"))
     relationships = _coerce_relationships(parsed.get("relationships"))
-    logger.info(
-        "entities_extracted",
-        entities=len(entities),
-        relationships=len(relationships),
-    )
+
+    # Namespace local_ids per chunk so identical aliases from different
+    # chunks (e.g. "actor_1") don't collide before merge.
+    if chunk_index is not None:
+        prefix = f"c{chunk_index}_"
+        entities = [
+            ExtractedEntity(local_id=prefix + e.local_id, type=e.type, properties=e.properties)
+            for e in entities
+        ]
+        relationships = [
+            ExtractedRelationship(
+                source=prefix + r.source,
+                target=prefix + r.target,
+                relationship_type=r.relationship_type,
+            )
+            for r in relationships
+        ]
     return Extraction(entities=entities, relationships=relationships)
+
+
+# ---------------------------------------------------------------------------
+# Chunking + merging
+# ---------------------------------------------------------------------------
+
+
+def _chunk_text(text: str, *, max_chars: int) -> list[str]:
+    """Split ``text`` into paragraph-aligned chunks no larger than ``max_chars``.
+
+    Paragraphs are detected by blank-line separators (``\\n\\n``). A
+    paragraph that on its own exceeds ``max_chars`` is hard-cut at the
+    boundary — the model still sees coherent prose, just clipped.
+    """
+    if max_chars <= 0:
+        raise ValueError("max_chars must be positive")
+    if len(text) <= max_chars:
+        return [text]
+
+    paragraphs = re.split(r"\n\s*\n", text)
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
+    for para in paragraphs:
+        para_len = len(para)
+        if para_len > max_chars:
+            if current:
+                chunks.append("\n\n".join(current))
+                current, current_len = [], 0
+            for start in range(0, para_len, max_chars):
+                chunks.append(para[start : start + max_chars])
+            continue
+        added = para_len + (2 if current else 0)
+        if current_len + added > max_chars:
+            chunks.append("\n\n".join(current))
+            current, current_len = [para], para_len
+        else:
+            current.append(para)
+            current_len += added
+    if current:
+        chunks.append("\n\n".join(current))
+    return chunks
+
+
+def _entity_merge_key(entity: ExtractedEntity) -> tuple[str, str] | None:
+    """Stable dedupe key. Falls back to None when the entity has no
+    distinguishing field — those records are kept as-is (no merging)."""
+    props = entity.properties
+    if entity.type == "indicator":
+        pattern = props.get("pattern")
+        if isinstance(pattern, str) and pattern.strip():
+            return (entity.type, pattern.strip())
+        return None
+    name = props.get("name")
+    if isinstance(name, str) and name.strip():
+        return (entity.type, name.strip().lower())
+    return None
+
+
+_LIST_UNION_FIELDS: frozenset[str] = frozenset(
+    {"labels", "aliases", "kill_chain_phases", "external_references", "malware_types", "tool_types"}
+)
+
+
+def _merge_entity_properties(into: dict, other: dict) -> None:
+    for key, value in other.items():
+        if key not in into:
+            into[key] = value
+            continue
+        if key in _LIST_UNION_FIELDS and isinstance(into[key], list) and isinstance(value, list):
+            seen = {json.dumps(v, sort_keys=True) for v in into[key]}
+            for v in value:
+                marker = json.dumps(v, sort_keys=True)
+                if marker not in seen:
+                    into[key].append(v)
+                    seen.add(marker)
+
+
+def _merge_extractions(parts: list[Extraction]) -> Extraction:
+    """Merge per-chunk extractions: dedupe entities, remap relationship endpoints."""
+    merged_entities: list[ExtractedEntity] = []
+    by_key: dict[tuple[str, str], int] = {}
+    alias_to_canonical: dict[str, str] = {}
+
+    for part in parts:
+        for entity in part.entities:
+            key = _entity_merge_key(entity)
+            if key is not None and key in by_key:
+                canonical = merged_entities[by_key[key]]
+                _merge_entity_properties(canonical.properties, entity.properties)
+                alias_to_canonical[entity.local_id] = canonical.local_id
+                continue
+            merged_entities.append(
+                ExtractedEntity(
+                    local_id=entity.local_id,
+                    type=entity.type,
+                    properties=dict(entity.properties),
+                )
+            )
+            alias_to_canonical[entity.local_id] = entity.local_id
+            if key is not None:
+                by_key[key] = len(merged_entities) - 1
+
+    merged_relationships: list[ExtractedRelationship] = []
+    rel_seen: set[tuple[str, str, str]] = set()
+    dropped = 0
+    for part in parts:
+        for rel in part.relationships:
+            src = alias_to_canonical.get(rel.source)
+            tgt = alias_to_canonical.get(rel.target)
+            if src is None or tgt is None:
+                dropped += 1
+                continue
+            marker = (src, tgt, rel.relationship_type)
+            if marker in rel_seen:
+                continue
+            rel_seen.add(marker)
+            merged_relationships.append(
+                ExtractedRelationship(
+                    source=src, target=tgt, relationship_type=rel.relationship_type
+                )
+            )
+
+    raw_entity_count = sum(len(p.entities) for p in parts)
+    raw_rel_count = sum(len(p.relationships) for p in parts)
+    logger.info(
+        "extractions_merged",
+        chunks=len(parts),
+        raw_entities=raw_entity_count,
+        merged_entities=len(merged_entities),
+        raw_relationships=raw_rel_count,
+        merged_relationships=len(merged_relationships),
+        dropped_relationships=dropped,
+    )
+    return Extraction(entities=merged_entities, relationships=merged_relationships)
 
 
 def _coerce_entities(raw: object) -> list[ExtractedEntity]:

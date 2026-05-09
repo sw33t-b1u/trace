@@ -6,6 +6,97 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [0.3.1] — 2026-05-09
+
+### Fixed — Per-chunk output truncation on dense reports
+
+0.3.0 split long reports into paragraph-aligned chunks so a single LLM
+call would not blow past `max_output_tokens`, but the per-chunk output
+ceiling was still 8,192 tokens and that turned out to be insufficient
+for entity-dense chunks of CTI articles. Real-URL verification on a
+24,750-char Picus FIN7 report saw chunks 0 and 1 truncate mid-property
+and mid-relationship-array respectively, leaving the merged extraction
+empty.
+
+Two layered mitigations:
+
+- **Per-chunk `max_output_tokens` raised from 8,192 to 32,768.** Gemini
+  2.5 flash supports up to 65,535 output tokens; 32,768 leaves headroom
+  while still bounding cost per call. This handles the common case.
+- **Bracket-balanced salvage in `_extract_json_from_text`.** When a
+  chunk's response is still truncated past 32,768 tokens, walk the
+  raw text, find each `"entities":` / `"relationships":` array, and
+  extract whatever complete `{...}` records are well-formed. The
+  partial result feeds the merge stage rather than being discarded.
+
+Together with the chunked input pipeline shipped in 0.3.0, this gives
+TRACE a structural answer to long, dense reports: input is chunked,
+output is bounded with headroom, and any residual truncation is
+salvaged rather than dropped.
+
+### Tests
+
+- 5 new salvage cases in `tests/test_stix_extractor.py` covering
+  mid-property cut, mid-relationship-array cut, well-formed JSON
+  passthrough, no-recoverable-arrays guard, and embedded-brace string
+  handling.
+
+---
+
+## [0.3.0] — 2026-05-09
+
+### Added — Chunked L3 extraction for long reports
+
+Long CTI reports (multi-page advisories, dense vendor PDFs) hit Gemini's
+`max_output_tokens` ceiling and produced a JSON response that was truncated
+mid-stream, causing `extract_entities` to return zero objects. The fix is
+structural: split the article on paragraph boundaries (`\n\n`) into chunks
+no larger than `Config.extraction_chunk_chars` (default `12000`, env
+`TRACE_EXTRACTION_CHUNK_CHARS`) and run the L3 prompt once per chunk.
+
+- Per-chunk `local_id`s are namespaced (`c0_actor_1`, `c1_actor_1`) to
+  prevent cross-chunk alias collisions.
+- `_merge_extractions` deduplicates entities by
+  `(type, name.strip().lower())` (or `(type, pattern)` for indicators),
+  unions list-valued properties (`labels`, `aliases`,
+  `kill_chain_phases`, `external_references`, `malware_types`,
+  `tool_types`), rewrites relationship `source` / `target` through the
+  merge alias map, and collapses identical
+  `(source, target, relationship_type)` triples.
+- A single chunk failing to parse is logged with `chunk_index` and
+  skipped — other chunks still contribute their entities. An extraction
+  fails only when *every* chunk fails.
+- Short articles (`len(text) <= chunk_chars`) bypass the chunk loop and
+  preserve 0.2.0's single-call behavior.
+
+### Added — Config field and env variable
+
+- `Config.extraction_chunk_chars: int = 12000` (env
+  `TRACE_EXTRACTION_CHUNK_CHARS`).
+
+### Changed — `extract_entities` signature
+
+`config: Config | None = None` is now an explicit parameter type
+(previously untyped). Behavior unchanged when omitted (`load_config()`).
+
+### Added — `cmd/update_taxonomy_cache.py`
+
+The CLI was promised by `docs/data-model.md` and the
+`validate/semantic/taxonomy.py` docstring since 0.1.0 but never landed.
+Copies `BEACON/schema/threat_taxonomy.json` into
+`TRACE/schema/threat_taxonomy.cached.json` atomically (`tempfile +
+os.replace`), validates the expected top-level shape (`_metadata`,
+`actor_categories` non-empty, `geography_threat_map`), and stamps a
+TRACE-side `_trace_cache` block recording when and from where the
+snapshot was taken (so future runs can show drift in `--dry-run`).
+
+### Documentation
+
+- `docs/crawl_design.md` and `docs/crawl_design.ja.md` document the
+  chunking strategy under §4 ("Chunked extraction for long reports").
+
+---
+
 ## [0.2.0] — 2026-05-09
 
 ### Changed — STIX extraction split into LLM-extract + code-build (BREAKING)

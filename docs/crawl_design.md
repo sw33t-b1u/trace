@@ -142,6 +142,33 @@ triaged against region-specific PIRs.
 The PIR context is a **hint** — the prompt explicitly tells the model not to
 invent entities purely to satisfy a PIR. Filtering already happened at L2.
 
+### Chunked extraction for long reports
+
+A single Gemini call has a hard `max_output_tokens` ceiling, so a 30k-char
+threat report can produce a JSON response that gets truncated mid-stream and
+fails to parse. To avoid that, `extract_entities` splits the article on
+paragraph boundaries (`\n\n`) into chunks no larger than
+`Config.extraction_chunk_chars` (default `12000`, env
+`TRACE_EXTRACTION_CHUNK_CHARS`) and runs the L3 prompt once per chunk.
+
+- A paragraph that on its own exceeds the limit is hard-cut at the boundary.
+- Each chunk's `local_id`s are namespaced (`c0_actor_1`, `c1_actor_1`) so
+  identical aliases from different chunks don't collide.
+- A single chunk that fails to parse is logged with `chunk_index` and
+  skipped; the remaining chunks still contribute their entities.
+
+The per-chunk results are merged by `_merge_extractions`:
+
+| Step | Behavior |
+|------|----------|
+| Entity dedupe | `(type, name.strip().lower())` for everything except `indicator`, which uses `(type, pattern)`. Properties from the second occurrence union into the first; list fields (`labels`, `aliases`, `kill_chain_phases`, `external_references`, `malware_types`, `tool_types`) are deduplicated. Same name + different type → kept as separate entities. |
+| Relationship rewrite | `source` / `target` are remapped through the merge alias map so cross-chunk relationships resolve. |
+| Relationship dedupe | Identical `(source, target, relationship_type)` triples are collapsed. |
+| Hallucinated endpoints | Dropped (alias map miss); counted in the `extractions_merged` log line. |
+
+For short articles (`len(text) <= chunk_chars`) the chunk loop is bypassed
+and behavior is identical to the pre-0.3.0 single-call path.
+
 ## 4a. L4 bundle assembly (code builds STIX)
 
 `stix/extractor.build_stix_bundle_from_extraction(extraction, ...)` is
