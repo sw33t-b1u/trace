@@ -71,6 +71,15 @@ class Config:
         default_factory=lambda: os.environ.get("TRACE_STATE_PATH", "output/crawl_state.json")
     )
 
+    # Concurrency for crawl_batch (TRACE 0.8.0). 1 = sequential (legacy
+    # behaviour). >1 dispatches per-source work to a ThreadPoolExecutor
+    # with that many workers. Bumping this without considering Vertex AI
+    # quota (per-tier QPM) can cause rate-limit errors; recommended
+    # range 1..8.
+    crawl_concurrency: int = field(
+        default_factory=lambda: int(os.environ.get("TRACE_CRAWL_CONCURRENCY", "4"))
+    )
+
     # GitHub / GHE review workflow
     ghe_token: str = field(default_factory=lambda: os.environ.get("TRACE_GHE_TOKEN", ""))
     ghe_repo: str = field(default_factory=lambda: os.environ.get("GHE_REPO", ""))

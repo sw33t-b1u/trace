@@ -6,6 +6,76 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [0.8.0] — 2026-05-09
+
+### Added — Concurrent batch crawl
+
+Sequential `crawl_batch` execution dominated wall-clock time on
+list-driven runs — every URL waited on Gemini round-trips before the
+next URL even started. Per-URL work is mostly I/O-bound (httpx fetches,
+Gemini calls, ATT&CK URL hashing), so a small thread pool yields
+near-linear speedup until the Vertex AI quota is the bottleneck.
+
+`crawl_batch(...)` now accepts `max_workers` (defaults to
+`Config.crawl_concurrency`, env `TRACE_CRAWL_CONCURRENCY`, default 4):
+
+- `max_workers <= 1` keeps the legacy sequential generator behaviour —
+  bit-for-bit identical for existing callers and tests.
+- `> 1` dispatches sources to a `ThreadPoolExecutor` and yields outcomes
+  in **completion order** (not source order). Each worker thread runs
+  a self-contained `_process_source` invocation.
+
+#### Per-URL work refactored to `_process_source`
+
+The big inline for-loop body that previously lived inside
+`crawl_batch` is now a top-level helper. The function returns one
+`BatchOutcome` per source. The main `crawl_batch` either calls it in a
+plain loop (sequential) or submits it to the executor.
+
+The new `BatchOutcome.metrics` field carries the per-URL
+`_RunMetrics` when a metrics collector is registered. The CLI driver
+no longer manages metrics lifecycle inline — it just collects
+`outcome.metrics` from each yielded record.
+
+### Changed — `MetricsCollector` is thread-local
+
+The 0.7.0 collector held a single active run on the instance, which
+would have collapsed concurrent worker runs into one shared bag. The
+0.8.0 collector keeps an active run **per thread id** (`dict[int,
+_RunMetrics]`, lock-protected). `start_run` / `finish_run` /
+`__call__` all consult the current thread's entry. Single-threaded
+callers see no behaviour change.
+
+### Changed — `CrawlState` is concurrency-safe
+
+`get` / `upsert` mutations are now serialised through a
+`threading.Lock`. The atomic `tempfile + os.replace` write in `save()`
+already protected disk consistency; the new lock protects the
+in-memory `entries` dict during concurrent worker access.
+
+### Tests
+
+- 2 new cases in `tests/test_crawl_batch.py`:
+  - `test_concurrent_crawl_processes_all_sources` — 8 URLs through 4
+    workers; every URL emits exactly one outcome.
+  - `test_concurrent_state_upserts_dont_corrupt` — 20 URLs through 8
+    workers; every URL has a state entry afterwards (no race losses).
+- 1 new case in `tests/test_cli_metrics.py::TestThreadLocalRuns` —
+  two threads run independent runs simultaneously without interfering.
+
+### Operational notes
+
+- Vertex AI per-tier QPM caps are not actively rate-limited by TRACE.
+  Bumping `crawl_concurrency` past Vertex AI's `gemini-2.5-flash`
+  quota will surface as `google.api_core.exceptions.ResourceExhausted`
+  errors logged at `extract_entities` call sites; the worker's outcome
+  will be `extraction_failed`. Recommended range 1..8.
+- Outcome order is no longer deterministic for `max_workers > 1`. The
+  state file and bundle outputs are unchanged; only the order of CLI
+  log lines and per-URL summaries differ run-to-run.
+
+---
+
 ## [0.7.0] — 2026-05-09
 
 ### Added — Per-run metrics collection

@@ -251,10 +251,13 @@ class TestRenderSummary:
 
 class TestEdgeCases:
     def test_to_dict_handles_unfinished_run(self):
+        import threading
+
         c = MetricsCollector()
         c.start_run(input_url_or_path="u")
-        run = c._run  # not finish_run'd
-        # No ended_at yet, but to_dict should still produce a payload.
+        # Per-thread storage as of 0.8.0 — peek at the run before
+        # finish_run sets ended_at.
+        run = c._runs[threading.get_ident()]
         run.ended_at = None
         d = to_dict(run)
         assert d["ended_at"] is None
@@ -276,3 +279,57 @@ class TestEdgeCases:
         c(None, "info", {"no_event_key": True})
         run = c.finish_run()
         assert run is not None  # still finishes cleanly
+
+
+# ---------------------------------------------------------------------------
+# 0.8.0 thread-local active runs
+# ---------------------------------------------------------------------------
+
+
+class TestThreadLocalRuns:
+    def test_two_threads_keep_independent_runs(self):
+        import threading
+
+        c = MetricsCollector()
+        # Thread A starts a run, emits one event. Thread B starts a
+        # different run and emits a different event. Each thread's
+        # finish_run should return its own data.
+        results: dict[str, object] = {}
+
+        def thread_a() -> None:
+            c.start_run(input_url_or_path="A")
+            _emit(
+                c,
+                event="extractions_merged",
+                chunks=1,
+                raw_entities=10,
+                merged_entities=10,
+                raw_relationships=5,
+                merged_relationships=5,
+            )
+            results["A"] = c.finish_run()
+
+        def thread_b() -> None:
+            c.start_run(input_url_or_path="B")
+            _emit(
+                c,
+                event="extractions_merged",
+                chunks=2,
+                raw_entities=20,
+                merged_entities=18,
+                raw_relationships=8,
+                merged_relationships=8,
+            )
+            results["B"] = c.finish_run()
+
+        ta = threading.Thread(target=thread_a)
+        tb = threading.Thread(target=thread_b)
+        ta.start()
+        tb.start()
+        ta.join()
+        tb.join()
+
+        assert results["A"].input_url_or_path == "A"  # type: ignore[union-attr]
+        assert results["A"].l3_merged_entities == 10  # type: ignore[union-attr]
+        assert results["B"].input_url_or_path == "B"  # type: ignore[union-attr]
+        assert results["B"].l3_merged_entities == 18  # type: ignore[union-attr]

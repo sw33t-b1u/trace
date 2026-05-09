@@ -127,18 +127,12 @@ def main() -> None:
         "no_objects": 0,
     }
 
-    collector = _metrics.get_collector()
     runs: list = []
-    sources_list = list(sources.sources)
 
-    # Per-URL metrics: start a run for the first URL, then on each yielded
-    # outcome finish the current run and start the next one before resuming
-    # the generator. This keeps metrics scoped to a single URL without
-    # restructuring the existing crawler/batch.py generator API.
-    if collector is not None and sources_list:
-        collector.start_run(input_url_or_path=sources_list[0].url)
-
-    generator = crawl_batch(
+    # crawler/batch.py (TRACE 0.8.0) drives per-URL metrics internally
+    # via _process_source. Outcomes carry their _RunMetrics on
+    # `outcome.metrics`; the CLI just collects them.
+    for outcome in crawl_batch(
         sources,
         state=state,
         output_dir=args.output_dir,
@@ -148,9 +142,7 @@ def main() -> None:
         recheck_on_pir_change=args.recheck_on_pir_change,
         dry_run=args.dry_run,
         config=cfg,
-    )
-
-    for index, outcome in enumerate(generator):
+    ):
         counts[outcome.kind] = counts.get(outcome.kind, 0) + 1
         log = logger.bind(url=outcome.url, label=outcome.label, kind=outcome.kind)
         if outcome.kind == "extracted":
@@ -169,14 +161,8 @@ def main() -> None:
         elif outcome.kind == "no_objects":
             log.warning("source_no_objects", score=outcome.relevance_score)
 
-        if collector is not None:
-            run = collector.finish_run()
-            if run is not None:
-                runs.append(run)
-            # Set up the next URL's run before resuming the generator.
-            next_index = index + 1
-            if next_index < len(sources_list):
-                collector.start_run(input_url_or_path=sources_list[next_index].url)
+        if outcome.metrics is not None:
+            runs.append(outcome.metrics)
 
     if not args.dry_run:
         state.save()

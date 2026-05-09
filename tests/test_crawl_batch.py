@@ -301,3 +301,82 @@ def test_recheck_on_pir_change_reextracts_when_hash_differs(
         )
     assert out[0].kind == "extracted"
     assert extract_call_count["n"] == 1
+
+
+# ---------------------------------------------------------------------------
+# 0.8.0 concurrency
+# ---------------------------------------------------------------------------
+
+
+def test_concurrent_crawl_processes_all_sources(tmp_path: Path) -> None:
+    """With max_workers > 1, all sources still produce outcomes; the
+    yielded order may differ from the source order but every URL is
+    represented exactly once."""
+    cfg_local = Config(gcp_project_id="test", crawl_concurrency=4)
+    state = CrawlState.load(tmp_path / "state.json")
+    urls = [f"https://example.com/{i}" for i in range(8)]
+    sources = _sources(*urls)
+    written: dict[Path, dict] = {}
+
+    def write(p: Path, b: dict) -> None:
+        written[p] = b
+
+    def fake_fetch(url, config=None):  # noqa: ARG001
+        return _fetch_result(url, body=url.encode())
+
+    def fake_read(_url, max_chars=30000):  # noqa: ARG001
+        return "article body"
+
+    with (
+        patch.object(batch_mod, "fetch", side_effect=fake_fetch),
+        patch.object(batch_mod, "read_report", side_effect=fake_read),
+        patch.object(batch_mod, "extract_entities", return_value=_extr("a", "threat-actor")),
+    ):
+        outcomes = list(
+            batch_mod.crawl_batch(
+                sources,
+                state=state,
+                output_dir=tmp_path,
+                config=cfg_local,
+                write_bundle=write,
+            )
+        )
+
+    assert len(outcomes) == 8
+    assert {o.url for o in outcomes} == set(urls)
+    assert all(o.kind == "extracted" for o in outcomes)
+
+
+def test_concurrent_state_upserts_dont_corrupt(tmp_path: Path) -> None:
+    """Many threads writing to CrawlState concurrently still produce a
+    consistent in-memory dict — the threading.Lock added in 0.8.0
+    serialises mutations."""
+    cfg_local = Config(gcp_project_id="test", crawl_concurrency=8)
+    state = CrawlState.load(tmp_path / "state.json")
+    urls = [f"https://example.com/{i}" for i in range(20)]
+    sources = _sources(*urls)
+
+    def fake_fetch(url, config=None):  # noqa: ARG001
+        return _fetch_result(url, body=url.encode())
+
+    with (
+        patch.object(batch_mod, "fetch", side_effect=fake_fetch),
+        patch.object(batch_mod, "read_report", return_value="body"),
+        patch.object(batch_mod, "extract_entities", return_value=_extr("a", "threat-actor")),
+    ):
+        outcomes = list(
+            batch_mod.crawl_batch(
+                sources,
+                state=state,
+                output_dir=tmp_path,
+                config=cfg_local,
+                write_bundle=lambda p, b: None,
+            )
+        )
+
+    assert len(outcomes) == 20
+    # Each URL must have a state entry; no losses from race.
+    for url in urls:
+        entry = state.get(url)
+        assert entry is not None
+        assert entry.relevance.decision == "no_pir"

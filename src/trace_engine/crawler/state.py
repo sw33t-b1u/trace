@@ -29,6 +29,7 @@ import hashlib
 import json
 import os
 import tempfile
+import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -104,6 +105,11 @@ class CrawlState:
     def __init__(self, path: Path, entries: dict[str, StateEntry] | None = None) -> None:
         self.path = path
         self.entries: dict[str, StateEntry] = entries or {}
+        # Concurrent batch crawls (TRACE 0.8.0) call get / upsert from
+        # multiple worker threads. Mutations and reads are serialised via
+        # this lock so the in-memory dict stays consistent. The atomic
+        # tempfile + os.replace dance in save() is unaffected.
+        self._lock = threading.Lock()
 
     @classmethod
     def load(cls, path: str | Path) -> CrawlState:
@@ -120,9 +126,11 @@ class CrawlState:
         return cls(p, entries)
 
     def save(self) -> None:
+        with self._lock:
+            entries_snapshot = {url: e.as_dict() for url, e in self.entries.items()}
         payload = {
             "version": STATE_VERSION,
-            "entries": {url: e.as_dict() for url, e in self.entries.items()},
+            "entries": entries_snapshot,
         }
         self.path.parent.mkdir(parents=True, exist_ok=True)
         # atomic: write to tmp in same dir, then os.replace
@@ -139,7 +147,8 @@ class CrawlState:
         os.replace(tmp_path, self.path)
 
     def get(self, url: str) -> StateEntry | None:
-        return self.entries.get(url)
+        with self._lock:
+            return self.entries.get(url)
 
     def upsert(
         self,
@@ -151,16 +160,17 @@ class CrawlState:
         now: str | None = None,
     ) -> StateEntry:
         ts = now or _now_iso()
-        prev = self.entries.get(url)
-        first_seen = prev.first_seen if prev else ts
-        entry = StateEntry(
-            first_seen=first_seen,
-            last_seen=ts,
-            content_sha256=content_sha256,
-            bundle_path=bundle_path,
-            relevance=relevance,
-        )
-        self.entries[url] = entry
+        with self._lock:
+            prev = self.entries.get(url)
+            first_seen = prev.first_seen if prev else ts
+            entry = StateEntry(
+                first_seen=first_seen,
+                last_seen=ts,
+                content_sha256=content_sha256,
+                bundle_path=bundle_path,
+                relevance=relevance,
+            )
+            self.entries[url] = entry
         return entry
 
 

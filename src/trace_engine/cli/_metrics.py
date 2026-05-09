@@ -88,15 +88,20 @@ class _RunMetrics:
 
 
 class MetricsCollector:
-    """Aggregate structured-log events for one CLI invocation.
+    """Aggregate structured-log events for CLI invocations.
 
     Acts as a structlog processor — it looks at each log record's
-    ``event`` field and updates the active ``_RunMetrics``. Records with
-    no active run are passed through untouched.
+    ``event`` field and updates the **active run for the current
+    thread**. Records with no active run on the current thread are
+    passed through untouched.
+
+    The per-thread design (TRACE 0.8.0) lets concurrent batch crawls
+    keep one ``_RunMetrics`` per worker without the runs interfering.
     """
 
     def __init__(self) -> None:
-        self._run: _RunMetrics | None = None
+        self._runs: dict[int, _RunMetrics] = {}
+        self._runs_lock = threading.Lock()
 
     # ---- run lifecycle ----
 
@@ -106,32 +111,35 @@ class MetricsCollector:
         input_url_or_path: str | None = None,
     ) -> str:
         run_id = uuid.uuid4().hex
-        self._run = _RunMetrics(
+        run = _RunMetrics(
             run_id=run_id,
             started_at=datetime.now(tz=UTC),
             input_url_or_path=input_url_or_path,
         )
+        with self._runs_lock:
+            self._runs[threading.get_ident()] = run
         return run_id
 
     def finish_run(self) -> _RunMetrics | None:
-        if self._run is None:
+        tid = threading.get_ident()
+        with self._runs_lock:
+            run = self._runs.pop(tid, None)
+        if run is None:
             return None
-        self._run.ended_at = datetime.now(tz=UTC)
-        finished = self._run
-        self._run = None
-        return finished
+        run.ended_at = datetime.now(tz=UTC)
+        return run
 
     # ---- structlog processor ----
 
     def __call__(self, logger, method_name: str, event_dict: dict) -> dict:
-        if self._run is not None:
-            self._observe(event_dict)
+        tid = threading.get_ident()
+        with self._runs_lock:
+            run = self._runs.get(tid)
+        if run is not None:
+            self._observe(event_dict, run)
         return event_dict
 
-    def _observe(self, event_dict: dict) -> None:
-        run = self._run
-        if run is None:
-            return
+    def _observe(self, event_dict: dict, run: _RunMetrics) -> None:
         event = event_dict.get("event")
         if not isinstance(event, str):
             return
