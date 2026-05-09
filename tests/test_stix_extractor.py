@@ -728,3 +728,61 @@ class TestExtensionPropertiesAndVocabDemotion:
         malware = next(o for o in bundle["objects"] if o["type"] == "malware")
         assert malware["malware_types"] == ["downloader", "trojan"]
         assert "labels" not in malware
+
+
+# ---------------------------------------------------------------------------
+# 0.5.2 — sophistication on intrusion-set demoted to labels ({401} fix)
+# ---------------------------------------------------------------------------
+
+
+class TestSophisticationDemotion:
+    def test_intrusion_set_sophistication_moves_to_labels(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="a",
+                    type="intrusion-set",
+                    properties={"name": "FIN7", "sophistication": "advanced"},
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        actor = next(o for o in bundle["objects"] if o["type"] == "intrusion-set")
+        assert "sophistication" not in actor
+        assert "advanced" in actor["labels"]
+
+    def test_intrusion_set_sophistication_dedup_in_existing_labels(self):
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="a",
+                    type="intrusion-set",
+                    properties={
+                        "name": "FIN7",
+                        "sophistication": "advanced",
+                        "labels": ["financially-motivated", "advanced"],
+                    },
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        actor = next(o for o in bundle["objects"] if o["type"] == "intrusion-set")
+        assert "sophistication" not in actor
+        # No duplicate "advanced".
+        assert actor["labels"] == ["financially-motivated", "advanced"]
+
+    def test_threat_actor_sophistication_preserved(self):
+        # `sophistication` is valid on threat-actor — must NOT be demoted.
+        ext = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="a",
+                    type="threat-actor",
+                    properties={"name": "FIN7", "sophistication": "advanced"},
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        actor = next(o for o in bundle["objects"] if o["type"] == "threat-actor")
+        assert actor.get("sophistication") == "advanced"
+        assert "advanced" not in actor.get("labels", [])

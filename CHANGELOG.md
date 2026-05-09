@@ -6,6 +6,45 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [0.5.2] — 2026-05-09
+
+### Fixed — `{401} sophistication` on intrusion-set
+
+The L3 LLM occasionally emits `sophistication` on intrusion-set
+objects. STIX 2.1 §4.5 defines `sophistication` for `threat-actor`
+only; on intrusion-set it is a custom property that triggers `{401}`.
+The bundle assembler now demotes it to `labels` (open vocab) — same
+pattern as the 0.5.1 vocab demotion. The semantic survives without
+the warning.
+
+`threat-actor.sophistication` is preserved untouched.
+
+### Documented — Accepted `{202}` suggested-target warnings
+
+Two `{202}` warnings (`tool uses malware` and `tool uses tool`) are
+now explicitly accepted in `docs/data-model.{md,ja.md}` under a new
+"Accepted OASIS validator warnings" section. STIX 2.1 §4.13 lists
+these as SHOULD rather than MUST, and dropping the relationships
+would discard valid attack-graph edges that incident reports
+regularly carry. Major consumers (MISP, OpenCTI) ingest these without
+complaint. Users who want to gate on them can run
+`validate_stix --strict` to promote to errors.
+
+### Tests
+
+- 3 new cases in
+  `tests/test_stix_extractor.py::TestSophisticationDemotion`:
+  intrusion-set demotion, dedup against existing labels, and
+  threat-actor preservation.
+
+### Compliance
+
+Combined with 0.3.2 / 0.4.0 / 0.5.0 / 0.5.1, FIN7-class bundles now
+pass the OASIS validator with **errors=0** and **warnings=2** (the
+two intentionally-accepted `{202}` cases).
+
+---
+
 ## [0.5.1] — 2026-05-09
 
 ### Fixed — Remaining warnings on FIN7-class bundles

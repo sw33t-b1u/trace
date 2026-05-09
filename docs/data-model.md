@@ -122,6 +122,17 @@ local checks that the OASIS validator does not cover.
 | `REL_REF_UNRESOLVED` | error | `relationship.{source_ref,target_ref}` does not match any `objects[*].id` |
 | `KILL_CHAIN_NAME` | warning | `kill_chain_phases[*].kill_chain_name != "mitre-attack"` (SAGE drops these) |
 
+### Accepted OASIS validator warnings
+
+Some OASIS warnings are **explicitly accepted** by TRACE because they sit
+at the SHOULD level of the spec and the alternative would discard valid
+threat-intel semantics. Users who want to gate on them can run
+`validate_stix --strict`, which promotes warnings to errors.
+
+| Code | Pattern | Why accepted |
+|------|---------|--------------|
+| `{202}` | `tool` source with `uses` relationship targeting `malware` or `tool` | STIX 2.1 §4.13 defines suggested target sets for each `(source_type, relationship_type)` pair. The combinations `tool uses malware` and `tool uses tool` are not in the suggested set, but the semantics ("attack tool A leverages malware/tool B") are well-defined and frequently observed in incident reports. Major STIX consumers (MISP, OpenCTI) ingest these without complaint. Dropping the relationship would lose attack-graph edges. |
+
 ### TRACE bundle metadata extension (L4)
 
 `build_stix_bundle_from_extraction` carries TRACE-specific metadata via a

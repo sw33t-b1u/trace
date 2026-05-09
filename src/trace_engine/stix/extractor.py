@@ -773,6 +773,34 @@ def _apply_required_property_defaults(obj: dict, ts: str) -> None:
         obj.setdefault("pattern_type", "stix")
     elif stype == "tool":
         _filter_open_vocab(obj, "tool_types", _STIX21_TOOL_TYPE_OV)
+    elif stype == "intrusion-set":
+        # STIX 2.1 §4.5 does not define `sophistication` for intrusion-set
+        # (it lives on `threat-actor` only). When the LLM puts it here,
+        # demote to `labels` (open vocab) — same pattern as the open-vocab
+        # demotion in 0.5.1.
+        _demote_property_to_labels(obj, "sophistication")
+
+
+def _demote_property_to_labels(obj: dict, field_name: str) -> None:
+    """Move a single LLM-supplied scalar property into ``labels``.
+
+    Used for properties the LLM emits on a STIX type that does not define
+    them (e.g. ``sophistication`` on ``intrusion-set``). The original
+    field is removed; the value joins ``labels`` (deduped, order-preserving)
+    so the information survives without tripping {401}.
+    """
+    raw = obj.pop(field_name, None)
+    if not isinstance(raw, str):
+        return
+    raw = raw.strip()
+    if not raw:
+        return
+    existing = obj.get("labels")
+    if isinstance(existing, list):
+        if raw not in existing:
+            existing.append(raw)
+    else:
+        obj["labels"] = [raw]
 
 
 def _filter_open_vocab(obj: dict, field_name: str, vocab: frozenset[str]) -> None:
