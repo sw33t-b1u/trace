@@ -6,6 +6,86 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [0.7.0] — 2026-05-09
+
+### Added — Per-run metrics collection
+
+Chunked extraction (0.3.0) multiplied the number of LLM calls per
+crawl, but operators had no way to see token consumption, parse
+failures, or defense activations except by reading raw structured
+logs. 0.7.0 adds a non-intrusive metrics layer.
+
+#### `MetricsCollector` (`src/trace_engine/cli/_metrics.py`)
+
+- Registered as a structlog **processor** in
+  ``cli/_logging.py`` so existing log call sites are unaffected.
+- Inspects each log record's ``event`` field and updates an in-memory
+  ``_RunMetrics`` for the active run (lifecycle: ``start_run`` /
+  ``finish_run``).
+- Records that arrive while no run is active are passed through
+  untouched — non-CLI callers (tests, library use) see no behaviour
+  change.
+
+#### Tracked counters
+
+- **L2**: model_tier, score, matched_pir_ids, salvaged / failed flags.
+- **L3**: model, task, chunks, chunk_chars_max, llm_calls,
+  llm_output_chars_total, parse_failures, raw_entities,
+  merged_entities, raw_relationships, merged_relationships.
+- **Defenses**: indicators_dropped_invalid_pattern,
+  relationships_dropped_unresolved,
+  relationships_dropped_type_mismatch, external_ref_fetched,
+  external_ref_fetch_failed.
+- **Per-tier LLM totals**: `simple` / `medium` / `complex` calls and
+  output character counts (rolling totals).
+- **Bundle**: path, entities, relationships, object_count.
+
+#### `crawl_single` integration
+
+- Starts a run on entry, finishes on bundle write.
+- Prints a human-readable summary to stdout after the bundle line:
+
+  ```
+  === Run summary ===
+  Input:        https://example.com/post (8,000 body / 10,000 raw chars)
+  L2:           score=0.60 → kept matched=PIR-001
+  L3:           3 chunks, 3 LLM calls, 30,000 output chars, 0 parse failures
+                raw 60/45 → merged 46/45 (entities/relationships)
+  Bundle:       92 objects (46 entities, 45 relationships) → output/bundle.json
+  Defenses:     2 ATT&CK URLs hashed, 1 indicators dropped (bad pattern)
+  Duration:     12.3s
+  Metrics:      output/run_metrics_<ts>_<id8>.json
+  ```
+
+- Persists the full structured payload as JSON in
+  ``output/run_metrics_<ts>_<id8>.json``.
+
+#### `crawl_batch` integration
+
+- Starts a run **per source URL** (option (a) of the design poll). The
+  generator-driven loop calls ``finish_run`` on each yielded outcome
+  and ``start_run`` for the next URL before resuming.
+- All per-URL summaries print to stdout in order, followed by a
+  combined ``output/run_metrics_batch_<ts>.json`` containing every
+  run plus a ``summary`` section with batch-level totals.
+
+### Tests
+
+- 13 new cases in `tests/test_cli_metrics.py` covering full
+  lifecycle observation, L2 failure / salvage paths, parse-failure
+  counting, processor pass-through semantics, atomic JSON write,
+  batch-summary aggregation, and unknown-event resilience.
+
+### Compatibility
+
+- No public API changes. Library callers
+  (`extract_entities`, `build_stix_bundle_from_extraction`,
+  `validate_*` modules) behave identically. Metrics collection is
+  opt-in via ``_metrics.install_collector()`` from CLI entry points
+  only.
+
+---
+
 ## [0.6.1] — 2026-05-09
 
 ### Fixed — Defensive guards for the more permissive 0.6.0 prompt

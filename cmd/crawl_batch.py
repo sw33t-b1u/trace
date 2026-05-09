@@ -28,6 +28,7 @@ from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from trace_engine.cli import _metrics  # noqa: E402
 from trace_engine.cli._logging import configure as configure_logging  # noqa: E402
 from trace_engine.config import load_config  # noqa: E402
 from trace_engine.crawler.batch import crawl_batch  # noqa: E402
@@ -36,6 +37,7 @@ from trace_engine.crawler.state import CrawlState  # noqa: E402
 from trace_engine.pir.loader import load_pir  # noqa: E402
 
 load_dotenv()
+_metrics.install_collector()
 configure_logging()
 logger = structlog.get_logger(__name__)
 
@@ -125,7 +127,18 @@ def main() -> None:
         "no_objects": 0,
     }
 
-    for outcome in crawl_batch(
+    collector = _metrics.get_collector()
+    runs: list = []
+    sources_list = list(sources.sources)
+
+    # Per-URL metrics: start a run for the first URL, then on each yielded
+    # outcome finish the current run and start the next one before resuming
+    # the generator. This keeps metrics scoped to a single URL without
+    # restructuring the existing crawler/batch.py generator API.
+    if collector is not None and sources_list:
+        collector.start_run(input_url_or_path=sources_list[0].url)
+
+    generator = crawl_batch(
         sources,
         state=state,
         output_dir=args.output_dir,
@@ -135,7 +148,9 @@ def main() -> None:
         recheck_on_pir_change=args.recheck_on_pir_change,
         dry_run=args.dry_run,
         config=cfg,
-    ):
+    )
+
+    for index, outcome in enumerate(generator):
         counts[outcome.kind] = counts.get(outcome.kind, 0) + 1
         log = logger.bind(url=outcome.url, label=outcome.label, kind=outcome.kind)
         if outcome.kind == "extracted":
@@ -154,12 +169,28 @@ def main() -> None:
         elif outcome.kind == "no_objects":
             log.warning("source_no_objects", score=outcome.relevance_score)
 
+        if collector is not None:
+            run = collector.finish_run()
+            if run is not None:
+                runs.append(run)
+            # Set up the next URL's run before resuming the generator.
+            next_index = index + 1
+            if next_index < len(sources_list):
+                collector.start_run(input_url_or_path=sources_list[next_index].url)
+
     if not args.dry_run:
         state.save()
 
     summary = " ".join(f"{k}={v}" for k, v in counts.items() if v)
     logger.info("crawl_batch_done", **counts, failures=failures)
     print(f"Crawl batch summary: {summary or '(no sources)'}")
+
+    if runs:
+        for run in runs:
+            print()
+            print(_metrics.render_summary(run))
+        path = _metrics.write_batch_json(runs, args.output_dir)
+        print(f"\nMetrics:      {path}")
 
     sys.exit(1 if failures else 0)
 

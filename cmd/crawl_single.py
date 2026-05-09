@@ -35,6 +35,7 @@ from dotenv import load_dotenv
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from trace_engine.cli import _metrics  # noqa: E402
 from trace_engine.cli._logging import configure as configure_logging  # noqa: E402
 from trace_engine.config import load_config  # noqa: E402
 from trace_engine.ingest.report_reader import _MAX_CHARS, read_report  # noqa: E402
@@ -46,6 +47,7 @@ from trace_engine.stix.extractor import (  # noqa: E402
 )
 
 load_dotenv()
+_metrics.install_collector()
 configure_logging()
 logger = structlog.get_logger(__name__)
 
@@ -117,6 +119,10 @@ def main() -> None:
     args = parser.parse_args()
     cfg = load_config()
 
+    collector = _metrics.get_collector()
+    if collector is not None:
+        collector.start_run(input_url_or_path=str(args.input))
+
     try:
         text = read_report(args.input, max_chars=args.max_chars)
     except FileNotFoundError as exc:
@@ -179,6 +185,14 @@ def main() -> None:
         f"Validate before feeding SAGE:\n"
         f"  uv run python cmd/validate_stix.py --bundle {out}"
     )
+
+    if collector is not None:
+        run = collector.finish_run()
+        if run is not None:
+            print()
+            print(_metrics.render_summary(run))
+            metrics_path = _metrics.write_run_json(run, _OUTPUT_DIR)
+            print(f"Metrics:      {metrics_path}")
 
 
 if __name__ == "__main__":
