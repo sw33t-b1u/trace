@@ -282,8 +282,9 @@ everything 1.4.0 emits.
 
 ### Future scope
 
-- E2E verification with the 楽天 Edy context.md once a User Accounts
-  section is added there (mirrors Initiative A's verification flow).
+- E2E verification with the in-house e-money pilot context.md
+  once a User Accounts section is added there (mirrors Initiative
+  A's verification flow).
 - Phase 2 evaluation gate (per Initiative B design doc):
   privileged-account PIR weighting, account lifecycle automation,
   query API endpoints.

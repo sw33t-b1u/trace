@@ -1168,7 +1168,7 @@ class TestIdentitySectorsDemotion:
                     local_id="i",
                     type="identity",
                     properties={
-                        "name": "Edy Co.",
+                        "name": "Acme Payments Inc.",
                         "sectors": ["financial-services", "fintech", "card-payments"],
                     },
                 )
@@ -1528,7 +1528,7 @@ class TestAttackMotivationDemotion:
 
 
 _ASSETS_FOR_IAE = [
-    {"id": "asset-CA-001", "name": "決済処理中央サーバ", "tags": ["financial"]},
+    {"id": "asset-CA-001", "name": "業務処理中央サーバ", "tags": ["financial"]},
     {"id": "asset-CA-002", "name": "ERP System", "tags": ["erp"]},
 ]
 

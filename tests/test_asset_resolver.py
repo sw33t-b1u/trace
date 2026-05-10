@@ -5,23 +5,23 @@ from __future__ import annotations
 from trace_engine.stix.asset_resolver import resolve_asset_reference
 
 _ASSETS = [
-    {"id": "asset-CA-001", "name": "決済処理中央サーバ", "tags": ["financial", "core"]},
-    {"id": "asset-CA-002", "name": "残高管理データベース", "tags": ["database", "financial"]},
-    {"id": "asset-CA-003", "name": "Edy Mypage Portal", "tags": ["web", "external-facing"]},
+    {"id": "asset-CA-001", "name": "業務処理中央サーバ", "tags": ["financial", "core"]},
+    {"id": "asset-CA-002", "name": "業務データベース", "tags": ["database", "financial"]},
+    {"id": "asset-CA-003", "name": "Customer Self-Service Portal", "tags": ["web", "external-facing"]},
     {"id": "asset-CA-004", "name": "Identity System", "tags": ["identity", "auth"]},
 ]
 
 
 class TestTier1Exact:
     def test_exact_japanese_name(self):
-        r = resolve_asset_reference("決済処理中央サーバ", _ASSETS)
+        r = resolve_asset_reference("業務処理中央サーバ", _ASSETS)
         assert r is not None
         assert r.asset_id == "asset-CA-001"
         assert r.confidence == 80
         assert r.tier == 1
 
     def test_exact_english_case_insensitive(self):
-        r = resolve_asset_reference("edy mypage portal", _ASSETS)
+        r = resolve_asset_reference("customer self-service portal", _ASSETS)
         assert r is not None
         assert r.asset_id == "asset-CA-003"
         assert r.confidence == 80
@@ -29,26 +29,27 @@ class TestTier1Exact:
 
 class TestTier2Substring:
     def test_substring_match(self):
-        r = resolve_asset_reference("Mypage", _ASSETS)
+        r = resolve_asset_reference("Self-Service", _ASSETS)
         assert r is not None
         assert r.asset_id == "asset-CA-003"
         assert r.confidence == 50
         assert r.tier == 2
 
     def test_short_substring_below_threshold_does_not_match(self):
-        # "Edy" (3 chars) is below the 4-char minimum.
-        r = resolve_asset_reference("Edy", _ASSETS)
-        # Drops or matches via tags — neither tag has "edy" so falls through.
+        # "Cus" (3 chars) is below the 4-char minimum and is a
+        # substring of "Customer Self-Service Portal".
+        r = resolve_asset_reference("Cus", _ASSETS)
+        # Drops or matches via tags — neither tag has "cus" so falls through.
         assert r is None
 
     def test_ambiguous_substring_drops(self):
         # "Financial" appears as a tag in 2 assets — but tier 2 is name-
         # based so falls through. Add an asset to force tier-2 ambiguity.
         assets = _ASSETS + [
-            {"id": "asset-CA-099", "name": "Edy Mypage Reports", "tags": []},
+            {"id": "asset-CA-099", "name": "Customer Self-Service Reports", "tags": []},
         ]
-        # "Mypage" now matches both CA-003 and CA-099 → ambiguous.
-        r = resolve_asset_reference("Mypage", assets)
+        # "Self-Service" now matches both CA-003 and CA-099 → ambiguous.
+        r = resolve_asset_reference("Self-Service", assets)
         assert r is None
 
 
