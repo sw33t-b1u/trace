@@ -324,7 +324,7 @@ def test_concurrent_crawl_processes_all_sources(tmp_path: Path) -> None:
     def fake_fetch(url, config=None):  # noqa: ARG001
         return _fetch_result(url, body=url.encode())
 
-    def fake_read(_url, max_chars=30000):  # noqa: ARG001
+    def fake_read(_url, max_chars=30000, *, config=None):  # noqa: ARG001
         return "article body"
 
     with (

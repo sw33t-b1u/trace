@@ -6,6 +6,75 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.4.1] — 2026-05-10
+
+### Fixed — `crawl_user_agent` ignored by URL fetch (markitdown path)
+
+Initiative B E2E verification stalled at the LLM-crawl step with
+``HTTPError: 429 Client Error: Too Many Requests`` against
+Trend Micro's research blog. Re-trying after a long wait did not
+help — root cause was structural, not rate-limit timing.
+
+`ingest/report_reader._markitdown_convert` instantiated
+``MarkItDown()`` without arguments. The library's default behaviour
+creates an internal ``requests.Session`` that sets only the
+``Accept`` header — no ``User-Agent``. The underlying ``requests``
+library therefore sent ``python-requests/<version>`` as the UA,
+which Cloudflare-fronted CTI sites reliably block as bot traffic.
+The TRACE ``crawl_user_agent`` config / ``TRACE_CRAWL_USER_AGENT``
+env var was wired into ``crawler/fetcher.py`` (used only by the
+batch path's httpx fetch) but **not** into the markitdown URL fetch
+that ``crawl_single`` uses.
+
+#### Fix
+
+- `_markitdown_convert(source, *, config=None)` now builds a
+  ``requests.Session`` with both the configured UA and markitdown's
+  preferred ``Accept`` header, then passes it as
+  ``MarkItDown(requests_session=session)``.
+- `read_report(source, max_chars=..., *, config=None)` accepts and
+  forwards the same parameter.
+- `cmd/crawl_single.py` and `crawler/batch._process_source_body`
+  pass their already-loaded ``Config`` instance through.
+
+#### Default UA changed
+
+The pre-1.4.1 default carried a tool-identifying string. Cloudflare-
+class WAFs treated it as a known bot pattern. The new default is a
+widely-deployed Firefox-on-macOS string, which passes typical
+commercial bot-detection heuristics. Operators who deliberately
+want to identify CTI collectors override via
+``TRACE_CRAWL_USER_AGENT``.
+
+```
+# Before (1.4.0):
+TRACE_CRAWL_USER_AGENT default = "TRACE/0.1 (+https://github.com/...)"
+
+# After (1.4.1):
+TRACE_CRAWL_USER_AGENT default = "Mozilla/5.0 (Macintosh; Intel Mac
+  OS X 11.1; rv:136.0) Gecko/20100101 Firefox/136.0"
+```
+
+### Tests
+
+5 new cases in `tests/test_report_reader_ua.py`:
+
+- `MarkItDown(requests_session=...)` receives a session whose
+  ``User-Agent`` header equals ``Config.crawl_user_agent``
+- the session retains markitdown's preferred ``Accept`` header
+- the in-code default is a browser-shaped string with no
+  ``TRACE/`` / ``trace/`` / ``github.com/sw33t-b1u`` substring
+- ``TRACE_CRAWL_USER_AGENT`` env var override still wins
+- ``read_report`` forwards the caller-supplied ``Config`` to
+  ``_markitdown_convert`` (regression guard for the CLI path)
+
+Plus `tests/test_crawl_batch.py::test_concurrent_crawl_processes_all_sources`'s
+mock signature updated to accept the new ``config=`` kwarg.
+
+All 266 tests pass; 0 vulnerabilities.
+
+---
+
 ## [1.4.0] — 2026-05-10
 
 ### Added — Initiative B Phase 2: L3 prompt + bundle assembler for user-account

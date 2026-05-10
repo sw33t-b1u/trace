@@ -234,7 +234,7 @@ def _process_source_body(
         )
 
     try:
-        text = read_report(source.url, max_chars=source.max_chars or 30_000)
+        text = read_report(source.url, max_chars=source.max_chars or 30_000, config=cfg)
     except Exception as exc:  # markitdown surfaces many runtime errors
         logger.warning("source_read_failed", url=source.url, error=str(exc))
         return BatchOutcome(

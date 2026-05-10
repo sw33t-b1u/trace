@@ -139,7 +139,7 @@ def main() -> None:
         collector.start_run(input_url_or_path=str(args.input))
 
     try:
-        text = read_report(args.input, max_chars=args.max_chars)
+        text = read_report(args.input, max_chars=args.max_chars, config=cfg)
     except FileNotFoundError as exc:
         logger.error("input_not_found", error=str(exc))
         sys.exit(1)

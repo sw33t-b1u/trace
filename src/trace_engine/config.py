@@ -62,9 +62,19 @@ class Config:
     )
 
     # Crawler
+    # The pre-1.4.1 default carried a bot-identifying tool string (the
+    # project's own name + URL). Cloudflare-fronted CTI sites (Trend
+    # Micro, others) reliably blocked that pattern with 429 / 403 — see
+    # TRACE 1.4.1 changelog. The current default is a widely-deployed
+    # Firefox-on-macOS string that passes typical commercial
+    # bot-detection heuristics. Override via TRACE_CRAWL_USER_AGENT when
+    # a more identifying UA is operationally required (e.g. internal
+    # honeypots that whitelist CTI collectors).
     crawl_user_agent: str = field(
         default_factory=lambda: os.environ.get(
-            "TRACE_CRAWL_USER_AGENT", "TRACE/0.1 (+https://github.com/sw33t-b1u/sage)"
+            "TRACE_CRAWL_USER_AGENT",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 11.1; rv:136.0) "
+            "Gecko/20100101 Firefox/136.0",
         )
     )
     state_path: str = field(

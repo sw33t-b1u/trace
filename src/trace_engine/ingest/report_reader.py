@@ -19,6 +19,8 @@ from pathlib import Path
 
 import structlog
 
+from trace_engine.config import Config, load_config
+
 logger = structlog.get_logger(__name__)
 
 # Target character limit for the LLM prompt (~7.5 k tokens).
@@ -27,18 +29,37 @@ logger = structlog.get_logger(__name__)
 _MAX_CHARS = 30_000
 
 
-def _markitdown_convert(source: str) -> str:
+def _markitdown_convert(source: str, *, config: Config | None = None) -> str:
     """Convert a URL or file path to Markdown using markitdown.
+
+    1.4.1: TRACE-configured ``crawl_user_agent`` is now propagated into
+    markitdown's URL fetch via a custom ``requests.Session``. The
+    upstream library's default behaviour does not set a User-Agent at
+    all, so the underlying ``requests`` library sends
+    ``python-requests/X.Y.Z`` — Cloudflare-fronted CTI sites
+    (Trend Micro, others) reliably reject that with 429/403. Passing a
+    realistic browser UA from ``Config.crawl_user_agent`` resolves it.
 
     Raises:
         RuntimeError: If markitdown is not installed.
     """
     try:
+        import requests  # noqa: PLC0415
         from markitdown import MarkItDown  # noqa: PLC0415
     except ImportError as exc:
         raise RuntimeError("markitdown is required for PDF/URL input. Run: uv sync") from exc
 
-    md = MarkItDown()
+    cfg = config or load_config()
+    session = requests.Session()
+    session.headers.update(
+        {
+            "User-Agent": cfg.crawl_user_agent,
+            # Mirror markitdown's own preference so we don't lose the
+            # markdown-friendly Accept negotiation.
+            "Accept": "text/markdown, text/html;q=0.9, text/plain;q=0.8, */*;q=0.1",
+        }
+    )
+    md = MarkItDown(requests_session=session)
     result = md.convert(source)
     return result.text_content or ""
 
@@ -61,7 +82,12 @@ def _find_article_start(text: str) -> int:
     return 0
 
 
-def read_report(source: str | Path, max_chars: int = _MAX_CHARS) -> str:
+def read_report(
+    source: str | Path,
+    max_chars: int = _MAX_CHARS,
+    *,
+    config: Config | None = None,
+) -> str:
     """Convert a CTI report to Markdown text and truncate to max_chars.
 
     Detects source type:
@@ -73,6 +99,10 @@ def read_report(source: str | Path, max_chars: int = _MAX_CHARS) -> str:
         source: URL string, PDF path, or plain-text/Markdown file path.
         max_chars: Maximum characters returned (default: _MAX_CHARS = 30,000).
                    Increase for lengthy technical reports.
+        config: Optional ``Config`` instance. The CLI passes its already-
+            loaded config so the URL fetch shares the same User-Agent
+            settings as everywhere else. Falls back to ``load_config()``
+            when omitted.
 
     Returns:
         Extracted text, truncated to max_chars.
@@ -84,7 +114,7 @@ def read_report(source: str | Path, max_chars: int = _MAX_CHARS) -> str:
     s = str(source)
 
     if s.lower().startswith(("http://", "https://")):
-        text = _markitdown_convert(s)
+        text = _markitdown_convert(s, config=config)
         start = _find_article_start(text)
         body = text[start:]
         logger.info("url_converted", url=s, chars=len(text), body_start=start, body_chars=len(body))
@@ -95,7 +125,7 @@ def read_report(source: str | Path, max_chars: int = _MAX_CHARS) -> str:
         raise FileNotFoundError(f"Report file not found: {path}")
 
     if path.suffix.lower() == ".pdf":
-        text = _markitdown_convert(str(path))
+        text = _markitdown_convert(str(path), config=config)
         logger.info("pdf_converted", path=str(path), chars=len(text))
         return text[:max_chars]
 
