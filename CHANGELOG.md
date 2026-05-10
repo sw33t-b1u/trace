@@ -6,6 +6,80 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.4.2] — 2026-05-10
+
+### Changed — `account_type` aligned to STIX 2.1 §6.4 ``account-type-ov`` strictly
+
+Pairs with BEACON 0.12.1. Initiative B's first slice (TRACE
+1.4.0 / BEACON 0.12.0) emitted operationally-named values
+(`service`, `unix-account`, `azure-ad`, `google-workspace`,
+`saas`, `kerberos`, `other`) on the synthesized STIX
+`user-account` SCO. None of those appear in STIX 2.1 §6.4
+``account-type-ov``, so the OASIS ``stix2-validator`` issued one
+`{244}` warning per emitted SCO — Initiative B real-LLM crawl on
+the Trend Micro article in 1.4.1 produced 4 such warnings.
+
+We do not extend the STIX vocabulary; doing so erodes the
+rationale for using STIX. 1.4.2 restricts emitted values to the
+spec OV and treats every other distinction as either
+`is_service_account: true` or free-form `description`.
+
+#### Extractor changes
+
+- `UserAccountObservation.account_type` default changed from
+  ``"other"`` → ``""``.
+- `_coerce_user_account_observations` rewrote the validation
+  set: only the 12 STIX OV values are kept; anything else is
+  coerced to empty string so the bundle assembler can omit
+  `account_type` entirely (it is OPTIONAL in STIX 2.1 §6.4).
+- L3 prompt (`stix_extraction.md`) updated to instruct the LLM
+  to use STIX OV only and to leave `account_type` empty when no
+  spec value applies. Examples reworked accordingly (Azure AD /
+  service accounts → empty + `is_service_account: true`).
+
+#### Pydantic schema
+
+`validate/schema/models.UserAccountEntry.account_type` Literal
+now restricts values to:
+
+```
+"" | unix | windows-local | windows-domain | ldap | tacacs |
+radius | nis | openid | facebook | skype | twitter | kavi
+```
+
+This matches the BEACON 0.12.1 schema; the cross-project
+validator (`validate_user_accounts`) accepts both BEACON-source
+and trace-source artifacts under the same vocabulary.
+
+#### Bundle assembler
+
+- `account_type` is emitted on the `user-account` SCO **only when
+  set** (non-empty STIX OV value). When empty, the property is
+  omitted from the SCO — STIX 2.1 §6.4 makes `account_type`
+  OPTIONAL, so this is fully spec-compliant.
+- `{244}` validator warning therefore disappears on Initiative B
+  real-LLM crawl output.
+
+#### Test updates
+
+- `test_unknown_account_type_demoted_to_other` →
+  `test_unknown_account_type_coerced_to_empty`.
+- Fixtures updated: `unix-account` → `unix`, `service` → ``""``
+  + `is_service_account=True`.
+
+#### Migration (consumers)
+
+- `BEACON/input/context.md` user-account entries: see BEACON
+  0.12.1 migration table.
+- `SAGE/tests/fixtures/synthetic_trace_user_account_bundle.json`:
+  `service` SCO drops `account_type`; STIX OV values pass through
+  unchanged.
+
+SAGE 0.7.0 schema needs no change (STRING(64) `account_type`
+already accepts both OV values and NULL/empty).
+
+---
+
 ## [1.4.1] — 2026-05-10
 
 ### Fixed — `crawl_user_agent` ignored by URL fetch (markitdown path)

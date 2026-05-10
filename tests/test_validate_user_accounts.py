@@ -43,7 +43,7 @@ def _identity_assets_doc(identity_ids: list[str]) -> IdentityAssetsDocument:
 class TestSchema:
     def test_minimal_user_account(self):
         ua = UserAccountEntry(id="ua-x", account_login="x")
-        assert ua.account_type == "other"
+        assert ua.account_type == ""  # 1.4.2 strict STIX OV: empty default
         assert ua.is_privileged is False
         assert ua.is_service_account is False
 

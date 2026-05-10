@@ -240,17 +240,25 @@ class IdentityAssetsDocument(_StrictModel):
 # in ``validate_user_accounts`` semantic.
 
 
+# 1.4.2: STIX 2.1 §6.4 ``account-type-ov`` canonical vocabulary plus
+# empty string for "no suitable spec value". Operational distinctions
+# (Azure AD / Kerberos / SaaS / generic services) move to
+# ``is_service_account`` + ``description`` instead. {244} validator
+# warning therefore disappears.
 _ACCOUNT_TYPE_OV: tuple[str, ...] = (
-    "unix-account",
+    "",
+    "unix",
     "windows-local",
     "windows-domain",
     "ldap",
-    "kerberos",
-    "azure-ad",
-    "google-workspace",
-    "saas",
-    "service",
-    "other",
+    "tacacs",
+    "radius",
+    "nis",
+    "openid",
+    "facebook",
+    "skype",
+    "twitter",
+    "kavi",
 )
 
 
@@ -259,17 +267,20 @@ class UserAccountEntry(_StrictModel):
     account_login: str = Field(min_length=1)
     display_name: str = ""
     account_type: Literal[
-        "unix-account",
+        "",
+        "unix",
         "windows-local",
         "windows-domain",
         "ldap",
-        "kerberos",
-        "azure-ad",
-        "google-workspace",
-        "saas",
-        "service",
-        "other",
-    ] = "other"
+        "tacacs",
+        "radius",
+        "nis",
+        "openid",
+        "facebook",
+        "skype",
+        "twitter",
+        "kavi",
+    ] = ""
     is_privileged: bool = False
     is_service_account: bool = False
     identity_id: str = ""  # optional

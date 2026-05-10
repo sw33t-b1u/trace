@@ -1747,7 +1747,11 @@ class TestUserAccountObservationCoercion:
         assert len(extraction.user_account_observations) == 1
         assert extraction.user_account_observations[0].account_login == "alice"
 
-    def test_unknown_account_type_demoted_to_other(self):
+    def test_unknown_account_type_coerced_to_empty(self):
+        # 1.4.2: any non-STIX-OV value (including legacy "service",
+        # "azure-ad", "kerberos", "other", or "weird-type") is coerced
+        # to empty string so the bundle assembler can omit account_type
+        # entirely and the {244} STIX validator warning never fires.
         payload = {
             "entities": [],
             "relationships": [],
@@ -1757,7 +1761,7 @@ class TestUserAccountObservationCoercion:
         }
         with _patch_llm(payload):
             extraction = extract_entities("text")
-        assert extraction.user_account_observations[0].account_type == "other"
+        assert extraction.user_account_observations[0].account_type == ""
 
 
 class TestBundleAssemblerUserAccountObservations:
@@ -1792,14 +1796,14 @@ class TestBundleAssemblerUserAccountObservations:
         ext1 = Extraction(
             user_account_observations=[
                 UserAccountObservation(
-                    account_login="root", account_type="unix-account"
+                    account_login="root", account_type="unix"
                 )
             ],
         )
         ext2 = Extraction(
             user_account_observations=[
                 UserAccountObservation(
-                    account_login="root", account_type="unix-account"
+                    account_login="root", account_type="unix"
                 )
             ],
         )
@@ -1814,7 +1818,7 @@ class TestBundleAssemblerUserAccountObservations:
             user_account_observations=[
                 UserAccountObservation(
                     account_login="svc-jenkins",
-                    account_type="service",
+                    account_type="",  # 1.4.2: STIX has no OV value for service accounts
                     is_service_account=True,
                     asset_references=["Build Server"],
                 )

@@ -379,7 +379,7 @@ class UserAccountObservation:
 
     account_login: str
     display_name: str = ""
-    account_type: str = "other"
+    account_type: str = ""  # STIX 2.1 §6.4 account-type-ov; empty when not applicable
     is_privileged: bool = False
     is_service_account: bool = False
     identity_local_id: str = ""
@@ -962,17 +962,24 @@ def _coerce_user_account_observations(raw: object) -> list[UserAccountObservatio
     if not isinstance(raw, list):
         return []
     out: list[UserAccountObservation] = []
+    # STIX 2.1 §6.4 account-type-ov canonical values. Anything else
+    # (azure-ad, google-workspace, kerberos, service, other, ...) is
+    # coerced to empty string — operational distinctions surface via
+    # ``is_service_account`` / ``description`` instead. {244} validator
+    # warning therefore disappears.
     valid_account_types = {
-        "unix-account",
+        "unix",
         "windows-local",
         "windows-domain",
         "ldap",
-        "kerberos",
-        "azure-ad",
-        "google-workspace",
-        "saas",
-        "service",
-        "other",
+        "tacacs",
+        "radius",
+        "nis",
+        "openid",
+        "facebook",
+        "skype",
+        "twitter",
+        "kavi",
     }
     for item in raw:
         if not isinstance(item, dict):
@@ -980,9 +987,9 @@ def _coerce_user_account_observations(raw: object) -> list[UserAccountObservatio
         login = item.get("account_login")
         if not (isinstance(login, str) and login.strip()):
             continue
-        account_type = item.get("account_type") or "other"
+        account_type = (item.get("account_type") or "").strip()
         if account_type not in valid_account_types:
-            account_type = "other"
+            account_type = ""
         asset_refs_raw = item.get("asset_references") or []
         if not isinstance(asset_refs_raw, list):
             asset_refs_raw = []
@@ -1298,8 +1305,12 @@ def build_stix_bundle_from_extraction(
             "id": ua_stix_id,
             "spec_version": "2.1",
             "user_id": obs.account_login,
-            "account_type": obs.account_type,
         }
+        # account_type is OPTIONAL in STIX 2.1 §6.4 — emit only when
+        # the OV-compliant value is set, to avoid {244} validator
+        # warnings on non-spec values.
+        if obs.account_type:
+            ua_obj["account_type"] = obs.account_type
         if obs.display_name:
             ua_obj["display_name"] = obs.display_name
         if obs.is_privileged:

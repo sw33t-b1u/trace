@@ -51,7 +51,7 @@ is to identify the entities and how they relate.
     {
       "account_login": "<full login as it appears at authentication, e.g. alice@corp.example.com, root, svc-jenkins>",
       "display_name": "<optional human-readable name>",
-      "account_type": "<one of: unix-account | windows-local | windows-domain | ldap | kerberos | azure-ad | google-workspace | saas | service | other>",
+      "account_type": "<STIX 2.1 §6.4 account-type-ov value, or empty string when none applies; permitted: '' | unix | windows-local | windows-domain | ldap | tacacs | radius | nis | openid | facebook | skype | twitter | kavi>",
       "is_privileged": false,
       "is_service_account": false,
       "identity_local_id": "<optional local_id of an identity entity above when the report names the owner>",
@@ -211,13 +211,15 @@ organization (or a service / system account on a victim host) —
 not the attacker's account — emit an entry. Examples that qualify:
 
 - "the alice@corp.example.com mailbox was compromised" → account_login
-  = `alice@corp.example.com`, account_type = `azure-ad` (or
-  `windows-domain` if on-premises), asset_references include the
-  mailbox / Exchange tenant.
+  = `alice@corp.example.com`, account_type = `windows-domain` if it
+  is an on-prem AD UPN; otherwise `""` (Azure AD / Google Workspace
+  / generic SaaS have no STIX OV value). `asset_references` include
+  the mailbox / Exchange tenant.
 - "svc-jenkins on the build server harvested credentials from CI
-  variables" → account_login = `svc-jenkins`, account_type =
-  `service`, is_service_account = true, asset_references = ["build
-  server", "Jenkins"].
+  variables" → account_login = `svc-jenkins`, account_type = `""`
+  (no STIX OV value matches automation accounts),
+  is_service_account = true, asset_references = ["build server",
+  "Jenkins"].
 - "the Domain Admin account TUSER\\\\admin was used for lateral
   movement" → account_login = `TUSER\\\\admin`, account_type =
   `windows-domain`, is_privileged = true.
@@ -232,8 +234,14 @@ Do **not** emit `user_account_observations` for:
   login string.
 
 `account_login` is required; entries without it are dropped.
-`account_type` defaults to `other` when ambiguous; pick from the
-spec list when the report makes it clear. `asset_references` is
+`account_type` MUST be one of the STIX 2.1 §6.4 ``account-type-ov``
+values (`unix`, `windows-local`, `windows-domain`, `ldap`,
+`tacacs`, `radius`, `nis`, `openid`, `facebook`, `skype`,
+`twitter`, `kavi`) or empty string. **Do not invent extension
+values** like `azure-ad`, `google-workspace`, `saas`, `service`,
+or `other` — when no STIX value applies, leave it empty and
+encode the operational nature via `is_service_account` /
+`is_privileged`. `asset_references` is
 optional — when present, TRACE resolves each entry against the
 analyst's asset inventory and emits an `x-trace-valids-on`
 relationship per resolved asset. `identity_local_id` is optional;
