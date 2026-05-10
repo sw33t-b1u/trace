@@ -11,8 +11,14 @@ build/
 
 # Runtime artifacts
 output/
-input/sources.yaml
+input/
 .env
 
 # Local-only design notes (kept out of VCS by maintainer policy)
 high-level-design.md
+
+# Temporary files
+tmp/
+temp/
+Thumbs.db
+TODO.md
