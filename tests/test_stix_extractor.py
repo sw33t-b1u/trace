@@ -14,6 +14,7 @@ from trace_engine.stix.extractor import (
     ExtractedEntity,
     ExtractedRelationship,
     Extraction,
+    IdentityAssetEdge,
     _chunk_text,
     _extract_json_from_text,
     _merge_extractions,
@@ -1506,3 +1507,165 @@ class TestAttackMotivationDemotion:
         actor = next(o for o in bundle["objects"] if o["type"] == "intrusion-set")
         assert actor.get("secondary_motivations") == ["organizational-gain"]
         assert "espionage" in actor.get("labels", [])
+
+
+# ---------------------------------------------------------------------------
+# 1.2.0 — Identity-asset edges (Initiative A)
+# ---------------------------------------------------------------------------
+
+
+_ASSETS_FOR_IAE = [
+    {"id": "asset-CA-001", "name": "決済処理中央サーバ", "tags": ["financial"]},
+    {"id": "asset-CA-002", "name": "ERP System", "tags": ["erp"]},
+]
+
+
+class TestIdentityAssetEdgeCoercion:
+    """LLM JSON parsing for the new identity_asset_edges field."""
+
+    def test_extract_entities_parses_identity_asset_edges_from_llm_json(self):
+        payload = {
+            "entities": [{"local_id": "id_1", "type": "identity", "name": "CFO"}],
+            "relationships": [],
+            "identity_asset_edges": [
+                {
+                    "source": "id_1",
+                    "asset_reference": "ERP System",
+                    "description": "ERP admin",
+                }
+            ],
+        }
+        with _patch_llm(payload):
+            extraction = extract_entities("text")
+        assert len(extraction.identity_asset_edges) == 1
+        edge = extraction.identity_asset_edges[0]
+        assert edge.source == "id_1"
+        assert edge.asset_reference == "ERP System"
+        assert edge.description == "ERP admin"
+
+    def test_extract_entities_handles_missing_identity_asset_edges_field(self):
+        # 1.0.x bundles never had this field — should default to empty list.
+        payload = {"entities": [], "relationships": []}
+        with _patch_llm(payload):
+            extraction = extract_entities("text")
+        assert extraction.identity_asset_edges == []
+
+    def test_coercer_drops_edge_with_blank_source_or_reference(self):
+        payload = {
+            "entities": [],
+            "relationships": [],
+            "identity_asset_edges": [
+                {"source": "", "asset_reference": "ERP"},
+                {"source": "id_1", "asset_reference": ""},
+                {"source": "id_1", "asset_reference": "ERP"},
+            ],
+        }
+        with _patch_llm(payload):
+            extraction = extract_entities("text")
+        assert len(extraction.identity_asset_edges) == 1
+
+
+class TestBundleAssemblerIdentityAssetEdges:
+    """Bundle assembler integrates resolve_asset_reference with IdentityAssetEdge."""
+
+    def test_resolved_edge_emits_x_asset_internal_and_relationship(self):
+        ext = Extraction(
+            entities=[_ent("id_cfo", "identity", "CFO", identity_class="individual")],
+            identity_asset_edges=[IdentityAssetEdge(source="id_cfo", asset_reference="ERP System")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, assets=_ASSETS_FOR_IAE)
+        # Assembler must synthesize one x-asset-internal object for the
+        # resolved asset and emit one x-trace-has-access relationship.
+        x_asset = [o for o in bundle["objects"] if o["type"] == "x-asset-internal"]
+        assert len(x_asset) == 1
+        assert x_asset[0]["id"] == "x-asset-internal--asset-CA-002"
+        assert x_asset[0]["asset_id"] == "asset-CA-002"
+
+        rels = [
+            o
+            for o in bundle["objects"]
+            if o["type"] == "relationship" and o["relationship_type"] == "x-trace-has-access"
+        ]
+        assert len(rels) == 1
+        assert rels[0]["source_ref"].startswith("identity--")
+        assert rels[0]["target_ref"] == "x-asset-internal--asset-CA-002"
+        assert rels[0]["confidence"] == 80  # tier 1 exact match
+
+    def test_unresolved_reference_is_dropped(self):
+        ext = Extraction(
+            entities=[_ent("id_x", "identity", "X")],
+            identity_asset_edges=[
+                IdentityAssetEdge(source="id_x", asset_reference="Nonexistent System")
+            ],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, assets=_ASSETS_FOR_IAE)
+        rels = [
+            o
+            for o in bundle["objects"]
+            if o["type"] == "relationship" and o["relationship_type"] == "x-trace-has-access"
+        ]
+        assert rels == []
+        x_asset = [o for o in bundle["objects"] if o["type"] == "x-asset-internal"]
+        assert x_asset == []
+
+    def test_no_assets_supplied_drops_all_edges_silently(self):
+        ext = Extraction(
+            entities=[_ent("id_x", "identity", "X")],
+            identity_asset_edges=[IdentityAssetEdge(source="id_x", asset_reference="ERP System")],
+        )
+        # No assets= argument — assembler can't resolve, drops all edges.
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [
+            o
+            for o in bundle["objects"]
+            if o["type"] == "relationship" and o["relationship_type"] == "x-trace-has-access"
+        ]
+        assert rels == []
+
+    def test_non_identity_source_is_dropped(self):
+        ext = Extraction(
+            entities=[_ent("a", "intrusion-set", "FIN7")],
+            identity_asset_edges=[IdentityAssetEdge(source="a", asset_reference="ERP System")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, assets=_ASSETS_FOR_IAE)
+        rels = [
+            o
+            for o in bundle["objects"]
+            if o["type"] == "relationship" and o["relationship_type"] == "x-trace-has-access"
+        ]
+        assert rels == []
+
+    def test_two_identities_same_asset_dedupes_x_asset_internal(self):
+        ext = Extraction(
+            entities=[
+                _ent("id_alice", "identity", "Alice", identity_class="individual"),
+                _ent("id_bob", "identity", "Bob", identity_class="individual"),
+            ],
+            identity_asset_edges=[
+                IdentityAssetEdge(source="id_alice", asset_reference="ERP System"),
+                IdentityAssetEdge(source="id_bob", asset_reference="ERP System"),
+            ],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, assets=_ASSETS_FOR_IAE)
+        # One synthesized x-asset-internal object reused, two relationships.
+        x_asset = [o for o in bundle["objects"] if o["type"] == "x-asset-internal"]
+        assert len(x_asset) == 1
+        rels = [
+            o
+            for o in bundle["objects"]
+            if o["type"] == "relationship" and o["relationship_type"] == "x-trace-has-access"
+        ]
+        assert len(rels) == 2
+
+    def test_unresolved_source_local_id_drops(self):
+        ext = Extraction(
+            entities=[],
+            identity_asset_edges=[IdentityAssetEdge(source="ghost", asset_reference="ERP System")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, assets=_ASSETS_FOR_IAE)
+        rels = [
+            o
+            for o in bundle["objects"]
+            if o["type"] == "relationship" and o["relationship_type"] == "x-trace-has-access"
+        ]
+        assert rels == []

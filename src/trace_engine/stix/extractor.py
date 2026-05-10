@@ -33,6 +33,7 @@ import structlog
 
 from trace_engine.config import Config, load_config
 from trace_engine.llm.client import TaskType, call_llm, load_prompt
+from trace_engine.stix.asset_resolver import resolve_asset_reference
 from trace_engine.validate.schema import PIRDocument, PIRItem
 
 logger = structlog.get_logger(__name__)
@@ -603,6 +604,7 @@ def _extract_chunk(
 
     entities = _coerce_entities(parsed.get("entities"))
     relationships = _coerce_relationships(parsed.get("relationships"))
+    identity_asset_edges = _coerce_identity_asset_edges(parsed.get("identity_asset_edges"))
 
     # Namespace local_ids per chunk so identical aliases from different
     # chunks (e.g. "actor_1") don't collide before merge.
@@ -620,7 +622,19 @@ def _extract_chunk(
             )
             for r in relationships
         ]
-    return Extraction(entities=entities, relationships=relationships)
+        identity_asset_edges = [
+            IdentityAssetEdge(
+                source=prefix + e.source,
+                asset_reference=e.asset_reference,
+                description=e.description,
+            )
+            for e in identity_asset_edges
+        ]
+    return Extraction(
+        entities=entities,
+        relationships=relationships,
+        identity_asset_edges=identity_asset_edges,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -744,8 +758,32 @@ def _merge_extractions(parts: list[Extraction]) -> Extraction:
                 )
             )
 
+    # Identity-asset edges (1.2.0): same alias remap + de-dup. Edges that
+    # reference an unknown identity local_id (LLM hallucination) are dropped.
+    merged_iae: list[IdentityAssetEdge] = []
+    iae_seen: set[tuple[str, str]] = set()
+    iae_dropped = 0
+    for part in parts:
+        for edge in part.identity_asset_edges:
+            src = alias_to_canonical.get(edge.source)
+            if src is None:
+                iae_dropped += 1
+                continue
+            marker = (src, edge.asset_reference.strip().lower())
+            if marker in iae_seen:
+                continue
+            iae_seen.add(marker)
+            merged_iae.append(
+                IdentityAssetEdge(
+                    source=src,
+                    asset_reference=edge.asset_reference,
+                    description=edge.description,
+                )
+            )
+
     raw_entity_count = sum(len(p.entities) for p in parts)
     raw_rel_count = sum(len(p.relationships) for p in parts)
+    raw_iae_count = sum(len(p.identity_asset_edges) for p in parts)
     logger.info(
         "extractions_merged",
         chunks=len(parts),
@@ -754,8 +792,15 @@ def _merge_extractions(parts: list[Extraction]) -> Extraction:
         raw_relationships=raw_rel_count,
         merged_relationships=len(merged_relationships),
         dropped_relationships=dropped,
+        raw_identity_asset_edges=raw_iae_count,
+        merged_identity_asset_edges=len(merged_iae),
+        dropped_identity_asset_edges=iae_dropped,
     )
-    return Extraction(entities=merged_entities, relationships=merged_relationships)
+    return Extraction(
+        entities=merged_entities,
+        relationships=merged_relationships,
+        identity_asset_edges=merged_iae,
+    )
 
 
 def _coerce_entities(raw: object) -> list[ExtractedEntity]:
@@ -794,6 +839,36 @@ def _coerce_relationships(raw: object) -> list[ExtractedRelationship]:
     return out
 
 
+def _coerce_identity_asset_edges(raw: object) -> list[IdentityAssetEdge]:
+    """Parse the LLM's ``identity_asset_edges`` array (TRACE 1.2.0+).
+
+    Distinct from ``relationships`` because the target is a free-form
+    asset reference string, not another extracted entity. Resolution
+    against ``assets.json`` happens at bundle assembly time.
+    """
+    if not isinstance(raw, list):
+        return []
+    out: list[IdentityAssetEdge] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        source = item.get("source")
+        asset_reference = item.get("asset_reference")
+        description = item.get("description") or ""
+        if not (isinstance(source, str) and source.strip()):
+            continue
+        if not (isinstance(asset_reference, str) and asset_reference.strip()):
+            continue
+        out.append(
+            IdentityAssetEdge(
+                source=source,
+                asset_reference=asset_reference,
+                description=description if isinstance(description, str) else "",
+            )
+        )
+    return out
+
+
 # ---------------------------------------------------------------------------
 # L4: TRACE-built STIX 2.1 bundle
 # ---------------------------------------------------------------------------
@@ -809,6 +884,7 @@ def build_stix_bundle_from_extraction(
     relevance_rationale: str | None = None,
     now: datetime | None = None,
     config: Config | None = None,
+    assets: list[dict] | None = None,
 ) -> dict:
     """Construct a STIX 2.1 bundle from an ``Extraction``.
 
@@ -820,6 +896,15 @@ def build_stix_bundle_from_extraction(
     doesn't exist in ``entities``) are dropped with a structured log
     warning rather than emitting a dangling reference SAGE would later
     fail on.
+
+    ``assets`` (1.2.0): list of ``assets.json[*].assets[]`` entries used
+    to resolve ``identity_asset_edges`` against. When omitted, no
+    identity-asset edges are emitted (the LLM may have extracted them
+    but resolution requires the analyst's asset inventory). When
+    supplied, each edge is run through the 4-tier
+    ``resolve_asset_reference`` ladder; resolved edges produce a
+    synthetic ``x-asset-internal--<asset_id>`` STIX object (one per
+    referenced asset) plus an ``x-trace-has-access`` relationship.
     """
     ts = (now or datetime.now(tz=UTC)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
@@ -933,11 +1018,87 @@ def build_stix_bundle_from_extraction(
     if dropped_type_mismatch:
         logger.warning("stix_relationships_type_mismatch_dropped", count=dropped_type_mismatch)
 
+    # 1.2.0 — Identity-asset edges (Initiative A).
+    # Each LLM-extracted edge references an identity by local_id and
+    # carries a free-form asset hint string. Resolution against the
+    # supplied ``assets`` list happens here at the bundle assembler;
+    # unresolved edges drop entirely (analyst manual review is not an
+    # acceptable fallback per the design decision 2026-05-10).
+    iae_emitted = 0
+    iae_dropped_unresolved_source = 0
+    iae_dropped_no_assets_supplied = 0
+    iae_dropped_unresolved_asset = 0
+    asset_internal_ids: dict[str, str] = {}  # asset_id → x-asset-internal STIX id (1:1)
+    has_identity_asset_edges = False
+    if extraction.identity_asset_edges:
+        for edge in extraction.identity_asset_edges:
+            src_stix = local_to_stix.get(edge.source)
+            src_type = local_to_type.get(edge.source)
+            if src_stix is None or src_type != "identity":
+                iae_dropped_unresolved_source += 1
+                logger.warning(
+                    "identity_asset_edge_unresolved_source",
+                    source_local=edge.source,
+                    asset_reference=edge.asset_reference,
+                )
+                continue
+            if not assets:
+                iae_dropped_no_assets_supplied += 1
+                continue
+            resolution = resolve_asset_reference(edge.asset_reference, assets)
+            if resolution is None:
+                iae_dropped_unresolved_asset += 1
+                continue
+            asset_internal_id = asset_internal_ids.get(resolution.asset_id)
+            if asset_internal_id is None:
+                asset_internal_id = f"x-asset-internal--{resolution.asset_id}"
+                asset_internal_ids[resolution.asset_id] = asset_internal_id
+                # Synthetic STIX object — the asset_id is the SAGE-side
+                # primary key. SAGE's mapper recognizes this id form and
+                # routes to the HasAccess table.
+                objects.append(
+                    {
+                        "type": "x-asset-internal",
+                        "id": asset_internal_id,
+                        "spec_version": "2.1",
+                        "created": ts,
+                        "modified": ts,
+                        "asset_id": resolution.asset_id,
+                    }
+                )
+            objects.append(
+                {
+                    "type": "relationship",
+                    "id": f"relationship--{uuid.uuid4()}",
+                    "spec_version": "2.1",
+                    "created": ts,
+                    "modified": ts,
+                    "relationship_type": "x-trace-has-access",
+                    "source_ref": src_stix,
+                    "target_ref": asset_internal_id,
+                    "description": edge.description or None,
+                    "confidence": resolution.confidence,
+                }
+            )
+            iae_emitted += 1
+            has_identity_asset_edges = True
+    if iae_emitted or extraction.identity_asset_edges:
+        logger.info(
+            "identity_asset_edges_processed",
+            extracted=len(extraction.identity_asset_edges),
+            emitted=iae_emitted,
+            dropped_unresolved_source=iae_dropped_unresolved_source,
+            dropped_no_assets_supplied=iae_dropped_no_assets_supplied,
+            dropped_unresolved_asset=iae_dropped_unresolved_asset,
+            asset_internal_objects=len(asset_internal_ids),
+        )
+
     has_trace_metadata = (
         source_url is not None
         or matched_pir_ids is not None
         or relevance_score is not None
         or bool(relevance_rationale)
+        or has_identity_asset_edges
     )
 
     # Prepend the TRACE extension definition object so the bundle can carry

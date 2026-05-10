@@ -116,6 +116,21 @@ def main() -> None:
         default=None,
         help="Override TRACE_RELEVANCE_THRESHOLD. Ignored when --pir is not set.",
     )
+    parser.add_argument(
+        "--assets",
+        type=Path,
+        default=None,
+        help=(
+            "Path to BEACON assets.json. Enables identity-asset edge "
+            "extraction (Initiative A): the L3 prompt asks the LLM to "
+            "emit identity_asset_edges, and the bundle assembler resolves "
+            "each free-form asset reference against this assets file via "
+            "the 4-tier matching ladder (name exact → substring → tag). "
+            "Unresolved edges are dropped. Without --assets, no identity-"
+            "asset edges are emitted (the LLM may extract them but they "
+            "cannot be resolved to known asset_ids)."
+        ),
+    )
     args = parser.parse_args()
     cfg = load_config()
 
@@ -156,6 +171,20 @@ def main() -> None:
             print(f"Skipped (relevance score {verdict.score:.2f} < threshold {threshold:.2f})")
             sys.exit(0)
 
+    # Initiative A: load --assets when supplied so identity_asset_edges
+    # can be resolved to known asset_ids during bundle assembly.
+    assets_list: list[dict] | None = None
+    if args.assets is not None:
+        if not args.assets.exists():
+            logger.error("assets_not_found", path=str(args.assets))
+            sys.exit(2)
+        with args.assets.open() as f:
+            assets_payload = json.load(f)
+        assets_list = assets_payload.get("assets") if isinstance(assets_payload, dict) else None
+        if assets_list is None:
+            logger.error("assets_missing_assets_key", path=str(args.assets))
+            sys.exit(2)
+
     extraction = extract_entities(text, task=args.task, config=cfg, pir_doc=pir_doc)
     bundle = build_stix_bundle_from_extraction(
         extraction,
@@ -163,6 +192,7 @@ def main() -> None:
         matched_pir_ids=verdict.matched_pir_ids if verdict else None,
         relevance_score=verdict.score if verdict else None,
         relevance_rationale=verdict.rationale if verdict else None,
+        assets=assets_list,
     )
 
     out = args.output if args.output is not None else _default_output(bundle["id"])

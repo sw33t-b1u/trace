@@ -85,6 +85,7 @@ def crawl_batch(
     config: Config | None = None,
     write_bundle=None,
     max_workers: int | None = None,
+    assets: list[dict] | None = None,
 ) -> Iterator[BatchOutcome]:
     """Yield one ``BatchOutcome`` per source. Caller is responsible for
     calling ``state.save()`` after iteration if it wants to persist.
@@ -116,6 +117,7 @@ def crawl_batch(
                 dry_run=dry_run,
                 cfg=cfg,
                 write_bundle=write_bundle,
+                assets=assets,
             )
         return
 
@@ -133,6 +135,7 @@ def crawl_batch(
                 dry_run=dry_run,
                 cfg=cfg,
                 write_bundle=write_bundle,
+                assets=assets,
             )
             for source in sources.sources
         ]
@@ -152,6 +155,7 @@ def _process_source(
     dry_run: bool,
     cfg: Config,
     write_bundle,
+    assets: list[dict] | None = None,
 ) -> BatchOutcome:
     """Process a single source URL end-to-end (fetch → L2 → L3 → bundle).
 
@@ -178,6 +182,7 @@ def _process_source(
             dry_run=dry_run,
             cfg=cfg,
             write_bundle=write_bundle,
+            assets=assets,
         )
     finally:
         if collector is not None:
@@ -203,6 +208,7 @@ def _process_source_body(
     dry_run: bool,
     cfg: Config,
     write_bundle,
+    assets: list[dict] | None = None,
 ) -> BatchOutcome:
     prev = state.get(source.url)
     if dry_run:
@@ -303,6 +309,7 @@ def _process_source_body(
         matched_pir_ids=verdict.matched_pir_ids if verdict else None,
         relevance_score=verdict.score if verdict else None,
         relevance_rationale=verdict.rationale if verdict else None,
+        assets=assets,
     )
     bundle_path = output_dir / f"stix_bundle_{_slug(source.url)}.json"
     if write_bundle is None:

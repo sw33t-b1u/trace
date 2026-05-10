@@ -20,6 +20,7 @@ extraction_failed / 2 input/argument error.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -91,6 +92,18 @@ def main() -> None:
         action="store_true",
         help="Print sources without fetching or extracting.",
     )
+    parser.add_argument(
+        "--assets",
+        type=Path,
+        default=None,
+        help=(
+            "Path to BEACON assets.json. Enables identity-asset edge "
+            "extraction (Initiative A): the bundle assembler resolves "
+            "free-form asset references in identity_asset_edges against "
+            "this assets file. Without --assets, no identity-asset edges "
+            "are emitted."
+        ),
+    )
     args = parser.parse_args()
 
     if not args.sources.exists():
@@ -113,6 +126,23 @@ def main() -> None:
             pir_doc, pir_set_hash = load_pir(args.pir)
         except Exception as exc:
             logger.error("pir_invalid", path=str(args.pir), error=str(exc))
+            sys.exit(2)
+
+    # Initiative A: load --assets so identity_asset_edges resolve.
+    assets_list: list[dict] | None = None
+    if args.assets is not None:
+        if not args.assets.exists():
+            logger.error("assets_not_found", path=str(args.assets))
+            sys.exit(2)
+        try:
+            with args.assets.open() as f:
+                assets_payload = json.load(f)
+            assets_list = assets_payload.get("assets") if isinstance(assets_payload, dict) else None
+            if assets_list is None:
+                logger.error("assets_missing_assets_key", path=str(args.assets))
+                sys.exit(2)
+        except Exception as exc:
+            logger.error("assets_invalid", path=str(args.assets), error=str(exc))
             sys.exit(2)
 
     state = CrawlState.load(args.state)
@@ -142,6 +172,7 @@ def main() -> None:
         recheck_on_pir_change=args.recheck_on_pir_change,
         dry_run=args.dry_run,
         config=cfg,
+        assets=assets_list,
     ):
         counts[outcome.kind] = counts.get(outcome.kind, 0) + 1
         log = logger.bind(url=outcome.url, label=outcome.label, kind=outcome.kind)

@@ -39,6 +39,13 @@ is to identify the entities and how they relate.
       "target": "<local_id of another entity above>",
       "relationship_type": "<see vocabulary below>"
     }
+  ],
+  "identity_asset_edges": [
+    {
+      "source": "<local_id of an identity entity above>",
+      "asset_reference": "<free-form name or short label of the internal asset accessed>",
+      "description": "<short role label, e.g. 'mailbox owner' or 'ERP admin' (≤120 chars)>"
+    }
   ]
 }
 ```
@@ -52,7 +59,7 @@ entities, omit it.
 
 If information is ambiguous or missing, omit the field rather than guessing.
 If the report contains no threat intelligence content, return
-`{"entities": [], "relationships": []}`.
+`{"entities": [], "relationships": [], "identity_asset_edges": []}`.
 
 ## Entity types and additional optional fields
 
@@ -155,6 +162,35 @@ labels.
 - threat-actor / intrusion-set / malware / tool **targets** identity / vulnerability / location / infrastructure
 
 Use only these relationship types. Skip relationships that don't fit.
+
+## Identity-asset access (`identity_asset_edges`)
+
+When the report describes a specific role / person / team that owned,
+operated, administered, or had authenticated access to a specific
+internal system or data store *before or during the incident*, emit an
+`identity_asset_edges` entry. Examples that qualify:
+
+- "the CFO's mailbox was compromised" → identity = CFO,
+  asset_reference = "mailbox" or "Office 365"
+- "the SRE team manages the Kubernetes control plane" → identity =
+  SRE team, asset_reference = "Kubernetes control plane"
+- "DBAs administer the customer database" → identity = DBA group,
+  asset_reference = "customer database"
+
+Do **not** emit `identity_asset_edges` for:
+
+- attacker behaviour ("attacker accessed the database") — that is a
+  `targets` relationship, not access by a legitimate identity.
+- generic mentions without an owner / operator / role specified.
+
+`asset_reference` is a free-form name; TRACE will resolve it against
+the analyst's asset inventory after extraction. Use the most specific
+phrase the report supplies (system name, application, dataset).
+`description` is an optional short role label (≤120 chars) — preserve
+the report's original wording when possible.
+
+If the report has no identity-asset context, return an empty
+`identity_asset_edges: []` array.
 
 ## Report Text
 

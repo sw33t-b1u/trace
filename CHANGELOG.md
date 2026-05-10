@@ -6,6 +6,119 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.2.0] — 2026-05-10
+
+### Added — Initiative A Phase 2: L3 prompt + bundle assembler integration
+
+Completes the Initiative A trace-source extraction pipeline that 1.1.0
+laid the ground for. The L3 prompt now asks the LLM to emit
+`identity_asset_edges` from CTI report text; the bundle assembler
+resolves each free-form asset reference against `assets.json` via the
+4-tier matching ladder (1.1.0's `asset_resolver`); resolved edges
+become `x-asset-internal--<asset_id>` synthetic STIX objects plus
+`x-trace-has-access` relationships that SAGE 0.6.0 ingests as
+`HasAccess` rows with `source = "trace"`.
+
+#### Extraction pipeline
+
+`Extraction.identity_asset_edges: list[IdentityAssetEdge]` is now
+populated by `extract_entities`. The new `_coerce_identity_asset_edges`
+parser reads the LLM's top-level `identity_asset_edges[]` array (each
+entry: `source` local_id of an identity, `asset_reference` free-form
+hint, `description` short role label). Chunked extractions namespace
+edges per chunk; `_merge_extractions` deduplicates on
+`(canonical_source, asset_reference.lower())`.
+
+#### Bundle assembler
+
+`build_stix_bundle_from_extraction(..., assets=...)` accepts the
+asset inventory. For each identity-asset edge:
+
+1. The source local_id is resolved to a STIX `identity--*` id
+   (else dropped with `identity_asset_edge_unresolved_source`).
+2. `asset_reference` runs through `resolve_asset_reference` against
+   `assets`. Unresolved or ambiguous references are dropped.
+3. The first emission for a given asset_id synthesizes a
+   `x-asset-internal--<asset_id>` STIX object (carries
+   `asset_id` for SAGE's mapper); subsequent emissions reuse it.
+4. An `x-trace-has-access` STIX relationship is appended with the
+   resolution's `confidence` (80 / 50 / 30 per tier).
+
+Without `assets`, no edges are emitted (the LLM may extract them but
+they cannot be resolved). The L3 prompt declares this contract so
+operators understand the dependency.
+
+#### CLI: `crawl_single` / `crawl_batch` accept `--assets`
+
+```bash
+# Single URL with identity-asset extraction
+uv run python cmd/crawl_single.py \
+  --input '<url>' \
+  --pir ../BEACON/output/pir_output.json \
+  --assets ../BEACON/output/assets.json \
+  --output output/bundle.json
+
+# Batch crawl with identity-asset extraction
+uv run python cmd/crawl_batch.py \
+  --pir ../BEACON/output/pir_output.json \
+  --assets ../BEACON/output/assets.json
+```
+
+`--assets` is optional. When omitted, the bundle is identical to
+1.1.0 output (no `identity_asset_edges` processing).
+
+#### L3 prompt update
+
+`stix_extraction.md` gained a new "Identity-asset access
+(`identity_asset_edges`)" section that:
+
+- Defines what qualifies (legitimate operator / owner / administrator
+  with named role-asset link in the report).
+- Explicitly excludes attacker-side relationships (those use
+  `targets`, not `identity_asset_edges`).
+- Provides three concrete examples (CFO mailbox, SRE Kubernetes,
+  DBA database).
+- Returns empty array when no identity-asset context is present.
+
+The output JSON shape adds `identity_asset_edges[]` at the top level.
+
+### Tests
+
+- `tests/test_stix_extractor.py::TestIdentityAssetEdgeCoercion` (3) —
+  LLM JSON parsing, missing-field tolerance, blank-source guard.
+- `tests/test_stix_extractor.py::TestBundleAssemblerIdentityAssetEdges`
+  (6) — resolved emission, unresolved drop, no-assets drop,
+  non-identity source drop, x-asset-internal dedup across multiple
+  identities sharing one asset, dangling source local_id drop.
+
+All 236 tests pass; 0 vulnerabilities.
+
+### Migration notes
+
+- BEACON 0.11.0 + SAGE 0.6.0 are the matching peers. SAGE 0.6.0 was
+  forward-compatible with TRACE 1.2.0 emissions (the
+  `x-trace-has-access` dispatch was wired in advance), so no SAGE
+  release is needed for this slice.
+- TRACE consumers using `crawl_single` / `crawl_batch` without
+  `--assets` see no behavior change.
+- Bundle output for runs that include identity-asset edges is larger
+  by the count of unique resolved assets (1 `x-asset-internal` object
+  per asset) plus the number of accepted edges (1 relationship per
+  edge). Unresolved edges add nothing.
+
+### Future scope
+
+- 1.3.0+: confidence-tier tuning based on Phase 2 evaluation
+  (operational decision after BEACON/SAGE/TRACE Phase 1 production
+  data accumulates).
+- The `_TRACE_EXTENSION_PROPERTIES` block does not yet declare
+  `x-trace-has-access` and `x-asset-internal` as registered
+  extension types — STIX validators may emit informational
+  notices about the unknown types. Adding them is cosmetic and
+  deferred.
+
+---
+
 ## [1.1.0] — 2026-05-10
 
 ### Added — Initiative A: identity_assets validator + asset resolver
