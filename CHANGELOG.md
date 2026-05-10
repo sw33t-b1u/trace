@@ -6,6 +6,95 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.0.3] — 2026-05-10
+
+### Fixed — Three defects surfaced by CISA AA22-108a Lazarus E2E crawl
+
+End-to-end verification (BEACON 0.10.2 → TRACE 1.0.2 → SAGE 0.5.0)
+on the CISA AA22-108a Lazarus advisory produced a 192-object bundle
+that landed at `errors=1 warnings=2` in `validate_stix`, and SAGE
+ETL aborted on the first vulnerability row. Three structural
+defects were identified, all in the same family (LLM emitting
+syntactically incomplete or out-of-vocab STIX) and all addressed
+together since they share the existing drop / demote scaffolding.
+
+#### Vulnerability without parseable CVE id (drop)
+
+The L3 LLM extracted a vulnerability entity named
+`"Common Vulnerabilities and Exposures (CVEs)"` (43 chars) from a
+generic prose mention. SAGE's `Vulnerability.cve_id STRING(32)`
+column rejected the row, halting the ETL pipeline.
+
+New helper `_extract_cve_id(obj)` resolves a CVE id by:
+
+1. Scanning `external_references[*]` for entries with
+   `source_name == "cve"`, checking `external_id` first then
+   extracting `CVE-YYYY-NNNN` from `url` via regex.
+2. Falling back to `name` when it parses as a CVE id.
+
+Vulnerabilities that yield no CVE id are dropped at the entity
+loop with `vulnerability_dropped_no_cve` warning. Surviving entries
+have their `name` normalized to the canonical CVE id even when the
+LLM emitted a longer descriptive name. Relationships pointing at a
+dropped vulnerability fall through the existing dangling-ref guard.
+
+CVE format: `^CVE-\d{4}-\d{4,}$` (CVE program rules — high-volume
+years exceed 6 digits, so no upper bound on the trailing block).
+
+#### Indicator without `pattern` (drop)
+
+STIX 2.1 §4.7 marks `pattern` as REQUIRED on indicator. The L3 LLM
+sometimes emits "indicator" entities for prose descriptions of
+patterns ("Newly Registered Domains") without an actual pattern.
+`_validate_indicator_pattern` now drops indicators where `pattern`
+is missing or empty (previously: returned True deferring to the
+validator → SAGE ETL parse failure).
+
+#### `attack-motivation-ov` open-vocab demotion ({211})
+
+STIX 2.1 §6.2 `attack-motivation-ov` defines 10 canonical values
+(`organizational-gain`, `personal-gain`, etc.). The L3 LLM commonly
+emits `financial`, `espionage`, `sabotage`, etc. — semantically
+similar but not in the spec list, tripping {211}. Same demote-to-
+labels pattern as `identity_class` (1.0.0), `sectors` (1.0.1), and
+`sophistication` (0.5.1):
+
+- `intrusion-set.primary_motivation` outside ov → moved to `labels`,
+  field cleared.
+- `intrusion-set.secondary_motivations[*]` → in-vocab values stay,
+  out-of-vocab move to `labels`.
+- `threat-actor` gets the same handling (STIX 2.1 §4.17 uses the
+  same vocab on the same fields).
+
+`_STIX21_ATTACK_MOTIVATION_OV` constant added.
+
+### Tests
+
+- 16 new cases:
+  - `TestVulnerabilityCveValidation` (6) — drop on non-CVE name,
+    keep on proper CVE name, extract from `external_id`, extract
+    from `url`, drop with unrelated external_references, dangling-
+    ref drop on dropped vulnerability.
+  - `TestIndicatorMissingPattern` (2) — drop without pattern, keep
+    with valid pattern.
+  - `TestAttackMotivationDemotion` (4) — in-vocab kept, out-of-
+    vocab demoted on `intrusion-set` and `threat-actor`,
+    `secondary_motivations` filtered.
+  - 4 existing indicator-default tests updated to supply a valid
+    `pattern` (regression: defaulting `valid_from` / `pattern_type`
+    no longer hides a missing-pattern emission).
+
+All 203 tests pass; 0 vulnerabilities.
+
+### Compliance
+
+Combined with prior 0.x.x and 1.0.x defenses, FIN7-class and
+Lazarus-class bundles now produce `errors=0` and only the
+documented SHOULD-level `{202}` accepted warnings remain
+(`tool uses {malware,tool}` and `attack-pattern uses attack-pattern`).
+
+---
+
 ## [1.0.2] — 2026-05-09
 
 ### Fixed — `{401}` vulnerability.aliases + `{202}` actor-source exploits

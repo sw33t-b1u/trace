@@ -250,6 +250,33 @@ _STIX21_MALWARE_TYPE_OV: frozenset[str] = frozenset(
 )
 
 
+# STIX 2.1 §6.2 attack-motivation-ov. Demote LLM values outside this set to
+# `labels` (same pattern as identity_class / sectors / sophistication).
+# Spec list: https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html
+# section 10.2 (open vocab `attack-motivation-ov`).
+_STIX21_ATTACK_MOTIVATION_OV: frozenset[str] = frozenset(
+    {
+        "accidental",
+        "coercion",
+        "dominance",
+        "ideology",
+        "notoriety",
+        "organizational-gain",
+        "personal-gain",
+        "personal-satisfaction",
+        "revenge",
+        "unpredictable",
+    }
+)
+
+
+# CVE identifier format per CVE Numbering Authority rules:
+# CVE-YYYY-NNNN where YYYY ≥ 1999 (CVE program start), NNNN ≥ 4 digits with
+# arbitrary trailing digits (no upper bound — high-volume years exceed 6).
+# Used to validate vulnerability `name` and external_reference external_id.
+_CVE_ID_PATTERN = re.compile(r"^CVE-\d{4}-\d{4,}$")
+
+
 # ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
@@ -771,6 +798,7 @@ def build_stix_bundle_from_extraction(
     local_to_type: dict[str, str] = {}
 
     indicators_dropped_invalid_pattern = 0
+    vulnerabilities_dropped_no_cve = 0
     for entity in extraction.entities:
         stix_id = f"{entity.type}--{uuid.uuid4()}"
         obj = {
@@ -795,8 +823,9 @@ def build_stix_bundle_from_extraction(
         # emits them when nothing is known.
         _scrub_empty_arrays(obj)
         # Validate STIX patterning syntax for indicators; drop the indicator
-        # outright if the pattern fails to parse. Relationships pointing at
-        # the dropped indicator fall through the dangling-ref guard below.
+        # outright if the pattern is missing or fails to parse. Relationships
+        # pointing at the dropped indicator fall through the dangling-ref
+        # guard below.
         if entity.type == "indicator" and not _validate_indicator_pattern(obj):
             indicators_dropped_invalid_pattern += 1
             logger.warning(
@@ -805,6 +834,25 @@ def build_stix_bundle_from_extraction(
                 pattern=obj.get("pattern"),
             )
             continue
+        # Drop vulnerability entries the LLM hallucinated from generic prose
+        # mentions (e.g. name="Common Vulnerabilities and Exposures (CVEs)").
+        # SAGE indexes vulnerabilities by CVE id with a STRING(32) column;
+        # entries without a parseable CVE both break the schema and provide
+        # no analytical value. (1.0.3 fix.)
+        if entity.type == "vulnerability":
+            cve_id = _extract_cve_id(obj)
+            if cve_id is None:
+                vulnerabilities_dropped_no_cve += 1
+                logger.warning(
+                    "vulnerability_dropped_no_cve",
+                    local_id=entity.local_id,
+                    name=obj.get("name"),
+                )
+                continue
+            # Normalize the entity name to the canonical CVE id so downstream
+            # consumers (SAGE mapper, validator) see a clean identifier even
+            # when the LLM wrote a longer descriptive name.
+            obj["name"] = cve_id
         local_to_stix[entity.local_id] = stix_id
         local_to_type[entity.local_id] = entity.type
         objects.append(obj)
@@ -812,6 +860,11 @@ def build_stix_bundle_from_extraction(
         logger.warning(
             "indicators_dropped_invalid_pattern_total",
             count=indicators_dropped_invalid_pattern,
+        )
+    if vulnerabilities_dropped_no_cve:
+        logger.warning(
+            "vulnerabilities_dropped_no_cve_total",
+            count=vulnerabilities_dropped_no_cve,
         )
 
     dropped_unresolved = 0
@@ -967,6 +1020,17 @@ def _apply_required_property_defaults(obj: dict, ts: str) -> None:
         # demote to `labels` (open vocab) — same pattern as the open-vocab
         # demotion in 0.5.1.
         _demote_property_to_labels(obj, "sophistication")
+        # STIX 2.1 §6.2 attack-motivation-ov is open vocab; `primary_motivation`
+        # / `secondary_motivations` outside the spec list trip {211}. Same
+        # demote-to-labels pattern as identity_class / sectors. (1.0.3 fix.)
+        _demote_scalar_to_labels_if_outside(obj, "primary_motivation", _STIX21_ATTACK_MOTIVATION_OV)
+        _filter_open_vocab(obj, "secondary_motivations", _STIX21_ATTACK_MOTIVATION_OV)
+    elif stype == "threat-actor":
+        # STIX 2.1 §4.17 threat-actor uses the same attack-motivation-ov for
+        # primary_motivation / secondary_motivations / goals (goals stays
+        # free-form per spec). Same demote pattern. (1.0.3 fix.)
+        _demote_scalar_to_labels_if_outside(obj, "primary_motivation", _STIX21_ATTACK_MOTIVATION_OV)
+        _filter_open_vocab(obj, "secondary_motivations", _STIX21_ATTACK_MOTIVATION_OV)
     elif stype == "identity":
         # STIX 2.1 §6.7 `identity-class-ov` is open vocab but the
         # validator emits {2xx} on out-of-vocab values. Demote to
@@ -1086,30 +1150,76 @@ def _scrub_empty_arrays(obj: dict) -> None:
 
 def _validate_indicator_pattern(obj: dict) -> bool:
     """Return True when the indicator's `pattern` parses as STIX 2.1
-    patterning syntax (or the pattern is in another language, or the
-    parser is missing, or no pattern is present).
+    patterning syntax (or the pattern is in another language).
 
     Returning False causes the caller to drop the indicator entirely;
     relationships pointing at it fall through the dangling-ref guard.
+
+    Drop conditions:
+    - `pattern` missing or empty → required by STIX 2.1 §4.7. The L3 LLM
+      sometimes emits "indicator" entities for prose descriptions of
+      patterns ("Newly Registered Domains") without an actual pattern;
+      these have no operational value to SAGE and would only generate
+      validator errors. (1.0.3 fix.)
+    - `pattern` present but does not parse as STIX patterning syntax
+      and `pattern_type == "stix"`. Other pattern types (YARA, Snort,
+      PCRE) are passed through untouched.
+
     Pattern parsing uses ``stix2patterns.v21.pattern.Pattern`` which is a
-    transitive dependency of ``stix2-validator``. Only ``pattern_type ==
-    "stix"`` is parsed; YARA, Snort, PCRE patterns are passed through
-    untouched (the OASIS validator handles their own syntax).
+    transitive dependency of ``stix2-validator``. When the parser is not
+    installed, only the missing-pattern check applies.
     """
+    pattern = obj.get("pattern")
+    if not isinstance(pattern, str) or not pattern.strip():
+        return False
     if _StixPattern is None:
         return True
     if obj.get("pattern_type", "stix") != "stix":
-        return True
-    pattern = obj.get("pattern")
-    if not isinstance(pattern, str) or not pattern.strip():
-        # No pattern → schema validator will surface the missing-required
-        # error; not our job here.
         return True
     try:
         _StixPattern(pattern)
     except Exception:  # noqa: BLE001 — stix2patterns raises ParseException; be defensive
         return False
     return True
+
+
+def _extract_cve_id(obj: dict) -> str | None:
+    """Return a normalized CVE-YYYY-NNNN identifier for a vulnerability
+    object, or ``None`` when no CVE id can be derived.
+
+    Resolution order, matching STIX 2.1 §4.18 conventions:
+
+    1. Each entry in ``external_references`` whose ``source_name`` equals
+       ``"cve"`` (case-insensitive). The ``external_id`` is checked first,
+       then ``url`` for the trailing CVE token. The first match wins.
+    2. The vulnerability's ``name`` itself, when it parses as a CVE id.
+
+    Used to drop vulnerability entries that the LLM hallucinated from
+    generic CVE references in prose (e.g. ``name="Common Vulnerabilities
+    and Exposures (CVEs)"``). Such entries break SAGE's
+    ``Vulnerability.cve_id STRING(32)`` constraint and have no analytical
+    value because no actual CVE is identified. (1.0.3 fix.)
+    """
+    refs = obj.get("external_references") or []
+    if isinstance(refs, list):
+        for ref in refs:
+            if not isinstance(ref, dict):
+                continue
+            if (ref.get("source_name") or "").lower() != "cve":
+                continue
+            ext_id = ref.get("external_id")
+            if isinstance(ext_id, str) and _CVE_ID_PATTERN.fullmatch(ext_id.strip()):
+                return ext_id.strip()
+            url = ref.get("url")
+            if isinstance(url, str):
+                # MITRE / NVD URLs end with `/CVE-YYYY-NNNN` or `?name=CVE-...`
+                m = re.search(r"CVE-\d{4}-\d{4,}", url)
+                if m and _CVE_ID_PATTERN.fullmatch(m.group()):
+                    return m.group()
+    name = obj.get("name")
+    if isinstance(name, str) and _CVE_ID_PATTERN.fullmatch(name.strip()):
+        return name.strip()
+    return None
 
 
 def _is_relationship_suggested(src_type: str, rel_type: str, tgt_type: str) -> bool:

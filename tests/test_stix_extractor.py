@@ -483,14 +483,25 @@ class TestRequiredPropertyDefaults:
         assert malware["is_family"] is True
 
     def test_indicator_gets_valid_from_default_to_object_ts(self):
-        ext = Extraction(entities=[_ent("i", "indicator", "ip-1.2.3.4")])
+        ext = Extraction(
+            entities=[_ent("i", "indicator", "ip-1.2.3.4", pattern="[ipv4-addr:value = '1.2.3.4']")]
+        )
         bundle = build_stix_bundle_from_extraction(ext)
         indicator = next(o for o in bundle["objects"] if o["type"] == "indicator")
         # All non-extension objects share one timestamp; valid_from equals it.
         assert indicator["valid_from"] == indicator["created"]
 
     def test_indicator_gets_pattern_type_stix_default(self):
-        ext = Extraction(entities=[_ent("i", "indicator", "domain-example")])
+        ext = Extraction(
+            entities=[
+                _ent(
+                    "i",
+                    "indicator",
+                    "domain-example",
+                    pattern="[domain-name:value = 'example.com']",
+                )
+            ]
+        )
         bundle = build_stix_bundle_from_extraction(ext)
         indicator = next(o for o in bundle["objects"] if o["type"] == "indicator")
         assert indicator["pattern_type"] == "stix"
@@ -1328,3 +1339,164 @@ class TestExploitsSourceTightening:
         bundle = build_stix_bundle_from_extraction(ext)
         rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
         assert rels == []
+
+
+class TestVulnerabilityCveValidation:
+    """1.0.3: drop vulnerability entities the LLM hallucinated from prose."""
+
+    def test_drops_vulnerability_with_non_cve_name(self):
+        ext = Extraction(
+            entities=[_ent("v", "vulnerability", "Common Vulnerabilities and Exposures (CVEs)")]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        vulns = [o for o in bundle["objects"] if o["type"] == "vulnerability"]
+        assert vulns == []
+
+    def test_keeps_vulnerability_with_proper_cve_name(self):
+        ext = Extraction(entities=[_ent("v", "vulnerability", "CVE-2024-12345")])
+        bundle = build_stix_bundle_from_extraction(ext)
+        vulns = [o for o in bundle["objects"] if o["type"] == "vulnerability"]
+        assert len(vulns) == 1
+        assert vulns[0]["name"] == "CVE-2024-12345"
+
+    def test_extracts_cve_from_external_references_external_id(self):
+        ext = Extraction(
+            entities=[
+                _ent(
+                    "v",
+                    "vulnerability",
+                    "Path traversal in Foo",
+                    external_references=[{"source_name": "cve", "external_id": "CVE-2023-9999"}],
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        vulns = [o for o in bundle["objects"] if o["type"] == "vulnerability"]
+        assert len(vulns) == 1
+        # Name normalized to the CVE id even though the LLM wrote prose.
+        assert vulns[0]["name"] == "CVE-2023-9999"
+
+    def test_extracts_cve_from_external_references_url(self):
+        ext = Extraction(
+            entities=[
+                _ent(
+                    "v",
+                    "vulnerability",
+                    "Some advisory",
+                    external_references=[
+                        {
+                            "source_name": "cve",
+                            "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-4242",
+                        }
+                    ],
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        vulns = [o for o in bundle["objects"] if o["type"] == "vulnerability"]
+        assert len(vulns) == 1
+        assert vulns[0]["name"] == "CVE-2025-4242"
+
+    def test_drops_vulnerability_with_only_unrelated_external_references(self):
+        ext = Extraction(
+            entities=[
+                _ent(
+                    "v",
+                    "vulnerability",
+                    "Generic mention",
+                    external_references=[
+                        {"source_name": "mitre-attack", "url": "https://example.com"}
+                    ],
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        vulns = [o for o in bundle["objects"] if o["type"] == "vulnerability"]
+        assert vulns == []
+
+    def test_relationships_to_dropped_vulnerability_fall_through_dangling_guard(self):
+        ext = Extraction(
+            entities=[
+                _ent("m", "malware", "FooBot"),
+                _ent("v", "vulnerability", "Generic CVE mention"),
+            ],
+            relationships=[ExtractedRelationship("m", "v", "exploits")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        # Vulnerability dropped; relationship lost its target → dangling-ref drop.
+        assert rels == []
+
+
+class TestIndicatorMissingPattern:
+    """1.0.3: drop indicators with no pattern (was: kept; surfaced as validator error)."""
+
+    def test_drops_indicator_without_pattern(self):
+        ext = Extraction(entities=[_ent("i", "indicator", "Newly Registered Domains")])
+        bundle = build_stix_bundle_from_extraction(ext)
+        inds = [o for o in bundle["objects"] if o["type"] == "indicator"]
+        assert inds == []
+
+    def test_keeps_indicator_with_pattern(self):
+        ext = Extraction(
+            entities=[
+                _ent(
+                    "i",
+                    "indicator",
+                    "ip",
+                    pattern="[ipv4-addr:value = '1.2.3.4']",
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        inds = [o for o in bundle["objects"] if o["type"] == "indicator"]
+        assert len(inds) == 1
+
+
+class TestAttackMotivationDemotion:
+    """1.0.3: primary_motivation / secondary_motivations outside attack-motivation-ov."""
+
+    def test_intrusion_set_in_vocab_motivation_kept(self):
+        ext = Extraction(
+            entities=[_ent("a", "intrusion-set", "FIN7", primary_motivation="organizational-gain")]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        actor = next(o for o in bundle["objects"] if o["type"] == "intrusion-set")
+        assert actor["primary_motivation"] == "organizational-gain"
+        assert "labels" not in actor
+
+    def test_intrusion_set_out_of_vocab_motivation_demoted_to_labels(self):
+        # "financial" and "espionage" are common LLM emissions but not in
+        # STIX 2.1 §6.2 (the canonical values are organizational-gain etc.).
+        ext = Extraction(
+            entities=[_ent("a", "intrusion-set", "Lazarus", primary_motivation="financial")]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        actor = next(o for o in bundle["objects"] if o["type"] == "intrusion-set")
+        assert "primary_motivation" not in actor
+        assert "financial" in actor.get("labels", [])
+
+    def test_threat_actor_out_of_vocab_motivation_demoted(self):
+        ext = Extraction(
+            entities=[_ent("a", "threat-actor", "APT29", primary_motivation="espionage")]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        actor = next(o for o in bundle["objects"] if o["type"] == "threat-actor")
+        assert "primary_motivation" not in actor
+        assert "espionage" in actor.get("labels", [])
+
+    def test_secondary_motivations_filtered(self):
+        ext = Extraction(
+            entities=[
+                _ent(
+                    "a",
+                    "intrusion-set",
+                    "Mixed",
+                    secondary_motivations=["organizational-gain", "espionage"],
+                )
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        actor = next(o for o in bundle["objects"] if o["type"] == "intrusion-set")
+        assert actor.get("secondary_motivations") == ["organizational-gain"]
+        assert "espionage" in actor.get("labels", [])
