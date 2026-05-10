@@ -6,6 +6,108 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.4.0] — 2026-05-10
+
+### Added — Initiative B Phase 2: L3 prompt + bundle assembler for user-account
+
+Completes the User-Account SCO trace-source pipeline that 1.3.0
+declared. The L3 prompt now asks the LLM to emit
+``user_account_observations`` from CTI report text; the bundle
+assembler synthesizes STIX 2.1 §6.4 user-account SCOs (UUIDv5-id'd
+for cross-run determinism), wraps them in §4.10 observed-data SDOs,
+and emits ``x-trace-valids-on`` relationships for each
+asset-resolved host. Mirror of 1.2.0's identity_asset_edges flow
+with the same asset_resolver ladder.
+
+#### Extraction pipeline
+
+- New `UserAccountObservation` dataclass on `Extraction`.
+- `_coerce_user_account_observations` parses the LLM's
+  `user_account_observations[]` array (account_login required,
+  account_type validated against the §6.4 vocab and demoted to
+  `other` when unknown).
+- `_extract_chunk` populates the new field; chunked extractions
+  re-prefix `identity_local_id` so the merge stage can resolve it
+  through the canonical alias map.
+- `_merge_extractions` deduplicates on
+  `(account_login.lower(), account_type)` and clears unresolved
+  identity owner links.
+
+#### Bundle assembler
+
+`build_stix_bundle_from_extraction` now processes
+`user_account_observations` after the IAE block:
+
+1. Each observation produces one user-account SCO with
+   ``id = user-account--<uuid5(NAMESPACE, account_login + "\\0" +
+   account_type)>``. Same login + type across crawls produces the
+   same STIX id, so SAGE 0.7.0's
+   ``upsert_user_account`` updates rather than duplicates.
+2. One observed-data SDO per observation wraps the SCO in
+   `object_refs` (STIX-spec carrier).
+3. When `identity_local_id` resolves to an extracted identity
+   entity, emit a `related-to` relationship binding the account to
+   its owner. SAGE 0.7.0 maps `(identity → user-account,
+   related-to)` to `UserAccountBelongsTo`.
+4. For each `asset_references[*]`, run the same
+   `resolve_asset_reference` 4-tier ladder used for IAE, reuse the
+   `x-asset-internal` cache built by the IAE block (so the same
+   host shared by an IAE and a UAO produces a single
+   `x-asset-internal` object), and emit one `x-trace-valids-on`
+   relationship.
+
+The same `assets=` argument from 1.2.0 powers both flows; no CLI
+changes required (`crawl_single` / `crawl_batch` already accept
+`--assets`).
+
+#### L3 prompt update
+
+`stix_extraction.md` gained a `user_account_observations` block in
+the schema and a new "User-account observations" section with three
+worked examples (mailbox compromise, service-account credential
+harvest, Domain Admin lateral movement) and an explicit attacker-
+account exclusion rule.
+
+#### `_USER_ACCOUNT_NAMESPACE` constant
+
+UUIDv5 namespace mirroring `_X_ASSET_INTERNAL_NAMESPACE` so the
+synthesized user-account ids are deterministic per
+`(login, account_type)`.
+
+### Tests
+
+12 new cases:
+
+- `tests/test_stix_extractor.py::TestUserAccountObservationCoercion`
+  (4) — LLM JSON parsing, missing-field tolerance, blank-login
+  guard, account_type vocabulary demotion.
+- `tests/test_stix_extractor.py::TestBundleAssemblerUserAccountObservations`
+  (8) — SCO + observed-data emission, deterministic STIX id across
+  re-emissions, resolved asset reference emits valids-on, unresolved
+  drops relationship but keeps SCO, no-assets drops relationships,
+  identity owner emits related-to, unknown owner drops link, IAE +
+  UAO sharing one asset reuses one x-asset-internal object.
+
+All 261 tests pass; 0 vulnerabilities.
+
+### SAGE pairing
+
+Initiative B Phase 1 SAGE 0.7.0 already accepts
+`x-trace-valids-on` and the supporting types. No SAGE release is
+required for this slice; existing forward-compatibility (parser
+SUPPORTED_TYPES, mapper dispatch, `upsert_account_on_asset`) covers
+everything 1.4.0 emits.
+
+### Future scope
+
+- E2E verification with the 楽天 Edy context.md once a User Accounts
+  section is added there (mirrors Initiative A's verification flow).
+- Phase 2 evaluation gate (per Initiative B design doc):
+  privileged-account PIR weighting, account lifecycle automation,
+  query API endpoints.
+
+---
+
 ## [1.3.0] — 2026-05-10
 
 ### Added — Initiative B: user_accounts validator + STIX vocabulary

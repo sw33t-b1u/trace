@@ -15,6 +15,7 @@ from trace_engine.stix.extractor import (
     ExtractedRelationship,
     Extraction,
     IdentityAssetEdge,
+    UserAccountObservation,
     _chunk_text,
     _extract_json_from_text,
     _merge_extractions,
@@ -1687,3 +1688,242 @@ class TestBundleAssemblerIdentityAssetEdges:
             if o["type"] == "relationship" and o["relationship_type"] == "x-trace-has-access"
         ]
         assert rels == []
+
+
+# ---------------------------------------------------------------------------
+# 1.4.0 — User-account observations (Initiative B Phase 2)
+# ---------------------------------------------------------------------------
+
+
+_ASSETS_FOR_UAO = [
+    {"id": "asset-CA-005", "name": "Build Server", "tags": ["ci", "internal"]},
+    {"id": "asset-CA-007", "name": "Identity System", "tags": ["identity", "auth"]},
+]
+
+
+class TestUserAccountObservationCoercion:
+    """LLM JSON parsing for the new user_account_observations field."""
+
+    def test_extract_entities_parses_observations_from_llm_json(self):
+        payload = {
+            "entities": [],
+            "relationships": [],
+            "user_account_observations": [
+                {
+                    "account_login": "alice@corp.example.com",
+                    "display_name": "Alice",
+                    "account_type": "windows-domain",
+                    "is_privileged": False,
+                    "is_service_account": False,
+                    "asset_references": ["Mail server"],
+                }
+            ],
+        }
+        with _patch_llm(payload):
+            extraction = extract_entities("text")
+        assert len(extraction.user_account_observations) == 1
+        obs = extraction.user_account_observations[0]
+        assert obs.account_login == "alice@corp.example.com"
+        assert obs.account_type == "windows-domain"
+        assert obs.asset_references == ["Mail server"]
+
+    def test_handles_missing_user_account_observations_field(self):
+        payload = {"entities": [], "relationships": []}
+        with _patch_llm(payload):
+            extraction = extract_entities("text")
+        assert extraction.user_account_observations == []
+
+    def test_drops_observation_with_blank_login(self):
+        payload = {
+            "entities": [],
+            "relationships": [],
+            "user_account_observations": [
+                {"account_login": "", "asset_references": ["Server"]},
+                {"account_login": "alice", "asset_references": []},
+            ],
+        }
+        with _patch_llm(payload):
+            extraction = extract_entities("text")
+        assert len(extraction.user_account_observations) == 1
+        assert extraction.user_account_observations[0].account_login == "alice"
+
+    def test_unknown_account_type_demoted_to_other(self):
+        payload = {
+            "entities": [],
+            "relationships": [],
+            "user_account_observations": [
+                {"account_login": "x", "account_type": "weird-type"}
+            ],
+        }
+        with _patch_llm(payload):
+            extraction = extract_entities("text")
+        assert extraction.user_account_observations[0].account_type == "other"
+
+
+class TestBundleAssemblerUserAccountObservations:
+    """Bundle assembler synthesizes user-account SCO + observed-data SDO
+    + optional x-trace-valids-on relationships from each observation."""
+
+    def test_observation_emits_user_account_and_observed_data(self):
+        ext = Extraction(
+            user_account_observations=[
+                UserAccountObservation(
+                    account_login="alice@corp.example.com",
+                    display_name="Alice",
+                    account_type="windows-domain",
+                )
+            ],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        ua = [o for o in bundle["objects"] if o["type"] == "user-account"]
+        assert len(ua) == 1
+        assert ua[0]["user_id"] == "alice@corp.example.com"
+        # Spec-compliant id: user-account--<uuid5>
+        assert ua[0]["id"].startswith("user-account--")
+        assert _UUID5_HEX.match(ua[0]["id"].split("--")[1])
+
+        od = [o for o in bundle["objects"] if o["type"] == "observed-data"]
+        assert len(od) == 1
+        assert ua[0]["id"] in od[0]["object_refs"]
+
+    def test_deterministic_user_account_id_across_emissions(self):
+        # Same login + account_type should produce the same STIX id so
+        # SAGE's upsert hits the same row across re-crawls.
+        ext1 = Extraction(
+            user_account_observations=[
+                UserAccountObservation(
+                    account_login="root", account_type="unix-account"
+                )
+            ],
+        )
+        ext2 = Extraction(
+            user_account_observations=[
+                UserAccountObservation(
+                    account_login="root", account_type="unix-account"
+                )
+            ],
+        )
+        b1 = build_stix_bundle_from_extraction(ext1)
+        b2 = build_stix_bundle_from_extraction(ext2)
+        ua1 = next(o for o in b1["objects"] if o["type"] == "user-account")
+        ua2 = next(o for o in b2["objects"] if o["type"] == "user-account")
+        assert ua1["id"] == ua2["id"]
+
+    def test_resolved_asset_reference_emits_x_trace_valids_on(self):
+        ext = Extraction(
+            user_account_observations=[
+                UserAccountObservation(
+                    account_login="svc-jenkins",
+                    account_type="service",
+                    is_service_account=True,
+                    asset_references=["Build Server"],
+                )
+            ],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, assets=_ASSETS_FOR_UAO)
+        rels = [
+            o
+            for o in bundle["objects"]
+            if o["type"] == "relationship" and o["relationship_type"] == "x-trace-valids-on"
+        ]
+        assert len(rels) == 1
+        assert rels[0]["source_ref"].startswith("user-account--")
+        assert rels[0]["target_ref"].startswith("x-asset-internal--")
+        # Tier 1 exact match → confidence 80
+        assert rels[0]["confidence"] == 80
+
+    def test_unresolved_asset_reference_drops_relationship_keeps_sco(self):
+        ext = Extraction(
+            user_account_observations=[
+                UserAccountObservation(
+                    account_login="alice",
+                    asset_references=["Nonexistent System"],
+                )
+            ],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, assets=_ASSETS_FOR_UAO)
+        # SCO survives — no x-trace-valids-on edge.
+        ua = [o for o in bundle["objects"] if o["type"] == "user-account"]
+        rels = [
+            o
+            for o in bundle["objects"]
+            if o["type"] == "relationship" and o["relationship_type"] == "x-trace-valids-on"
+        ]
+        assert len(ua) == 1
+        assert rels == []
+
+    def test_no_assets_supplied_drops_relationships(self):
+        ext = Extraction(
+            user_account_observations=[
+                UserAccountObservation(
+                    account_login="alice",
+                    asset_references=["Build Server"],
+                )
+            ],
+        )
+        # No assets= — even valid references can't resolve.
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [
+            o
+            for o in bundle["objects"]
+            if o["type"] == "relationship" and o["relationship_type"] == "x-trace-valids-on"
+        ]
+        assert rels == []
+
+    def test_identity_owner_emits_related_to_relationship(self):
+        ext = Extraction(
+            entities=[_ent("id_finance", "identity", "Finance Team")],
+            user_account_observations=[
+                UserAccountObservation(
+                    account_login="finance-shared",
+                    identity_local_id="id_finance",
+                )
+            ],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        related_rels = [
+            o
+            for o in bundle["objects"]
+            if o["type"] == "relationship" and o["relationship_type"] == "related-to"
+        ]
+        assert len(related_rels) == 1
+        assert related_rels[0]["source_ref"].startswith("identity--")
+        assert related_rels[0]["target_ref"].startswith("user-account--")
+
+    def test_unknown_identity_owner_drops_link_keeps_sco(self):
+        ext = Extraction(
+            user_account_observations=[
+                UserAccountObservation(
+                    account_login="orphan",
+                    identity_local_id="ghost",
+                )
+            ],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        ua = [o for o in bundle["objects"] if o["type"] == "user-account"]
+        related_rels = [
+            o
+            for o in bundle["objects"]
+            if o["type"] == "relationship" and o["relationship_type"] == "related-to"
+        ]
+        assert len(ua) == 1
+        assert related_rels == []
+
+    def test_x_asset_internal_dedup_across_iae_and_uao(self):
+        # IAE pointing at "Build Server" + UAO pointing at "Build Server"
+        # must reuse the same x-asset-internal object (not create two).
+        ext = Extraction(
+            entities=[_ent("id_x", "identity", "X")],
+            identity_asset_edges=[
+                IdentityAssetEdge(source="id_x", asset_reference="Build Server")
+            ],
+            user_account_observations=[
+                UserAccountObservation(
+                    account_login="svc",
+                    asset_references=["Build Server"],
+                )
+            ],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, assets=_ASSETS_FOR_UAO)
+        x_asset = [o for o in bundle["objects"] if o["type"] == "x-asset-internal"]
+        assert len(x_asset) == 1

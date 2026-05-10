@@ -317,6 +317,14 @@ _CVE_ID_PATTERN = re.compile(r"^CVE-\d{4}-\d{4,}$")
 _X_ASSET_INTERNAL_NAMESPACE = uuid.UUID("d41d8cd9-8f00-b204-e980-0998ecf8427e")
 
 
+# 1.4.0: UUIDv5 namespace for synthetic ``user-account`` STIX ids
+# (Initiative B). Same goal as ``_X_ASSET_INTERNAL_NAMESPACE`` — re-emitting
+# the same login + account_type pair from a later crawl produces the same
+# STIX id, so SAGE's ``upsert_user_account`` updates the existing row
+# rather than creating a duplicate.
+_USER_ACCOUNT_NAMESPACE = uuid.UUID("e51e9d8a-3b2c-5d7f-9c4e-2b6a8f3c1d50")
+
+
 # ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
@@ -352,10 +360,38 @@ class IdentityAssetEdge:
 
 
 @dataclass
+class UserAccountObservation:
+    """LLM-extracted user-account observation (Initiative B / 1.4.0).
+
+    Carries enough information to synthesize a STIX 2.1 §6.4
+    user-account SCO plus the TRACE custom fields the bundle
+    assembler emits as `x-trace-valids-on` relationships:
+
+    - ``account_login`` is required; without it the bundle assembler
+      drops the observation.
+    - ``asset_references`` is the list of free-form host hints —
+      same 4-tier resolver as Initiative A maps each to a SAGE
+      asset_id at assembly time.
+    - ``identity_local_id`` optional: when set and matches an
+      extracted ``identity`` entity's local_id, the bundle gets a
+      ``related-to`` relationship binding the account to its owner.
+    """
+
+    account_login: str
+    display_name: str = ""
+    account_type: str = "other"
+    is_privileged: bool = False
+    is_service_account: bool = False
+    identity_local_id: str = ""
+    asset_references: list[str] = field(default_factory=list)
+
+
+@dataclass
 class Extraction:
     entities: list[ExtractedEntity] = field(default_factory=list)
     relationships: list[ExtractedRelationship] = field(default_factory=list)
     identity_asset_edges: list[IdentityAssetEdge] = field(default_factory=list)
+    user_account_observations: list[UserAccountObservation] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -630,6 +666,9 @@ def _extract_chunk(
     entities = _coerce_entities(parsed.get("entities"))
     relationships = _coerce_relationships(parsed.get("relationships"))
     identity_asset_edges = _coerce_identity_asset_edges(parsed.get("identity_asset_edges"))
+    user_account_observations = _coerce_user_account_observations(
+        parsed.get("user_account_observations")
+    )
 
     # Namespace local_ids per chunk so identical aliases from different
     # chunks (e.g. "actor_1") don't collide before merge.
@@ -655,10 +694,25 @@ def _extract_chunk(
             )
             for e in identity_asset_edges
         ]
+        # Re-prefix identity_local_id when set so the merge stage can
+        # resolve it against the namespaced entities. Empty stays empty.
+        user_account_observations = [
+            UserAccountObservation(
+                account_login=u.account_login,
+                display_name=u.display_name,
+                account_type=u.account_type,
+                is_privileged=u.is_privileged,
+                is_service_account=u.is_service_account,
+                identity_local_id=(prefix + u.identity_local_id) if u.identity_local_id else "",
+                asset_references=list(u.asset_references),
+            )
+            for u in user_account_observations
+        ]
     return Extraction(
         entities=entities,
         relationships=relationships,
         identity_asset_edges=identity_asset_edges,
+        user_account_observations=user_account_observations,
     )
 
 
@@ -806,9 +860,39 @@ def _merge_extractions(parts: list[Extraction]) -> Extraction:
                 )
             )
 
+    # User-account observations (1.4.0): de-dup on
+    # ``(account_login, account_type)`` so the same login extracted from
+    # two chunks of a long article doesn't produce duplicate SCOs.
+    # ``identity_local_id`` is remapped through alias_to_canonical;
+    # unresolved owners are cleared (the SCO survives, the owner link
+    # falls through the dangling-ref guard at bundle-assembly time).
+    merged_uao: list[UserAccountObservation] = []
+    uao_seen: set[tuple[str, str]] = set()
+    for part in parts:
+        for obs in part.user_account_observations:
+            marker = (obs.account_login.lower(), obs.account_type)
+            if marker in uao_seen:
+                continue
+            uao_seen.add(marker)
+            owner = ""
+            if obs.identity_local_id:
+                owner = alias_to_canonical.get(obs.identity_local_id, "") or ""
+            merged_uao.append(
+                UserAccountObservation(
+                    account_login=obs.account_login,
+                    display_name=obs.display_name,
+                    account_type=obs.account_type,
+                    is_privileged=obs.is_privileged,
+                    is_service_account=obs.is_service_account,
+                    identity_local_id=owner,
+                    asset_references=list(obs.asset_references),
+                )
+            )
+
     raw_entity_count = sum(len(p.entities) for p in parts)
     raw_rel_count = sum(len(p.relationships) for p in parts)
     raw_iae_count = sum(len(p.identity_asset_edges) for p in parts)
+    raw_uao_count = sum(len(p.user_account_observations) for p in parts)
     logger.info(
         "extractions_merged",
         chunks=len(parts),
@@ -820,11 +904,14 @@ def _merge_extractions(parts: list[Extraction]) -> Extraction:
         raw_identity_asset_edges=raw_iae_count,
         merged_identity_asset_edges=len(merged_iae),
         dropped_identity_asset_edges=iae_dropped,
+        raw_user_account_observations=raw_uao_count,
+        merged_user_account_observations=len(merged_uao),
     )
     return Extraction(
         entities=merged_entities,
         relationships=merged_relationships,
         identity_asset_edges=merged_iae,
+        user_account_observations=merged_uao,
     )
 
 
@@ -861,6 +948,57 @@ def _coerce_relationships(raw: object) -> list[ExtractedRelationship]:
         if rtype not in _VALID_RELATIONSHIP_TYPES:
             continue
         out.append(ExtractedRelationship(source=source, target=target, relationship_type=rtype))
+    return out
+
+
+def _coerce_user_account_observations(raw: object) -> list[UserAccountObservation]:
+    """Parse the LLM's ``user_account_observations`` array (TRACE 1.4.0+).
+
+    Each entry produces one synthesized STIX user-account SCO at bundle
+    assembly time. ``account_login`` is the only required field; entries
+    without it are dropped silently here so the assembler never has to
+    handle malformed shapes.
+    """
+    if not isinstance(raw, list):
+        return []
+    out: list[UserAccountObservation] = []
+    valid_account_types = {
+        "unix-account",
+        "windows-local",
+        "windows-domain",
+        "ldap",
+        "kerberos",
+        "azure-ad",
+        "google-workspace",
+        "saas",
+        "service",
+        "other",
+    }
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        login = item.get("account_login")
+        if not (isinstance(login, str) and login.strip()):
+            continue
+        account_type = item.get("account_type") or "other"
+        if account_type not in valid_account_types:
+            account_type = "other"
+        asset_refs_raw = item.get("asset_references") or []
+        if not isinstance(asset_refs_raw, list):
+            asset_refs_raw = []
+        asset_refs = [r for r in asset_refs_raw if isinstance(r, str) and r.strip()]
+        identity_local_id = item.get("identity_local_id") or ""
+        out.append(
+            UserAccountObservation(
+                account_login=login.strip(),
+                display_name=str(item.get("display_name") or ""),
+                account_type=account_type,
+                is_privileged=bool(item.get("is_privileged", False)),
+                is_service_account=bool(item.get("is_service_account", False)),
+                identity_local_id=str(identity_local_id),
+                asset_references=asset_refs,
+            )
+        )
     return out
 
 
@@ -1127,12 +1265,141 @@ def build_stix_bundle_from_extraction(
             asset_internal_objects=len(asset_internal_ids),
         )
 
+    # 1.4.0 — User-account observations (Initiative B Phase 2).
+    # Each observation produces:
+    #   - 1 STIX 2.1 §6.4 user-account SCO (id is UUID5 from
+    #     account_login + account_type so re-emissions of the same
+    #     login in subsequent crawls hit the same SAGE row).
+    #   - 1 STIX 2.1 §4.10 observed-data SDO wrapping the SCO. The
+    #     SDO is a STIX-spec carrier; SAGE 0.7.0's parser keeps it
+    #     as a dict (no graph data drawn from it) and reads the
+    #     user-account id from object_refs when needed.
+    #   - 0 or more x-trace-valids-on relationships pointing at
+    #     resolved x-asset-internal objects (re-uses the same
+    #     resolver and object cache the IAE block built).
+    #   - 0 or 1 related-to relationship to an extracted identity
+    #     when the LLM linked the account to a known role/team.
+    #
+    # Unresolved asset references drop the relationship; the SCO
+    # survives. SAGE 0.7.0's worker filters dangling relationship
+    # endpoints upstream.
+    uao_emitted = 0
+    uao_relationships_emitted = 0
+    uao_dropped_unresolved_asset = 0
+    uao_dropped_no_assets_supplied = 0
+    has_user_account_observations = False
+    for obs in extraction.user_account_observations:
+        ua_uuid = uuid.uuid5(
+            _USER_ACCOUNT_NAMESPACE, f"{obs.account_login}\0{obs.account_type}"
+        )
+        ua_stix_id = f"user-account--{ua_uuid}"
+        ua_obj: dict = {
+            "type": "user-account",
+            "id": ua_stix_id,
+            "spec_version": "2.1",
+            "user_id": obs.account_login,
+            "account_type": obs.account_type,
+        }
+        if obs.display_name:
+            ua_obj["display_name"] = obs.display_name
+        if obs.is_privileged:
+            ua_obj["is_privileged"] = True
+        if obs.is_service_account:
+            ua_obj["is_service_account"] = True
+        objects.append(ua_obj)
+        # observed-data wrapper — STIX-required carrier for SCOs at
+        # the top-level of a bundle.
+        objects.append(
+            {
+                "type": "observed-data",
+                "id": f"observed-data--{uuid.uuid4()}",
+                "spec_version": "2.1",
+                "created": ts,
+                "modified": ts,
+                "first_observed": ts,
+                "last_observed": ts,
+                "number_observed": 1,
+                "object_refs": [ua_stix_id],
+            }
+        )
+        uao_emitted += 1
+        has_user_account_observations = True
+
+        # Optional ownership link to a known identity entity.
+        if obs.identity_local_id:
+            owner_stix = local_to_stix.get(obs.identity_local_id)
+            owner_type = local_to_type.get(obs.identity_local_id)
+            if owner_stix is not None and owner_type == "identity":
+                objects.append(
+                    {
+                        "type": "relationship",
+                        "id": f"relationship--{uuid.uuid4()}",
+                        "spec_version": "2.1",
+                        "created": ts,
+                        "modified": ts,
+                        "relationship_type": "related-to",
+                        "source_ref": owner_stix,
+                        "target_ref": ua_stix_id,
+                    }
+                )
+                uao_relationships_emitted += 1
+
+        # x-trace-valids-on relationships per resolved asset host.
+        for ref in obs.asset_references:
+            if not assets:
+                uao_dropped_no_assets_supplied += 1
+                continue
+            resolution = resolve_asset_reference(ref, assets)
+            if resolution is None:
+                uao_dropped_unresolved_asset += 1
+                continue
+            asset_internal_id = asset_internal_ids.get(resolution.asset_id)
+            if asset_internal_id is None:
+                asset_uuid = uuid.uuid5(_X_ASSET_INTERNAL_NAMESPACE, resolution.asset_id)
+                asset_internal_id = f"x-asset-internal--{asset_uuid}"
+                asset_internal_ids[resolution.asset_id] = asset_internal_id
+                objects.append(
+                    {
+                        "type": "x-asset-internal",
+                        "id": asset_internal_id,
+                        "spec_version": "2.1",
+                        "created": ts,
+                        "modified": ts,
+                        "asset_id": resolution.asset_id,
+                    }
+                )
+            objects.append(
+                {
+                    "type": "relationship",
+                    "id": f"relationship--{uuid.uuid4()}",
+                    "spec_version": "2.1",
+                    "created": ts,
+                    "modified": ts,
+                    "relationship_type": "x-trace-valids-on",
+                    "source_ref": ua_stix_id,
+                    "target_ref": asset_internal_id,
+                    "confidence": resolution.confidence,
+                }
+            )
+            uao_relationships_emitted += 1
+
+    if uao_emitted or extraction.user_account_observations:
+        logger.info(
+            "user_account_observations_processed",
+            extracted=len(extraction.user_account_observations),
+            emitted=uao_emitted,
+            relationships_emitted=uao_relationships_emitted,
+            dropped_no_assets_supplied=uao_dropped_no_assets_supplied,
+            dropped_unresolved_asset=uao_dropped_unresolved_asset,
+        )
+
     has_trace_metadata = (
         source_url is not None
         or matched_pir_ids is not None
         or relevance_score is not None
         or bool(relevance_rationale)
         or has_identity_asset_edges
+        or has_user_account_observations
     )
 
     # Prepend the TRACE extension definition object so the bundle can carry
