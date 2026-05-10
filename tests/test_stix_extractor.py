@@ -124,9 +124,19 @@ def test_valid_entity_and_relationship_vocabularies_are_disjoint():
     # (TRACE 1.2.0), but the vocabulary is declared so SAGE 0.6.0 can
     # accept the type when receiving bundles produced by 1.2.0+.
     assert _VALID_RELATIONSHIP_TYPES == frozenset(
-        {"uses", "exploits", "indicates", "targets", "x-trace-has-access"}
+        {
+            "uses",
+            "exploits",
+            "indicates",
+            "targets",
+            "x-trace-has-access",
+            "x-trace-valids-on",  # 1.3.0 / Initiative B — user-account → asset
+        }
     )
     assert "identity" in _VALID_ENTITY_TYPES
+    # 1.3.0 / Initiative B
+    assert "user-account" in _VALID_ENTITY_TYPES
+    assert "observed-data" in _VALID_ENTITY_TYPES
 
 
 # ---------------------------------------------------------------------------

@@ -53,6 +53,12 @@ _VALID_ENTITY_TYPES: frozenset[str] = frozenset(
         "vulnerability",
         "indicator",
         "identity",  # 1.0.0 — credential / org-targeting graph node, paired with SAGE 0.5.0
+        # 1.3.0 / Initiative B — STIX 2.1 §6.4 user-account SCO + §4.10
+        # observed-data SDO. The L3 prompt emits user-account observations
+        # wrapped in observed-data; the bundle assembler synthesizes
+        # x-asset-internal references for AccountOnAsset edges.
+        "user-account",
+        "observed-data",
     }
 )
 
@@ -65,8 +71,12 @@ _VALID_ENTITY_TYPES: frozenset[str] = frozenset(
 # ladder in `resolve_asset_reference`). The relationship target_ref points
 # at a synthesized `x-asset-internal--<asset_id>` STIX object that the
 # bundle assembler creates per referenced asset.
+#
+# `x-trace-valids-on` added in 1.3.0 (Initiative B): user-account → asset.
+# Same `x-asset-internal--<uuid5>` target convention as has-access; SAGE
+# 0.7.0 maps it to the AccountOnAsset edge.
 _VALID_RELATIONSHIP_TYPES: frozenset[str] = frozenset(
-    {"uses", "exploits", "indicates", "targets", "x-trace-has-access"}
+    {"uses", "exploits", "indicates", "targets", "x-trace-has-access", "x-trace-valids-on"}
 )
 
 # STIX 2.1 §6.7 `identity-class-ov` open vocabulary. Demote LLM values
@@ -183,6 +193,10 @@ _RELATIONSHIP_TYPE_TABLE: dict[tuple[str, str], frozenset[str]] = {
     # supplied asset reference to a SAGE asset_id. SAGE 0.6.0+ consumes
     # these as `HasAccess` rows.
     ("identity", "x-trace-has-access"): frozenset({"x-asset-internal"}),
+    # x-trace-valids-on (1.3.0 / Initiative B) — user-account → internal
+    # asset. Same x-asset-internal target convention as has-access; SAGE
+    # 0.7.0 routes to the AccountOnAsset edge.
+    ("user-account", "x-trace-valids-on"): frozenset({"x-asset-internal"}),
 }
 
 

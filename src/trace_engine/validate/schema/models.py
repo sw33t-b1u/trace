@@ -228,3 +228,71 @@ class IdentityAssetsDocument(_StrictModel):
     # Allow the optional _comment field BEACON emits as a hint to the
     # operator. Strict mode would reject it otherwise.
     model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+
+# ---------------------------------------------------------------------------
+# User accounts (Initiative B — TRACE 1.3.0 / SAGE 0.7.0)
+# ---------------------------------------------------------------------------
+# Pydantic mirror of BEACON 0.12.0's `user_accounts.json` artifact. Same
+# shape-only validation pattern as IdentityAssetsDocument; cross-reference
+# (user_account_id ∈ user_accounts[*].id, asset_id ∈ assets[*].id,
+# identity_id ∈ identity_assets identities[*].id when supplied) is enforced
+# in ``validate_user_accounts`` semantic.
+
+
+_ACCOUNT_TYPE_OV: tuple[str, ...] = (
+    "unix-account",
+    "windows-local",
+    "windows-domain",
+    "ldap",
+    "kerberos",
+    "azure-ad",
+    "google-workspace",
+    "saas",
+    "service",
+    "other",
+)
+
+
+class UserAccountEntry(_StrictModel):
+    id: str = Field(min_length=1)
+    account_login: str = Field(min_length=1)
+    display_name: str = ""
+    account_type: Literal[
+        "unix-account",
+        "windows-local",
+        "windows-domain",
+        "ldap",
+        "kerberos",
+        "azure-ad",
+        "google-workspace",
+        "saas",
+        "service",
+        "other",
+    ] = "other"
+    is_privileged: bool = False
+    is_service_account: bool = False
+    identity_id: str = ""  # optional
+    description: str = ""
+
+
+class AccountOnAssetEntry(_StrictModel):
+    user_account_id: str = Field(min_length=1)
+    asset_id: str = Field(min_length=1)
+    first_seen: str = ""
+    last_seen: str = ""
+
+    @model_validator(mode="after")
+    def _first_before_last(self) -> AccountOnAssetEntry:
+        if self.first_seen and self.last_seen and self.first_seen >= self.last_seen:
+            raise ValueError(
+                f"first_seen ({self.first_seen}) must precede last_seen ({self.last_seen})"
+            )
+        return self
+
+
+class UserAccountsDocument(_StrictModel):
+    version: int = Field(default=1, ge=1)
+    user_accounts: list[UserAccountEntry] = Field(default_factory=list)
+    account_on_asset: list[AccountOnAssetEntry] = Field(default_factory=list)
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)

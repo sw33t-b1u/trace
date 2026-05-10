@@ -6,6 +6,103 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.3.0] — 2026-05-10
+
+### Added — Initiative B: user_accounts validator + STIX vocabulary
+
+Validation gate for BEACON 0.12.0's `user_accounts.json`. Mirrors
+the Initiative A validator pattern; `--assets` is required for the
+asset_id cross-reference, and `--identity-assets` is optional for
+the additional `identity_id` cross-reference.
+
+The full Initiative B initiative spans two TRACE releases:
+
+- **1.3.0 (this release)** — schema, semantic validator, CLI,
+  STIX type vocabulary additions (`user-account`, `observed-data`,
+  `x-trace-valids-on`). The L3 prompt and bundle assembler still
+  treat user-account content as out-of-band (BEACON-supplied via
+  `cmd/load_user_accounts.py` in SAGE 0.7.0); CTI-extracted
+  user-account observations arrive in 1.4.0.
+- **1.4.0 (next)** — L3 prompt extension to extract user-account
+  observations and `x-trace-valids-on` relationships from CTI
+  reports; bundle assembler integration; `crawl_single` /
+  `crawl_batch` use the existing `--assets` flag.
+
+#### Pydantic schema additions
+
+`src/trace_engine/validate/schema/models.py`:
+
+- `UserAccountEntry` — `id`, `account_login`, `display_name`,
+  `account_type` (Literal of STIX 2.1 §6.4 `account-type-ov`),
+  `is_privileged`, `is_service_account`, `identity_id` (optional),
+  `description`.
+- `AccountOnAssetEntry` — `user_account_id`, `asset_id`,
+  `first_seen`, `last_seen`. A `model_validator` rejects
+  `first_seen >= last_seen`.
+- `UserAccountsDocument` — top-level container with `version`,
+  `user_accounts[]`, `account_on_asset[]`. `extra="ignore"` to
+  accept BEACON's `_comment` field.
+
+#### Cross-reference checks
+
+`src/trace_engine/validate/semantic/user_accounts.py`:
+
+- `user_accounts[*].id` uniqueness — error.
+- `account_on_asset[*].user_account_id` resolves to
+  `user_accounts[*].id` — error.
+- `account_on_asset[*].asset_id` resolves to a supplied
+  `assets.json`'s `assets[*].id` — error.
+- (Optional) `user_accounts[*].identity_id` resolves to a supplied
+  `identity_assets.json`'s `identities[*].id` — error.
+- Duplicate `(user_account_id, asset_id)` pairs — warning.
+
+#### `cmd/validate_user_accounts.py` CLI
+
+`--assets` required, `--identity-assets` optional. Same exit-code
+contract as `validate_identity_assets.py`.
+
+#### Extractor vocabulary expansion
+
+- `_VALID_ENTITY_TYPES += {"user-account", "observed-data"}` —
+  STIX 2.1 §6.4 SCO + §4.10 SDO. Declared so SAGE 0.7.0 can accept
+  bundles emitted by TRACE 1.4.0+ without a vocabulary mismatch.
+- `_VALID_RELATIONSHIP_TYPES += "x-trace-valids-on"` — same
+  pattern as 1.1.0's `x-trace-has-access` declaration.
+- `_RELATIONSHIP_TYPE_TABLE[("user-account", "x-trace-valids-on")] =
+  {"x-asset-internal"}` — declares the intended target type for
+  forward compatibility.
+
+The bundle assembler does not yet emit any of these (the LLM
+prompt is unchanged in 1.3.0); existing tests remain green.
+
+### Tests
+
+13 new cases:
+
+- `tests/test_validate_user_accounts.py` (12) —
+  - `TestSchema` (4): minimal account, account_type rejection,
+    first_seen/last_seen inversion, optional `_comment` accepted.
+  - `TestCrossReference` (5): clean doc, dangling user_account_id,
+    dangling asset_id, duplicate user_account_id, duplicate
+    account-asset pair.
+  - `TestIdentityCrossReference` (2): unknown identity_id with
+    identity-assets supplied (error), without identity-assets
+    (silent).
+  - `TestCli` (2): subprocess clean / dangling.
+- `test_stix_extractor.py::test_valid_entity_and_relationship_vocabularies_are_disjoint`
+  updated to assert the new entity / relationship types.
+
+All 249 tests pass; 0 vulnerabilities.
+
+### Future scope (TRACE share of remaining Initiative B)
+
+- 1.4.0: L3 prompt extension to emit user-account observed-data +
+  `x-trace-valids-on`; bundle assembler integration with
+  `asset_resolver`. crawl_single/crawl_batch already accept
+  `--assets` from 1.2.0.
+
+---
+
 ## [1.2.1] — 2026-05-10
 
 ### Fixed — `x-asset-internal` STIX identifier format violation

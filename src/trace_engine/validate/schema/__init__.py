@@ -1,6 +1,7 @@
 """Pydantic v2 schema models for SAGE input contracts."""
 
 from trace_engine.validate.schema.models import (
+    AccountOnAssetEntry,
     ActorTarget,
     Asset,
     AssetConnection,
@@ -16,9 +17,12 @@ from trace_engine.validate.schema.models import (
     SecurityControl,
     SourceEntry,
     SourcesDocument,
+    UserAccountEntry,
+    UserAccountsDocument,
 )
 
 __all__ = [
+    "AccountOnAssetEntry",
     "ActorTarget",
     "Asset",
     "AssetConnection",
@@ -34,4 +38,6 @@ __all__ = [
     "SecurityControl",
     "SourceEntry",
     "SourcesDocument",
+    "UserAccountEntry",
+    "UserAccountsDocument",
 ]
