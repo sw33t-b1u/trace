@@ -23,6 +23,8 @@ from trace_engine.stix.extractor import (
 )
 
 _UUIDV4 = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+# UUIDv5 has the same shape as v4 except the version nibble is `5`.
+_UUID5_HEX = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 
 
 def _as_json(value) -> str:
@@ -1578,7 +1580,12 @@ class TestBundleAssemblerIdentityAssetEdges:
         # resolved asset and emit one x-trace-has-access relationship.
         x_asset = [o for o in bundle["objects"] if o["type"] == "x-asset-internal"]
         assert len(x_asset) == 1
-        assert x_asset[0]["id"] == "x-asset-internal--asset-CA-002"
+        # 1.2.1: id is x-asset-internal--<uuid5> (STIX 2.1 §2.7 compliant);
+        # the actual asset_id lives in the property.
+        assert x_asset[0]["id"].startswith("x-asset-internal--")
+        assert _UUIDV4.match(x_asset[0]["id"].split("--")[1]) or _UUID5_HEX.match(
+            x_asset[0]["id"].split("--")[1]
+        )
         assert x_asset[0]["asset_id"] == "asset-CA-002"
 
         rels = [
@@ -1588,7 +1595,8 @@ class TestBundleAssemblerIdentityAssetEdges:
         ]
         assert len(rels) == 1
         assert rels[0]["source_ref"].startswith("identity--")
-        assert rels[0]["target_ref"] == "x-asset-internal--asset-CA-002"
+        # target_ref points at the synthesized x-asset-internal object's id.
+        assert rels[0]["target_ref"] == x_asset[0]["id"]
         assert rels[0]["confidence"] == 80  # tier 1 exact match
 
     def test_unresolved_reference_is_dropped(self):

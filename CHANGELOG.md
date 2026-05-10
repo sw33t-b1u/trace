@@ -6,6 +6,55 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.2.1] — 2026-05-10
+
+### Fixed — `x-asset-internal` STIX identifier format violation
+
+E2E verification of the trace-source HasAccess path surfaced a
+spec-level bug: 1.2.0 emitted ``x-asset-internal--asset-CA-001`` as
+the synthetic STIX object's id, but STIX 2.1 §2.7 requires every
+identifier referenced by a relationship to match
+``<object-type>--<UUIDv4|v5>``. The ``stix2`` library used by SAGE's
+parser raised
+``Invalid value for Relationship 'target_ref': not a valid STIX
+identifier``, dropping every ``x-trace-has-access`` relationship at
+parse time. The bug was latent in 1.2.0 because the only real-URL
+crawl produced ``emitted=0`` (asset resolver dropped all candidates).
+
+#### Format change
+
+The ``x-asset-internal`` id now uses ``uuid5(_NAMESPACE, asset_id)``,
+keeping the id deterministic per asset_id (same SAGE asset always
+produces the same STIX id across runs) while satisfying the §2.7
+identifier regex. The actual SAGE-side ``asset_id`` lives in the
+``asset_id`` property on the object, where SAGE 0.6.2's
+parser/worker reads it from.
+
+```python
+# Before (1.2.0):
+"id": "x-asset-internal--asset-CA-001"  # rejected by stix2 lib
+
+# After (1.2.1):
+"id": "x-asset-internal--<uuid5(NAMESPACE, 'asset-CA-001')>",
+"asset_id": "asset-CA-001"
+```
+
+The relationship's ``target_ref`` points at the new UUID5 form.
+
+### Tests
+
+Updated `TestBundleAssemblerIdentityAssetEdges::test_resolved_edge_emits_x_asset_internal_and_relationship` to assert on the UUID5 shape rather than the raw asset_id; verified that the relationship `target_ref` points at the synthesized object's id (not the raw asset_id).
+
+All 236 tests pass; 0 vulnerabilities.
+
+### SAGE pairing
+
+Requires SAGE 0.6.2 to read the `asset_id` property and route
+``x-trace-has-access`` relationships to the ``HasAccess`` table.
+Lockstep release per memory `project_release_pairing.md`.
+
+---
+
 ## [1.2.0] — 2026-05-10
 
 ### Added — Initiative A Phase 2: L3 prompt + bundle assembler integration

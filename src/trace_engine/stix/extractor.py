@@ -292,6 +292,17 @@ _STIX21_ATTACK_MOTIVATION_OV: frozenset[str] = frozenset(
 _CVE_ID_PATTERN = re.compile(r"^CVE-\d{4}-\d{4,}$")
 
 
+# 1.2.1: UUIDv5 namespace for synthetic ``x-asset-internal`` STIX ids.
+# STIX 2.1 §2.7 requires `<type>--<UUIDv4|v5>` for any identifier referenced
+# by a relationship. Using the asset_id directly (e.g. `asset-CA-001`)
+# violated the format and the stix2 library rejected the relationship at
+# SAGE's parser. UUIDv5 keeps the id deterministic per asset_id (the same
+# SAGE asset always produces the same STIX id across runs) while staying
+# spec-compliant. The actual asset_id lives in the `asset_id` property of
+# the x-asset-internal object — SAGE reads from there, not from the id.
+_X_ASSET_INTERNAL_NAMESPACE = uuid.UUID("d41d8cd9-8f00-b204-e980-0998ecf8427e")
+
+
 # ---------------------------------------------------------------------------
 # Data model
 # ---------------------------------------------------------------------------
@@ -1051,11 +1062,20 @@ def build_stix_bundle_from_extraction(
                 continue
             asset_internal_id = asset_internal_ids.get(resolution.asset_id)
             if asset_internal_id is None:
-                asset_internal_id = f"x-asset-internal--{resolution.asset_id}"
+                # 1.2.1: STIX 2.1 §2.7 requires <type>--<UUIDv4|v5> for the
+                # identifier of any object referenced by a relationship.
+                # ``x-asset-internal--asset-CA-001`` failed validation in
+                # the stix2 library used by SAGE's parser. Switch to a
+                # UUIDv5 derived deterministically from ``asset_id`` so
+                # the same SAGE asset always produces the same STIX id;
+                # the actual asset_id moves into a property on the object.
+                asset_uuid = uuid.uuid5(_X_ASSET_INTERNAL_NAMESPACE, resolution.asset_id)
+                asset_internal_id = f"x-asset-internal--{asset_uuid}"
                 asset_internal_ids[resolution.asset_id] = asset_internal_id
-                # Synthetic STIX object — the asset_id is the SAGE-side
-                # primary key. SAGE's mapper recognizes this id form and
-                # routes to the HasAccess table.
+                # Synthetic STIX object — `asset_id` carries the SAGE-side
+                # primary key separately from the STIX id. SAGE 0.6.2's
+                # parser/worker reads `asset_id` from this object when
+                # resolving x-trace-has-access relationships.
                 objects.append(
                     {
                         "type": "x-asset-internal",
