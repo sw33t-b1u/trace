@@ -6,6 +6,135 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.1.0] — 2026-05-10
+
+### Added — Initiative A: identity_assets validator + asset resolver
+
+Second slice of the Identity-Asset HasAccess initiative. BEACON 0.11.0
+emits the new `identity_assets.json` artifact; this release is the
+validation gate that artifact must clear before SAGE 0.6.0 ingests it.
+
+The full initiative spans two TRACE releases:
+
+- **1.1.0 (this release)** — schema, semantic validator, CLI, asset
+  resolver helper. The L3 prompt and bundle assembler still treat
+  `identity_assets` content as out-of-band (analyst-supplied via
+  BEACON); CTI-extracted identity-asset edges arrive in 1.2.0.
+- **1.2.0 (next)** — L3 prompt extension to extract
+  `x-trace-has-access` relationships from CTI reports, bundle
+  assembler integration, `crawl_single --assets` flag.
+
+Splitting the work keeps 1.1.0 immediately useful (BEACON's
+authoritative `source=beacon` artifact validates and ingests into
+SAGE 0.6.0) while the more complex bundle-rewrite work matures
+separately.
+
+#### Pydantic schema additions
+
+`src/trace_engine/validate/schema/models.py`:
+
+- `IdentityEntry` — `id`, `name`, `identity_class` (Literal of STIX
+  2.1 §6.7 `identity-class-ov`: individual / group / system /
+  organization / class / unspecified), `sectors[]`, `roles[]`,
+  `description`.
+- `HasAccessEntry` — `identity_id`, `asset_id`, `access_level`
+  (Literal: read / write / admin / deny), `role`, `granted_at`,
+  `revoked_at`. A `model_validator` rejects `granted_at >= revoked_at`.
+- `IdentityAssetsDocument` — top-level container with `version`,
+  `identities[]`, `has_access[]`. `extra="ignore"` to accept the
+  optional `_comment` field BEACON emits.
+
+#### Cross-reference checks
+
+`src/trace_engine/validate/semantic/identity_assets.py`:
+
+- `identities[*].id` uniqueness — error.
+- `has_access[*].identity_id` resolves to `identities[*].id` — error.
+- `has_access[*].asset_id` resolves to a supplied `assets.json`'s
+  `assets[*].id` — error.
+- Duplicate `(identity_id, asset_id)` pairs — warning (SAGE upsert
+  collapses duplicates to the last entry; the analyst should know).
+
+#### `cmd/validate_identity_assets.py` CLI
+
+`--assets` is **required** (Initiative A 2026-05-10 design decision —
+independent validation provides too little safety to be worth the
+API surface):
+
+```bash
+uv run python cmd/validate_identity_assets.py \
+  --identity-assets ../BEACON/output/identity_assets.json \
+  --assets ../BEACON/output/assets.json
+```
+
+Same exit-code contract as `validate_assets.py` /
+`validate_pir.py` (0 clean, 1 errors, 2 input).
+
+#### `src/trace_engine/stix/asset_resolver.py` — 4-tier matching ladder
+
+Resolves an LLM-supplied free-form asset reference against a known
+`assets[]` list. Used by 1.2.0+'s extractor; exposed in 1.1.0 for
+testing and analyst tooling. The ladder (decided 2026-05-10):
+
+| Tier | Match | Confidence |
+|------|-------|------------|
+| 1 | `Asset.name` exact (case-insensitive) | 80 |
+| 2 | `Asset.name` substring overlap ≥ 4 chars (bidirectional) | 50 |
+| 3 | Single `Asset.tags` exact match | 30 |
+| 4 | No match → drop with `asset_resolution_no_match` | — |
+
+Ambiguous matches (multiple assets at the same tier) drop with
+`asset_resolution_ambiguous` rather than picking arbitrarily.
+
+#### Extractor vocabulary expansion
+
+`_VALID_RELATIONSHIP_TYPES += "x-trace-has-access"` — declared so SAGE
+0.6.0 can accept bundles emitted by TRACE 1.2.0+ without a vocabulary
+mismatch. The bundle assembler does not yet emit this type (the LLM
+prompt is unchanged in 1.1.0); existing tests remain green.
+
+`_RELATIONSHIP_TYPE_TABLE[("identity", "x-trace-has-access")] =
+{"x-asset-internal"}` — declares the intended target type for
+forward compatibility.
+
+`IdentityAssetEdge` dataclass added to the extractor module. Unused
+in 1.1.0 (always empty list); 1.2.0 will populate it from the L3
+prompt.
+
+### Tests
+
+24 new cases across two new test files:
+
+- `tests/test_validate_identity_assets.py` (12) —
+  - `TestSchema` (5): minimal, identity_class validation,
+    access_level default, granted/revoked inversion rejected,
+    optional `_comment` accepted.
+  - `TestCrossReference` (5): clean doc, dangling identity_id /
+    asset_id, duplicate identity_id, duplicate access pair.
+  - `TestCli` (2): CLI exit code 0 / 1 against real subprocess spawn.
+- `tests/test_asset_resolver.py` (12) —
+  - `TestTier1Exact` (2): exact ja/en name match.
+  - `TestTier2Substring` (3): substring match, threshold guard,
+    ambiguous drops.
+  - `TestTier3Tag` (3): unique tag match, ambiguous tag drops, name
+    substring wins over tag.
+  - `TestNoMatch` (3) + `TestEmptyAssets` (1).
+- `test_stix_extractor.py::test_valid_entity_and_relationship_vocabularies_are_disjoint`
+  updated for the expanded relationship vocabulary.
+
+All 227 tests pass; 0 vulnerabilities.
+
+### Future scope (TRACE share of remaining Initiative A)
+
+- 1.2.0: L3 prompt extension to emit `x-trace-has-access`; bundle
+  assembler integration with `asset_resolver`; `--assets` flag on
+  `crawl_single` / `crawl_batch`; `extension-definition` block
+  declares `x-asset-internal` and `x-trace-has-access`.
+- 1.3.0+: per-identity asset-resolution confidence tuning based on
+  Phase 1 production data.
+
+---
+
 ## [1.0.3] — 2026-05-10
 
 ### Fixed — Three defects surfaced by CISA AA22-108a Lazarus E2E crawl

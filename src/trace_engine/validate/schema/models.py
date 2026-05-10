@@ -167,3 +167,64 @@ class SourceEntry(_StrictModel):
 class SourcesDocument(_StrictModel):
     version: int = Field(default=1, ge=1)
     sources: list[SourceEntry] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Identity assets (Initiative A — TRACE 1.1.0 / SAGE 0.6.0)
+# ---------------------------------------------------------------------------
+# Pydantic mirror of BEACON 0.11.0's `identity_assets.json` artifact.
+# The schema is shape-validation only — cross-reference (asset_id ∈
+# assets.json, identity_id ∈ identities[].id) is performed by
+# ``validate_identity_assets`` semantic.
+
+
+_IDENTITY_CLASS_OV: tuple[str, ...] = (
+    "individual",
+    "group",
+    "system",
+    "organization",
+    "class",
+    "unspecified",
+)
+
+
+class IdentityEntry(_StrictModel):
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    identity_class: Literal[
+        "individual",
+        "group",
+        "system",
+        "organization",
+        "class",
+        "unspecified",
+    ] = "group"
+    sectors: list[str] = Field(default_factory=list)
+    roles: list[str] = Field(default_factory=list)
+    description: str = ""
+
+
+class HasAccessEntry(_StrictModel):
+    identity_id: str = Field(min_length=1)
+    asset_id: str = Field(min_length=1)
+    access_level: Literal["read", "write", "admin", "deny"] = "read"
+    role: str = ""
+    granted_at: str = ""  # ISO date or empty
+    revoked_at: str = ""
+
+    @model_validator(mode="after")
+    def _granted_before_revoked(self) -> HasAccessEntry:
+        if self.granted_at and self.revoked_at and self.granted_at >= self.revoked_at:
+            raise ValueError(
+                f"granted_at ({self.granted_at}) must precede revoked_at ({self.revoked_at})"
+            )
+        return self
+
+
+class IdentityAssetsDocument(_StrictModel):
+    version: int = Field(default=1, ge=1)
+    identities: list[IdentityEntry] = Field(default_factory=list)
+    has_access: list[HasAccessEntry] = Field(default_factory=list)
+    # Allow the optional _comment field BEACON emits as a hint to the
+    # operator. Strict mode would reject it otherwise.
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)

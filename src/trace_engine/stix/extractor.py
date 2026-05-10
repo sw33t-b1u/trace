@@ -58,7 +58,15 @@ _VALID_ENTITY_TYPES: frozenset[str] = frozenset(
 # `targets` added in 1.0.0 alongside identity. STIX 2.1 §4.13 source
 # vocabulary: attack-pattern, campaign, intrusion-set, malware, threat-actor,
 # tool. Target vocabulary: identity, location, vulnerability, infrastructure.
-_VALID_RELATIONSHIP_TYPES: frozenset[str] = frozenset({"uses", "exploits", "indicates", "targets"})
+#
+# `x-trace-has-access` added in 1.1.0 (Initiative A): identity → asset
+# (resolved to a SAGE asset_id at TRACE-side via the 4-tier matching
+# ladder in `resolve_asset_reference`). The relationship target_ref points
+# at a synthesized `x-asset-internal--<asset_id>` STIX object that the
+# bundle assembler creates per referenced asset.
+_VALID_RELATIONSHIP_TYPES: frozenset[str] = frozenset(
+    {"uses", "exploits", "indicates", "targets", "x-trace-has-access"}
+)
 
 # STIX 2.1 §6.7 `identity-class-ov` open vocabulary. Demote LLM values
 # outside this set to `labels` (open vocab) — same pattern as the 0.5.1
@@ -168,6 +176,12 @@ _RELATIONSHIP_TYPE_TABLE: dict[tuple[str, str], frozenset[str]] = {
         {"identity", "location", "vulnerability", "infrastructure"}
     ),
     ("tool", "targets"): frozenset({"identity", "location", "vulnerability", "infrastructure"}),
+    # x-trace-has-access (1.1.0 / Initiative A) — identity → internal asset.
+    # The target type `x-asset-internal` is a TRACE-synthesized STIX object
+    # created by the bundle assembler whenever the resolver maps an LLM-
+    # supplied asset reference to a SAGE asset_id. SAGE 0.6.0+ consumes
+    # these as `HasAccess` rows.
+    ("identity", "x-trace-has-access"): frozenset({"x-asset-internal"}),
 }
 
 
@@ -297,9 +311,25 @@ class ExtractedRelationship:
 
 
 @dataclass
+class IdentityAssetEdge:
+    """LLM-extracted identity → asset edge (Initiative A).
+
+    Distinct from ``ExtractedRelationship`` because the target is not
+    another extracted entity but a free-form asset reference that
+    requires TRACE-side resolution against ``assets.json``. Resolution
+    happens at bundle assembly time; unresolved edges are dropped.
+    """
+
+    source: str  # identity local_id
+    asset_reference: str  # LLM-supplied free-form asset hint
+    description: str = ""
+
+
+@dataclass
 class Extraction:
     entities: list[ExtractedEntity] = field(default_factory=list)
     relationships: list[ExtractedRelationship] = field(default_factory=list)
+    identity_asset_edges: list[IdentityAssetEdge] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

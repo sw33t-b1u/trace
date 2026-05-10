@@ -116,7 +116,13 @@ def test_valid_entity_and_relationship_vocabularies_are_disjoint():
     # 'relationship' is no longer a valid entity type — only entities are.
     assert "relationship" not in _VALID_ENTITY_TYPES
     # 1.0.0 added `targets` for actor → identity edges.
-    assert _VALID_RELATIONSHIP_TYPES == frozenset({"uses", "exploits", "indicates", "targets"})
+    # 1.1.0 added `x-trace-has-access` for identity → internal asset
+    # (Initiative A); the bundle assembler does not yet emit it
+    # (TRACE 1.2.0), but the vocabulary is declared so SAGE 0.6.0 can
+    # accept the type when receiving bundles produced by 1.2.0+.
+    assert _VALID_RELATIONSHIP_TYPES == frozenset(
+        {"uses", "exploits", "indicates", "targets", "x-trace-has-access"}
+    )
     assert "identity" in _VALID_ENTITY_TYPES
 
 
