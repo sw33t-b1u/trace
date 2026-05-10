@@ -184,7 +184,7 @@ _IDENTITY_CLASS_OV: tuple[str, ...] = (
     "system",
     "organization",
     "class",
-    "unspecified",
+    "unknown",
 )
 
 
@@ -197,7 +197,7 @@ class IdentityEntry(_StrictModel):
         "system",
         "organization",
         "class",
-        "unspecified",
+        "unknown",
     ] = "group"
     sectors: list[str] = Field(default_factory=list)
     roles: list[str] = Field(default_factory=list)

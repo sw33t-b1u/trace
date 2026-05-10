@@ -6,6 +6,45 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.4.3] — 2026-05-10
+
+### Fixed — `identity_class` aligned to STIX 2.1 §6.7 ``identity-class-ov``
+
+Pairs with BEACON 0.12.2. Initiative A (TRACE 1.1.0) inherited
+the same ``"unspecified"`` typo for the `identity_class` open
+vocabulary that BEACON 0.11.0 carried. The canonical STIX 2.1
+§6.7 value is ``"unknown"`` — verified against
+``stix2-validator``'s ``IDENTITY_CLASS_OV``.
+
+Symptom: TRACE 1.4.2 real-LLM crawl on the Trend Micro article
+emitted exactly one ``{213}`` validator warning per identity SDO
+that landed on ``unspecified``. Same architectural class as the
+``{244}`` warnings 1.4.2 fixed — just a different vocabulary.
+
+#### Changes
+
+- `_STIX21_IDENTITY_CLASS_OV` frozenset (`stix/extractor.py`):
+  `unspecified` → `unknown`. The demote-to-labels function was
+  doing the right thing — it was the OV constant itself that was
+  wrong, so spec-compliant LLM output was passing through *and
+  then* tripping the validator on the wire.
+- L3 prompt (`stix_extraction.md`): same correction in the
+  identity entity's optional fields block.
+- `validate/schema/models.IdentityEntry.identity_class` Literal
+  (and the parallel `_IDENTITY_CLASS_OV` tuple): same correction.
+  Cross-project parity with BEACON 0.12.2.
+
+No test changes — no test asserted on the typo'd value.
+
+#### Verification
+
+After the fix, the identity SDO emitted by the L3 LLM extractor
+on ambiguous victim references (e.g. "owner of compromised email
+server") carries `identity_class: "unknown"`, which both Pydantic
+and ``stix2-validator`` accept without warnings.
+
+---
+
 ## [1.4.2] — 2026-05-10
 
 ### Changed — `account_type` aligned to STIX 2.1 §6.4 ``account-type-ov`` strictly

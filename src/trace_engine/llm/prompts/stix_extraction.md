@@ -130,7 +130,7 @@ targeted role, or affected organization. `name` is required.
 Additional optional fields:
 ```json
 {
-  "identity_class": "individual | group | system | organization | class | unspecified",
+  "identity_class": "individual | group | system | organization | class | unknown",
   "sectors": ["finance"],
   "description": "<short one-liner>",
   "roles": ["<role string>"]

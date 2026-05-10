@@ -89,7 +89,7 @@ _STIX21_IDENTITY_CLASS_OV: frozenset[str] = frozenset(
         "system",
         "organization",
         "class",
-        "unspecified",
+        "unknown",
     }
 )
 
