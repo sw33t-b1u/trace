@@ -34,6 +34,7 @@ import structlog
 from trace_engine.config import Config, load_config
 from trace_engine.llm.client import TaskType, call_llm, load_prompt
 from trace_engine.stix.asset_resolver import resolve_asset_reference
+from trace_engine.stix.identity_resolver import resolve_identity_reference
 from trace_engine.validate.schema import PIRDocument, PIRItem
 
 logger = structlog.get_logger(__name__)
@@ -47,6 +48,10 @@ _VALID_ENTITY_TYPES: frozenset[str] = frozenset(
     {
         "threat-actor",
         "intrusion-set",
+        # 1.5.0 / Initiative C — campaign is the STIX 2.1 §4.4 SDO for named
+        # adversarial operations ("SolarWinds compromise"). Required as attributed-to
+        # source; incident SDO is a stub (§4.6) with no defined relationships.
+        "campaign",
         "attack-pattern",
         "malware",
         "tool",
@@ -75,8 +80,22 @@ _VALID_ENTITY_TYPES: frozenset[str] = frozenset(
 # `x-trace-valids-on` added in 1.3.0 (Initiative B): user-account → asset.
 # Same `x-asset-internal--<uuid5>` target convention as has-access; SAGE
 # 0.7.0 maps it to the AccountOnAsset edge.
+#
+# `attributed-to` / `impersonates` added in 1.5.0 (Initiative C): STIX 2.1
+# §7.2 spec-standard SROs for provenance attribution and identity deception.
+# 5 spec-compliant source/target combinations per §3.4; out-of-spec combos
+# fall through the relationship_type_mismatch_dropped guard.
 _VALID_RELATIONSHIP_TYPES: frozenset[str] = frozenset(
-    {"uses", "exploits", "indicates", "targets", "x-trace-has-access", "x-trace-valids-on"}
+    {
+        "uses",
+        "exploits",
+        "indicates",
+        "targets",
+        "x-trace-has-access",
+        "x-trace-valids-on",
+        "attributed-to",
+        "impersonates",
+    }
 )
 
 # STIX 2.1 §6.7 `identity-class-ov` open vocabulary. Demote LLM values
@@ -197,6 +216,15 @@ _RELATIONSHIP_TYPE_TABLE: dict[tuple[str, str], frozenset[str]] = {
     # asset. Same x-asset-internal target convention as has-access; SAGE
     # 0.7.0 routes to the AccountOnAsset edge.
     ("user-account", "x-trace-valids-on"): frozenset({"x-asset-internal"}),
+    # attributed-to (1.5.0 / Initiative C) — STIX 2.1 §7.2 spec-standard.
+    # Source: OASIS cti-stix-validator/v21/enums.py RELATIONSHIPS dict.
+    # 5 emit-ready combos; incident source is a stub SDO (§3.1.1 pending).
+    ("campaign", "attributed-to"): frozenset({"intrusion-set", "threat-actor"}),
+    ("intrusion-set", "attributed-to"): frozenset({"threat-actor"}),
+    ("threat-actor", "attributed-to"): frozenset({"identity"}),
+    # impersonates (1.5.0 / Initiative C) — threat-actor source only (spec).
+    # intrusion-set source is §3.1.1 pending; drop at the guard below.
+    ("threat-actor", "impersonates"): frozenset({"identity", "x-identity-internal"}),
 }
 
 
@@ -220,7 +248,12 @@ _TRACE_EXTENSION_SCHEMA_URL: str = (
     "https://github.com/sw33t-b1u/sage/blob/main/TRACE/docs/data-model.md#"
     "trace-bundle-metadata-extension"
 )
-_TRACE_EXTENSION_VERSION: str = "1.0"
+_TRACE_EXTENSION_VERSION: str = "1.1"
+
+# extension_types for the TRACE extension definition (1.5.0 bump from 1.0).
+# v1.1 adds "new-sdo" to register x-asset-internal (Initiative A) and
+# x-identity-internal (Initiative C) under the same stable extension namespace.
+_TRACE_EXTENSION_TYPES: list[str] = ["toplevel-property-extension", "new-sdo"]
 
 # Property names introduced by the TRACE bundle metadata extension. Listed in
 # `extension-definition.extension_properties` per STIX 2.1 §7.3 (SHOULD)
@@ -316,6 +349,13 @@ _CVE_ID_PATTERN = re.compile(r"^CVE-\d{4}-\d{4,}$")
 # the x-asset-internal object — SAGE reads from there, not from the id.
 _X_ASSET_INTERNAL_NAMESPACE = uuid.UUID("d41d8cd9-8f00-b204-e980-0998ecf8427e")
 
+# 1.5.0 (Initiative C): UUIDv5 namespace for synthetic ``x-identity-internal``
+# STIX ids. Same rationale as _X_ASSET_INTERNAL_NAMESPACE. The namespace is
+# pinned so the same BEACON identity_id always produces the same STIX id
+# across TRACE emissions, enabling SAGE upserts to converge. UUIDv5 input
+# is the BEACON stable id-* slug (e.g. "id-supplier-dhl").
+_IDENTITY_INTERNAL_NAMESPACE = uuid.UUID("c4f8d2e6-9b1a-5c7d-8e3f-2a4b6d8e1c5f")
+
 
 # 1.4.0: UUIDv5 namespace for synthetic ``user-account`` STIX ids
 # (Initiative B). Same goal as ``_X_ASSET_INTERNAL_NAMESPACE`` — re-emitting
@@ -387,11 +427,30 @@ class UserAccountObservation:
 
 
 @dataclass
+class IdentityRelationshipEdge:
+    """LLM-extracted impersonates / attributed-to edge with free-form target (Initiative C).
+
+    When the LLM identifies an impersonated or attributed-to identity by name
+    rather than by a bundle entity local_id, it populates
+    ``target_identity_reference`` instead of ``target``. The bundle assembler
+    then calls the identity resolver to map the free-form string to a BEACON
+    identity_id and emits a synthetic ``x-identity-internal`` SDO.
+    """
+
+    source: str  # threat-actor or campaign/intrusion-set local_id
+    relationship_type: str  # "impersonates" or "attributed-to"
+    target_identity_reference: str  # LLM-supplied free-form identity hint
+    confidence: int | None = None
+    description: str = ""
+
+
+@dataclass
 class Extraction:
     entities: list[ExtractedEntity] = field(default_factory=list)
     relationships: list[ExtractedRelationship] = field(default_factory=list)
     identity_asset_edges: list[IdentityAssetEdge] = field(default_factory=list)
     user_account_observations: list[UserAccountObservation] = field(default_factory=list)
+    identity_relationship_edges: list[IdentityRelationshipEdge] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -1055,6 +1114,7 @@ def build_stix_bundle_from_extraction(
     now: datetime | None = None,
     config: Config | None = None,
     assets: list[dict] | None = None,
+    identities: list[dict] | None = None,
 ) -> dict:
     """Construct a STIX 2.1 bundle from an ``Extraction``.
 
@@ -1243,6 +1303,7 @@ def build_stix_bundle_from_extraction(
                         "created": ts,
                         "modified": ts,
                         "asset_id": resolution.asset_id,
+                        "extensions": {_TRACE_EXTENSION_ID: {"extension_type": "new-sdo"}},
                     }
                 )
             objects.append(
@@ -1296,9 +1357,7 @@ def build_stix_bundle_from_extraction(
     uao_dropped_no_assets_supplied = 0
     has_user_account_observations = False
     for obs in extraction.user_account_observations:
-        ua_uuid = uuid.uuid5(
-            _USER_ACCOUNT_NAMESPACE, f"{obs.account_login}\0{obs.account_type}"
-        )
+        ua_uuid = uuid.uuid5(_USER_ACCOUNT_NAMESPACE, f"{obs.account_login}\0{obs.account_type}")
         ua_stix_id = f"user-account--{ua_uuid}"
         ua_obj: dict = {
             "type": "user-account",
@@ -1377,6 +1436,7 @@ def build_stix_bundle_from_extraction(
                         "created": ts,
                         "modified": ts,
                         "asset_id": resolution.asset_id,
+                        "extensions": {_TRACE_EXTENSION_ID: {"extension_type": "new-sdo"}},
                     }
                 )
             objects.append(
@@ -1404,6 +1464,97 @@ def build_stix_bundle_from_extraction(
             dropped_unresolved_asset=uao_dropped_unresolved_asset,
         )
 
+    # 1.5.0 — Identity relationship edges (Initiative C).
+    # Free-form identity references (impersonates / attributed-to → identity)
+    # that the LLM couldn't bind to a bundle entity. The resolver maps the
+    # string to a BEACON identity_id; resolved edges produce a synthetic
+    # x-identity-internal SDO (deduped by identity_id) and the relationship
+    # with the synthesized target_ref. Tier-4 misses are logged and dropped.
+    ire_emitted = 0
+    ire_dropped_unresolved_source = 0
+    ire_dropped_no_identities_supplied = 0
+    ire_dropped_unresolved_identity = 0
+    identity_internal_ids: dict[str, str] = {}  # identity_id → x-identity-internal STIX id
+    has_identity_relationship_edges = False
+    if extraction.identity_relationship_edges:
+        for edge in extraction.identity_relationship_edges:
+            src_stix = local_to_stix.get(edge.source)
+            src_type = local_to_type.get(edge.source)
+            if src_stix is None:
+                ire_dropped_unresolved_source += 1
+                logger.warning(
+                    "identity_relationship_edge_unresolved_source",
+                    source_local=edge.source,
+                    identity_reference=edge.target_identity_reference,
+                )
+                continue
+            if not identities:
+                ire_dropped_no_identities_supplied += 1
+                continue
+            resolution = resolve_identity_reference(edge.target_identity_reference, identities)
+            if resolution is None:
+                ire_dropped_unresolved_identity += 1
+                logger.warning(
+                    "identity_reference_unresolved",
+                    identity_reference=edge.target_identity_reference,
+                    tier_attempts=3,
+                    bundle_id="",
+                )
+                continue
+            identity_internal_id = identity_internal_ids.get(resolution.identity_id)
+            if identity_internal_id is None:
+                id_uuid = uuid.uuid5(_IDENTITY_INTERNAL_NAMESPACE, resolution.identity_id)
+                identity_internal_id = f"x-identity-internal--{id_uuid}"
+                identity_internal_ids[resolution.identity_id] = identity_internal_id
+                objects.append(
+                    {
+                        "type": "x-identity-internal",
+                        "id": identity_internal_id,
+                        "spec_version": "2.1",
+                        "created": ts,
+                        "modified": ts,
+                        "identity_id": resolution.identity_id,
+                        "name": edge.target_identity_reference,
+                        "x_trace_resolution_tier": resolution.tier,
+                        "x_trace_resolution_confidence": resolution.confidence,
+                        "extensions": {_TRACE_EXTENSION_ID: {"extension_type": "new-sdo"}},
+                    }
+                )
+                logger.info(
+                    "identity_reference_resolved",
+                    identity_reference=edge.target_identity_reference,
+                    identity_id=resolution.identity_id,
+                    tier=resolution.tier,
+                    confidence=resolution.confidence,
+                )
+            rel_obj: dict = {
+                "type": "relationship",
+                "id": f"relationship--{uuid.uuid4()}",
+                "spec_version": "2.1",
+                "created": ts,
+                "modified": ts,
+                "relationship_type": edge.relationship_type,
+                "source_ref": src_stix,
+                "target_ref": identity_internal_id,
+            }
+            if edge.confidence is not None:
+                rel_obj["confidence"] = edge.confidence
+            if edge.description:
+                rel_obj["description"] = edge.description
+            objects.append(rel_obj)
+            ire_emitted += 1
+            has_identity_relationship_edges = True
+    if ire_emitted or extraction.identity_relationship_edges:
+        logger.info(
+            "identity_relationship_edges_processed",
+            extracted=len(extraction.identity_relationship_edges),
+            emitted=ire_emitted,
+            dropped_unresolved_source=ire_dropped_unresolved_source,
+            dropped_no_identities_supplied=ire_dropped_no_identities_supplied,
+            dropped_unresolved_identity=ire_dropped_unresolved_identity,
+            identity_internal_objects=len(identity_internal_ids),
+        )
+
     has_trace_metadata = (
         source_url is not None
         or matched_pir_ids is not None
@@ -1411,6 +1562,7 @@ def build_stix_bundle_from_extraction(
         or bool(relevance_rationale)
         or has_identity_asset_edges
         or has_user_account_observations
+        or has_identity_relationship_edges
     )
 
     # Prepend the TRACE extension definition object so the bundle can carry
@@ -1457,6 +1609,48 @@ def build_stix_bundle_from_extraction(
     return bundle
 
 
+def _confidence_from_hedge_phrase(text: str) -> int | None:
+    """Map ICD 203 Words of Estimative Probability to a STIX 0-100 integer.
+
+    Band integers are from the STIX 2.1 Appendix A DNI Scale
+    (verified against cti-python-stix2/stix2/confidence/scales.py).
+
+    More-specific phrases are matched before less-specific ones
+    (e.g. "high confidence" before "confidence") to avoid shadowing.
+    Returns None when no hedge phrase matches — callers must then omit
+    the ``confidence`` field rather than fabricating a value.
+    """
+    if not text:
+        return None
+    lower = text.lower()
+    # Almost certain (95%) — check before "likely" to avoid shadowing
+    if any(p in lower for p in ("almost certain", "definitive", "confirmed", "with certainty")):
+        return 95
+    # Very likely / high confidence (85%)
+    if any(
+        p in lower for p in ("very likely", "highly probable", "high confidence", "very probable")
+    ):
+        return 85
+    # Very unlikely / highly improbable (15%) — must precede "unlikely" (substring risk)
+    if any(p in lower for p in ("highly unlikely", "very unlikely", "highly improbable")):
+        return 15
+    # Unlikely / improbable / low confidence (30%) — must precede "likely" (substring risk)
+    if any(p in lower for p in ("unlikely", "improbable", "low confidence")):
+        return 30
+    # Likely / probable / moderate confidence (70%)
+    if any(p in lower for p in ("likely", "probable", "moderate confidence")):
+        return 70
+    # Almost no chance / remote (5%)
+    if any(
+        p in lower for p in ("no evidence", "no indication", "almost no chance", "remote chance")
+    ):
+        return 5
+    # Roughly even chance / we assess without qualifier (50%)
+    if any(p in lower for p in ("roughly even", "we assess", "even chance", "50/50")):
+        return 50
+    return None
+
+
 def _build_trace_extension_definition(ts: str) -> dict:
     """Construct the STIX 2.1 extension-definition object for TRACE metadata.
 
@@ -1473,14 +1667,17 @@ def _build_trace_extension_definition(ts: str) -> dict:
         "modified": ts,
         "name": "TRACE bundle metadata extension",
         "description": (
-            "TRACE-emitted top-level bundle properties: source URL, "
-            "collection timestamp, matched PIR ids, relevance score, and "
-            "relevance rationale. Consumers without the extension can "
-            "ignore these fields safely."
+            "TRACE-emitted top-level bundle properties (x_trace_*) and "
+            "new-SDO type declarations. x-asset-internal: synthesized STIX "
+            "object referencing a SAGE asset_id (Initiative A). "
+            "x-identity-internal: synthesized STIX object referencing a "
+            "BEACON identity_id (Initiative C). Both carry this extensions "
+            "map entry per STIX 2.1 §7.3. Consumers without the extension "
+            "can ignore these fields safely."
         ),
         "schema": _TRACE_EXTENSION_SCHEMA_URL,
         "version": _TRACE_EXTENSION_VERSION,
-        "extension_types": ["toplevel-property-extension"],
+        "extension_types": list(_TRACE_EXTENSION_TYPES),
         "extension_properties": list(_TRACE_EXTENSION_PROPERTIES),
     }
 

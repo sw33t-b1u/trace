@@ -153,6 +153,13 @@ When at least one metadata field would be set, the assembler:
 Bundles without metadata (e.g., raw extraction with no PIR / source URL)
 omit the extension definition entirely.
 
+#### Extension-definition version history
+
+| Version | Change |
+|---------|--------|
+| `1.0` | Initial. Declares `x_trace_*` toplevel properties via `extension_types: ["toplevel-property-extension"]`. |
+| `1.1` | Initiative C Phase 1 (TRACE 1.5.0). Adds `"new-sdo"` to `extension_types` to formally register `x-asset-internal` (Initiative A) and `x-identity-internal` (Initiative C) as STIX 2.1 §7.3-compliant new-SDO types. Both types carry the `extensions` map entry `{"extension-definition--c1e4d6a7-…": {"extension_type": "new-sdo"}}` per §7.3 conformance. |
+
 | Property | When | Meaning |
 |----------|------|---------|
 | `x_trace_source_url` | always (when called from CLIs) | origin URL or input path |

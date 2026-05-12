@@ -7,7 +7,11 @@ from trace_engine.stix.asset_resolver import resolve_asset_reference
 _ASSETS = [
     {"id": "asset-CA-001", "name": "業務処理中央サーバ", "tags": ["financial", "core"]},
     {"id": "asset-CA-002", "name": "業務データベース", "tags": ["database", "financial"]},
-    {"id": "asset-CA-003", "name": "Customer Self-Service Portal", "tags": ["web", "external-facing"]},
+    {
+        "id": "asset-CA-003",
+        "name": "Customer Self-Service Portal",
+        "tags": ["web", "external-facing"],
+    },
     {"id": "asset-CA-004", "name": "Identity System", "tags": ["identity", "auth"]},
 ]
 

@@ -32,6 +32,10 @@ from trace_engine.validate.semantic.findings import (  # noqa: E402
     ValidationFinding,
     has_errors,
 )
+from trace_engine.validate.semantic.relationships import (  # noqa: E402
+    check_identity_ref_resolution,
+    check_relationship_type_match,
+)
 from trace_engine.validate.stix import (  # noqa: E402
     check_stix_bundle,
     run_stix2_validator,
@@ -41,12 +45,27 @@ configure_logging()
 logger = structlog.get_logger(__name__)
 
 
-def validate_bundle_file(path: Path, *, strict: bool) -> list[ValidationFinding]:
+def validate_bundle_file(
+    path: Path,
+    *,
+    strict: bool,
+    identity_assets_path: Path | None = None,
+) -> list[ValidationFinding]:
     with path.open() as f:
         bundle = json.load(f)
     findings: list[ValidationFinding] = []
     findings.extend(run_stix2_validator(bundle, strict=strict))
     findings.extend(check_stix_bundle(bundle))
+    findings.extend(check_relationship_type_match(bundle))
+    if identity_assets_path is not None:
+        with identity_assets_path.open() as f:
+            ia_doc = json.load(f)
+        known_ids: set[str] = set()
+        for group in ia_doc if isinstance(ia_doc, list) else [ia_doc]:
+            for ident in group.get("identities") or []:
+                if isinstance(ident, dict) and ident.get("id"):
+                    known_ids.add(ident["id"])
+        findings.extend(check_identity_ref_resolution(bundle, known_ids))
     return findings
 
 
@@ -59,13 +78,24 @@ def main() -> None:
         help="Promote OASIS validator warnings to errors",
     )
     parser.add_argument("--report", type=Path, default=None, help="Markdown report output path")
+    parser.add_argument(
+        "--identity-assets",
+        type=Path,
+        default=None,
+        dest="identity_assets",
+        help="identity_assets.json to check x-identity-internal identity_id cross-references",
+    )
     args = parser.parse_args()
 
     if not args.bundle.exists():
         logger.error("file_not_found", path=str(args.bundle))
         sys.exit(1)
 
-    findings = validate_bundle_file(args.bundle, strict=args.strict)
+    findings = validate_bundle_file(
+        args.bundle,
+        strict=args.strict,
+        identity_assets_path=args.identity_assets,
+    )
 
     for f in findings:
         log_method = logger.error if f.severity == "error" else logger.warning

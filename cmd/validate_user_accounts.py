@@ -92,9 +92,7 @@ def validate_user_accounts_files(
     a_doc = _load_and_validate_schema(assets_path, AssetsDocument, findings)
     ia_doc = None
     if identity_assets_path is not None:
-        ia_doc = _load_and_validate_schema(
-            identity_assets_path, IdentityAssetsDocument, findings
-        )
+        ia_doc = _load_and_validate_schema(identity_assets_path, IdentityAssetsDocument, findings)
     if ua_doc is None or a_doc is None:
         return findings
     findings.extend(check_user_accounts(ua_doc, a_doc, ia_doc))
@@ -115,10 +113,7 @@ def main() -> None:
         "--assets",
         required=True,
         type=Path,
-        help=(
-            "Path to assets.json (REQUIRED for cross-reference of "
-            "account_on_asset[*].asset_id)"
-        ),
+        help=("Path to assets.json (REQUIRED for cross-reference of account_on_asset[*].asset_id)"),
     )
     parser.add_argument(
         "--identity-assets",
@@ -148,9 +143,7 @@ def main() -> None:
         logger.error("file_not_found", role="identity-assets", path=str(args.identity_assets))
         sys.exit(1)
 
-    findings = validate_user_accounts_files(
-        args.user_accounts, args.assets, args.identity_assets
-    )
+    findings = validate_user_accounts_files(args.user_accounts, args.assets, args.identity_assets)
 
     for f in findings:
         log_method = logger.error if f.severity == "error" else logger.warning

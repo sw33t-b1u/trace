@@ -6,6 +6,61 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.5.0] — 2026-05-XX
+
+### Added — Initiative C Phase 1: `attributed-to` / `impersonates` SRO support
+
+Paired release with SAGE 0.8.0. Implements STIX 2.1 §7.2 spec-standard
+attribution and impersonation edges end-to-end from L3 LLM extraction
+through STIX bundle assembly.
+
+#### New capabilities
+
+- **`attributed-to` SRO** (5 emit-ready source/target combos per §3.4):
+  `campaign → threat-actor/intrusion-set`, `intrusion-set → threat-actor`,
+  `threat-actor → identity`.
+- **`impersonates` SRO**: `threat-actor → identity`.
+- **`campaign` entity type** added to `_VALID_ENTITY_TYPES` for SolarWinds-class
+  named adversarial operations (STIX 2.1 §4.4 canonical source for
+  `attributed-to`).
+- **Identity resolver** (`stix/identity_resolver.py`): 4-tier matching ladder
+  (exact name → substring → roles/sectors → drop) modeled on `asset_resolver`.
+  Returns `Resolution(identity_id, tier, confidence)` for cross-artifact
+  identity resolution against `identity_assets.json`.
+- **`x-identity-internal` SDO** synthesis: UUIDv5-deterministic STIX id
+  (namespace `c4f8d2e6-9b1a-5c7d-8e3f-2a4b6d8e1c5f`, input = BEACON
+  `identity_id` slug). Carries `extensions` map entry per STIX 2.1 §7.3.
+- **ICD 203 confidence parser** (`_confidence_from_hedge_phrase`): 7-band
+  Words of Estimative Probability → integer mapping; omits field when no
+  hedge phrase matched (no fabrication).
+- **Extension-definition v1.0 → v1.1**: `extension_types` gains `"new-sdo"`;
+  description documents `x-asset-internal` (Initiative A) and
+  `x-identity-internal` (Initiative C). All `x-asset-internal` instances
+  retrofit the `extensions` map entry.
+- **Semantic validator** (`validate/semantic/relationships.py`):
+  `check_relationship_type_match` flags `RELATIONSHIP_TYPE_MATCH` errors;
+  `check_identity_ref_resolution` flags `IDENTITY_REF_RESOLUTION` warnings.
+- **`validate_stix.py --identity-assets`** flag: cross-checks
+  `x-identity-internal[*].identity_id ∈ identity_assets.json[*].identities[*].id`.
+- **L3 prompt** (`stix_extraction.md`): campaign entity guidance, attribution /
+  impersonation relationship vocabulary, ICD 203 confidence table,
+  prose-normalization examples, `identity_relationship_edges` output shape.
+- **Synthetic test fixtures** (`tests/fixtures/initiative_c/`): 3 bundles
+  covering the §8.5 deterministic CI gate.
+
+#### Out-of-spec combinations dropped (§3.1.1 pending)
+
+`incident → attributed-to → *`, `threat-actor → attributed-to → intrusion-set`,
+`intrusion-set → attributed-to → identity`, `intrusion-set → impersonates → identity`
+are dropped at `_RELATIONSHIP_TYPE_TABLE` guard with `relationship_type_mismatch_dropped`
+structured log. Deferred per strict-compliance posture of TRACE 1.4.2/1.4.3.
+
+#### Tests
+
+317 tests pass (51 new Initiative C cases).
+
+---
+
 ## [1.4.3] — 2026-05-10
 
 ### Fixed — `identity_class` aligned to STIX 2.1 §6.7 ``identity-class-ov``

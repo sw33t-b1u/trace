@@ -57,6 +57,15 @@ is to identify the entities and how they relate.
       "identity_local_id": "<optional local_id of an identity entity above when the report names the owner>",
       "asset_references": ["<free-form host / system / tenant references where the account is valid>"]
     }
+  ],
+  "identity_relationship_edges": [
+    {
+      "source": "<local_id of the threat-actor, campaign, or intrusion-set entity above>",
+      "relationship_type": "attributed-to | impersonates",
+      "target_identity_reference": "<free-form name of the attributed-to or impersonated identity, e.g. 'DHL', 'Russian SVR', 'the CFO'>",
+      "confidence": 70,
+      "description": "<optional short description>"
+    }
   ]
 }
 ```
@@ -73,6 +82,25 @@ If the report contains no threat intelligence content, return
 `{"entities": [], "relationships": [], "identity_asset_edges": [], "user_account_observations": []}`.
 
 ## Entity types and additional optional fields
+
+### campaign (a grouping of adversarial behaviors over time against a specific set of targets — STIX 2.1 §4.4)
+
+Emit `campaign` for **named, time-bound adversarial operations** described in
+the report ("the SolarWinds compromise", "the Colonial Pipeline ransomware
+operation", "Operation Aurora"). The Campaign SDO is the STIX-spec-supported
+source for `attributed-to` relationships to threat-actor / intrusion-set
+entities.
+
+Do **not** emit `campaign` for hypothetical / general threats, or for the
+report's own publication event.
+
+Required fields: `name` (the operation's commonly-used identifier — preserve
+original language).
+
+Optional fields: `description`, `first_seen`, `last_seen`, `objective`.
+
+The `incident` SDO is **not** emit-ready in this version. If the report
+describes a named adversarial operation, use `campaign` (not `incident`).
 
 ### threat-actor / intrusion-set
 Use `intrusion-set` for named campaigns or APT groups; use `threat-actor`
@@ -171,8 +199,82 @@ labels.
 - malware **exploits** vulnerability
 - indicator **indicates** attack-pattern / malware / intrusion-set / threat-actor
 - threat-actor / intrusion-set / malware / tool **targets** identity / vulnerability / location / infrastructure
+- campaign / intrusion-set / threat-actor **attributed-to** intrusion-set / threat-actor / identity
+  (use `identity_relationship_edges` when the target identity is a free-form name)
+- threat-actor **impersonates** identity
+  (use `identity_relationship_edges` when the target identity is a free-form name)
 
 Use only these relationship types. Skip relationships that don't fit.
+
+See the "Attribution and impersonation relationships" section below for
+allowed source/target combinations and `confidence` mapping.
+
+## Attribution and impersonation relationships
+
+### Attribution (`attributed-to`)
+
+Emit `attributed-to` when the report makes a provenance / origin claim. The
+STIX 2.1 §7.2 direction is **child → parent** (the more specific entity →
+the more general entity it derives from / belongs to). Reports phrase this in
+both directions; you must normalize:
+
+| Prose                                                          | Emit (source → target)                        |
+|----------------------------------------------------------------|-----------------------------------------------|
+| "UNC2452 is attributed to APT29"                               | UNC2452 → APT29                               |
+| "APT29 (a.k.a. UNC2452, Cozy Bear)"                           | UNC2452 → APT29 (drop alias-only equivalence) |
+| "APT29 includes UNC2452 as a subgroup"                         | UNC2452 → APT29 (**reverse** prose dir)       |
+| "APT29 sub-group UNC2452 deployed Cobalt Strike"               | UNC2452 → APT29 (**reverse** prose dir)       |
+| "FIN7 is reportedly affiliated with the Russian SVR"           | FIN7 → SVR-identity                           |
+| "SolarWinds incident attributed to Cozy Bear"                  | campaign → APT29 (use `campaign`, not `incident`) |
+
+Only these source/target combinations are supported:
+- `campaign → attributed-to → intrusion-set / threat-actor`
+- `intrusion-set → attributed-to → threat-actor`
+- `threat-actor → attributed-to → identity`
+
+For attribution to a named organization / nation-state (e.g. "SVR", "MSS"),
+use `identity_relationship_edges` with `relationship_type: "attributed-to"`
+and `target_identity_reference` set to the organization name.
+
+Confidence parsing — match the report's hedge language to the ICD 203 Words
+of Estimative Probability band and emit the integer. Omit `confidence`
+entirely when no hedge phrase is present (do not default to any value):
+
+| ICD 203 band                      | Probability | confidence | CTI prose patterns                               |
+|-----------------------------------|-------------|------------|--------------------------------------------------|
+| almost no chance / remote         | 1-5%        | 5          | "no evidence", "no indication"                   |
+| very unlikely / highly improbable | 5-20%       | 15         | "highly unlikely", "very unlikely"               |
+| unlikely / improbable / low conf  | 20-45%      | 30         | "unlikely", "improbable", "low confidence"       |
+| roughly even / we assess          | 45-55%      | 50         | "roughly even", "we assess" (no qualifier)       |
+| likely / probable / moderate conf | 55-80%      | 70         | "likely", "probable", "moderate confidence"      |
+| very likely / high confidence     | 80-95%      | 85         | "very likely", "highly probable", "high confidence" |
+| almost certain / definitive       | 95-99%      | 95         | "almost certain", "definitive(ly)", "confirmed"  |
+
+When the report asserts as fact with no hedge ("APT29 was responsible"), use
+**85** (matches the "very likely" band; absent explicit certainty language do
+not escalate to "almost certain").
+
+### Impersonation (`impersonates`)
+
+Emit `impersonates` when the report describes the actor *pretending to be* a
+third party — phishing impersonation, BEC spoofing, brand impersonation,
+supply-chain spoofing ("phishing emails imitating Microsoft", "fraudulent
+invoices spoofing legitimate suppliers", "BEC posing as the CFO").
+
+Do **not** emit `impersonates` for victims — that is `targets`.
+
+The only valid source is `threat-actor`. If the impersonating entity is an
+`intrusion-set`, use its associated `threat-actor` (or the `intrusion-set`
+itself if no individual actor is identified — note: this combination is
+currently handled by emitting it in `identity_relationship_edges` with
+`relationship_type: "impersonates"` and TRACE will drop it with a warning).
+
+If the impersonated identity is a publicly recognizable brand or company,
+also create an `identity` entity for it in `entities[]` so SAGE can link to
+it directly. If the impersonated party is a defender-side identity ("the
+victim's CFO", "a known supplier"), use `identity_relationship_edges` with
+`target_identity_reference` (free-form string) and let TRACE resolve it
+against the analyst's identity inventory.
 
 ## Identity-asset access (`identity_asset_edges`)
 

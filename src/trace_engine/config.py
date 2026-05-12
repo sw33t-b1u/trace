@@ -73,8 +73,7 @@ class Config:
     crawl_user_agent: str = field(
         default_factory=lambda: os.environ.get(
             "TRACE_CRAWL_USER_AGENT",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 11.1; rv:136.0) "
-            "Gecko/20100101 Firefox/136.0",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 11.1; rv:136.0) Gecko/20100101 Firefox/136.0",
         )
     )
     state_path: str = field(

@@ -106,10 +106,7 @@ def main() -> None:
         "--assets",
         required=True,
         type=Path,
-        help=(
-            "Path to assets.json (REQUIRED for cross-reference of "
-            "has_access[*].asset_id)"
-        ),
+        help=("Path to assets.json (REQUIRED for cross-reference of has_access[*].asset_id)"),
     )
     parser.add_argument(
         "--report",

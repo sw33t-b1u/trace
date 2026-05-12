@@ -26,8 +26,7 @@ class TestMarkitdownReceivesSession:
         from trace_engine.ingest.report_reader import _markitdown_convert
 
         cfg = _config_with_ua(
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 11.1; rv:136.0) "
-            "Gecko/20100101 Firefox/136.0"
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 11.1; rv:136.0) Gecko/20100101 Firefox/136.0"
         )
         captured: dict = {}
 
@@ -68,10 +67,7 @@ class TestMarkitdownReceivesSession:
     def test_env_var_override_wins(self):
         import os
 
-        custom = (
-            "Mozilla/5.0 (X11; Linux x86_64; rv:137.0) "
-            "Gecko/20100101 Firefox/137.0"
-        )
+        custom = "Mozilla/5.0 (X11; Linux x86_64; rv:137.0) Gecko/20100101 Firefox/137.0"
         with patch.dict(os.environ, {"TRACE_CRAWL_USER_AGENT": custom}):
             cfg = Config()
         assert cfg.crawl_user_agent == custom

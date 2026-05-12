@@ -15,6 +15,7 @@ from trace_engine.stix.extractor import (
     ExtractedRelationship,
     Extraction,
     IdentityAssetEdge,
+    IdentityRelationshipEdge,
     UserAccountObservation,
     _chunk_text,
     _extract_json_from_text,
@@ -132,12 +133,16 @@ def test_valid_entity_and_relationship_vocabularies_are_disjoint():
             "targets",
             "x-trace-has-access",
             "x-trace-valids-on",  # 1.3.0 / Initiative B — user-account → asset
+            "attributed-to",  # 1.5.0 / Initiative C — provenance attribution
+            "impersonates",  # 1.5.0 / Initiative C — identity deception
         }
     )
     assert "identity" in _VALID_ENTITY_TYPES
     # 1.3.0 / Initiative B
     assert "user-account" in _VALID_ENTITY_TYPES
     assert "observed-data" in _VALID_ENTITY_TYPES
+    # 1.5.0 / Initiative C
+    assert "campaign" in _VALID_ENTITY_TYPES
 
 
 # ---------------------------------------------------------------------------
@@ -1755,9 +1760,7 @@ class TestUserAccountObservationCoercion:
         payload = {
             "entities": [],
             "relationships": [],
-            "user_account_observations": [
-                {"account_login": "x", "account_type": "weird-type"}
-            ],
+            "user_account_observations": [{"account_login": "x", "account_type": "weird-type"}],
         }
         with _patch_llm(payload):
             extraction = extract_entities("text")
@@ -1795,16 +1798,12 @@ class TestBundleAssemblerUserAccountObservations:
         # SAGE's upsert hits the same row across re-crawls.
         ext1 = Extraction(
             user_account_observations=[
-                UserAccountObservation(
-                    account_login="root", account_type="unix"
-                )
+                UserAccountObservation(account_login="root", account_type="unix")
             ],
         )
         ext2 = Extraction(
             user_account_observations=[
-                UserAccountObservation(
-                    account_login="root", account_type="unix"
-                )
+                UserAccountObservation(account_login="root", account_type="unix")
             ],
         )
         b1 = build_stix_bundle_from_extraction(ext1)
@@ -1918,9 +1917,7 @@ class TestBundleAssemblerUserAccountObservations:
         # must reuse the same x-asset-internal object (not create two).
         ext = Extraction(
             entities=[_ent("id_x", "identity", "X")],
-            identity_asset_edges=[
-                IdentityAssetEdge(source="id_x", asset_reference="Build Server")
-            ],
+            identity_asset_edges=[IdentityAssetEdge(source="id_x", asset_reference="Build Server")],
             user_account_observations=[
                 UserAccountObservation(
                     account_login="svc",
@@ -1931,3 +1928,268 @@ class TestBundleAssemblerUserAccountObservations:
         bundle = build_stix_bundle_from_extraction(ext, assets=_ASSETS_FOR_UAO)
         x_asset = [o for o in bundle["objects"] if o["type"] == "x-asset-internal"]
         assert len(x_asset) == 1
+
+
+# ---------------------------------------------------------------------------
+# Initiative C — extractor campaign emphasis (§5.2.1)
+# ---------------------------------------------------------------------------
+
+
+class TestCampaignExtraction:
+    """Campaign entity must be accepted; incident SDO causes attributed-to drop."""
+
+    def test_campaign_entity_is_accepted(self):
+        payload = {
+            "entities": [{"local_id": "c1", "type": "campaign", "name": "SolarWinds Op"}],
+            "relationships": [],
+        }
+        with _patch_llm(payload):
+            extraction = extract_entities("text")
+        assert len(extraction.entities) == 1
+        assert extraction.entities[0].type == "campaign"
+
+    def test_campaign_requires_name(self):
+        payload = {
+            "entities": [{"local_id": "c1", "type": "campaign"}],  # no name
+            "relationships": [],
+        }
+        with _patch_llm(payload):
+            extraction = extract_entities("text")
+        # Entity accepted (name not required at extraction stage; validator handles it)
+        assert len(extraction.entities) == 1
+
+    def test_campaign_attributed_to_threat_actor_kept(self):
+        ext = Extraction(
+            entities=[
+                _ent("c1", "campaign", "Op Aurora"),
+                _ent("a1", "threat-actor", "APT17"),
+            ],
+            relationships=[ExtractedRelationship("c1", "a1", "attributed-to")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        assert len(rels) == 1
+        assert rels[0]["relationship_type"] == "attributed-to"
+
+
+# ---------------------------------------------------------------------------
+# Initiative C — extractor relationship type table (§3.4 / §3.1.1)
+# ---------------------------------------------------------------------------
+
+
+_IDENTITIES_FOR_IRE = [
+    {"id": "id-supplier-dhl", "name": "DHL", "roles": ["logistics"], "sectors": ["transportation"]},
+    {"id": "id-brand-microsoft", "name": "Microsoft", "roles": [], "sectors": ["technology"]},
+]
+
+
+class TestAttributedToImpersonatesEmit:
+    """5 spec-compliant source/target combos must survive the type table."""
+
+    def test_campaign_attributed_to_threat_actor(self):
+        ext = Extraction(
+            entities=[_ent("c", "campaign", "Op"), _ent("a", "threat-actor", "APT29")],
+            relationships=[ExtractedRelationship("c", "a", "attributed-to")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o.get("relationship_type") == "attributed-to"]
+        assert len(rels) == 1
+
+    def test_campaign_attributed_to_intrusion_set(self):
+        ext = Extraction(
+            entities=[_ent("c", "campaign", "Op"), _ent("i", "intrusion-set", "APT29")],
+            relationships=[ExtractedRelationship("c", "i", "attributed-to")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o.get("relationship_type") == "attributed-to"]
+        assert len(rels) == 1
+
+    def test_intrusion_set_attributed_to_threat_actor(self):
+        ext = Extraction(
+            entities=[_ent("i", "intrusion-set", "APT29"), _ent("a", "threat-actor", "TA1")],
+            relationships=[ExtractedRelationship("i", "a", "attributed-to")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o.get("relationship_type") == "attributed-to"]
+        assert len(rels) == 1
+
+    def test_threat_actor_attributed_to_identity(self):
+        ext = Extraction(
+            entities=[_ent("a", "threat-actor", "TA"), _ent("id1", "identity", "SVR")],
+            relationships=[ExtractedRelationship("a", "id1", "attributed-to")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o.get("relationship_type") == "attributed-to"]
+        assert len(rels) == 1
+
+    def test_threat_actor_impersonates_identity(self):
+        ext = Extraction(
+            entities=[_ent("a", "threat-actor", "FIN7"), _ent("id1", "identity", "DHL")],
+            relationships=[ExtractedRelationship("a", "id1", "impersonates")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o.get("relationship_type") == "impersonates"]
+        assert len(rels) == 1
+
+
+class TestAttributedToImpersonatesDrop:
+    """5 §3.1.1 out-of-spec combos must be dropped with relationship_type_mismatch_dropped."""
+
+    def _build(self, src_type, tgt_type, rel_type):
+        from structlog.testing import capture_logs
+
+        ext = Extraction(
+            entities=[_ent("s", src_type, "Src"), _ent("t", tgt_type, "Tgt")],
+            relationships=[ExtractedRelationship("s", "t", rel_type)],
+        )
+        with capture_logs() as cap:
+            bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o["type"] == "relationship"]
+        return rels, cap
+
+    def test_incident_attributed_to_threat_actor_dropped(self):
+        rels, cap = self._build("incident", "threat-actor", "attributed-to")
+        assert rels == []
+        assert any(e.get("event") == "relationship_type_mismatch_dropped" for e in cap)
+
+    def test_incident_attributed_to_intrusion_set_dropped(self):
+        rels, cap = self._build("incident", "intrusion-set", "attributed-to")
+        assert rels == []
+        assert any(e.get("event") == "relationship_type_mismatch_dropped" for e in cap)
+
+    def test_threat_actor_attributed_to_intrusion_set_dropped(self):
+        rels, cap = self._build("threat-actor", "intrusion-set", "attributed-to")
+        assert rels == []
+        assert any(e.get("event") == "relationship_type_mismatch_dropped" for e in cap)
+
+    def test_intrusion_set_attributed_to_identity_dropped(self):
+        rels, cap = self._build("intrusion-set", "identity", "attributed-to")
+        assert rels == []
+        assert any(e.get("event") == "relationship_type_mismatch_dropped" for e in cap)
+
+    def test_intrusion_set_impersonates_identity_dropped(self):
+        rels, cap = self._build("intrusion-set", "identity", "impersonates")
+        assert rels == []
+        assert any(e.get("event") == "relationship_type_mismatch_dropped" for e in cap)
+
+
+# ---------------------------------------------------------------------------
+# Initiative C — x-asset-internal extensions map retrofit (§4.1.1)
+# ---------------------------------------------------------------------------
+
+
+class TestXAssetInternalExtensionsRetrofit:
+    def test_x_asset_internal_carries_extensions_map(self):
+        ext = Extraction(
+            entities=[_ent("id_x", "identity", "Acme")],
+            identity_asset_edges=[IdentityAssetEdge(source="id_x", asset_reference="ERP System")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, assets=_ASSETS_FOR_IAE)
+        x_asset = [o for o in bundle["objects"] if o["type"] == "x-asset-internal"]
+        assert len(x_asset) == 1
+        exts = x_asset[0].get("extensions", {})
+        assert "extension-definition--c1e4d6a7-2f3b-4e8c-9a5f-1b8d7e6c4a3f" in exts
+        assert exts["extension-definition--c1e4d6a7-2f3b-4e8c-9a5f-1b8d7e6c4a3f"] == {
+            "extension_type": "new-sdo"
+        }
+
+
+# ---------------------------------------------------------------------------
+# Initiative C — bundle assembler: identity_relationship_edges (§4 Step 4)
+# ---------------------------------------------------------------------------
+
+
+_IDENTITIES_SIMPLE = [
+    {"id": "id-supplier-dhl", "name": "DHL", "roles": [], "sectors": ["transportation"]},
+]
+
+
+class TestIdentityRelationshipEdgeBundleAssembler:
+    def test_resolved_edge_emits_x_identity_internal_and_relationship(self):
+        ext = Extraction(
+            entities=[_ent("a", "threat-actor", "FIN7")],
+            identity_relationship_edges=[
+                IdentityRelationshipEdge(
+                    source="a",
+                    relationship_type="impersonates",
+                    target_identity_reference="DHL",
+                    confidence=85,
+                )
+            ],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, identities=_IDENTITIES_SIMPLE)
+        x_ident = [o for o in bundle["objects"] if o["type"] == "x-identity-internal"]
+        assert len(x_ident) == 1
+        assert x_ident[0]["identity_id"] == "id-supplier-dhl"
+        impersonates = [
+            o for o in bundle["objects"] if o.get("relationship_type") == "impersonates"
+        ]
+        assert len(impersonates) == 1
+        assert impersonates[0]["target_ref"] == x_ident[0]["id"]
+        assert impersonates[0]["confidence"] == 85
+
+    def test_uuid5_determinism(self):
+        import uuid
+
+        _identity_ns = uuid.UUID("c4f8d2e6-9b1a-5c7d-8e3f-2a4b6d8e1c5f")
+        expected_id = f"x-identity-internal--{uuid.uuid5(_identity_ns, 'id-supplier-dhl')}"
+        ext = Extraction(
+            entities=[_ent("a", "threat-actor", "FIN7")],
+            identity_relationship_edges=[
+                IdentityRelationshipEdge(
+                    source="a",
+                    relationship_type="impersonates",
+                    target_identity_reference="DHL",
+                )
+            ],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, identities=_IDENTITIES_SIMPLE)
+        x_ident = next(o for o in bundle["objects"] if o["type"] == "x-identity-internal")
+        assert x_ident["id"] == expected_id
+
+    def test_dedupe_by_identity_id(self):
+        ext = Extraction(
+            entities=[_ent("a", "threat-actor", "FIN7"), _ent("b", "campaign", "Op")],
+            identity_relationship_edges=[
+                IdentityRelationshipEdge("a", "impersonates", "DHL"),
+                IdentityRelationshipEdge("b", "attributed-to", "DHL"),
+            ],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, identities=_IDENTITIES_SIMPLE)
+        x_ident = [o for o in bundle["objects"] if o["type"] == "x-identity-internal"]
+        assert len(x_ident) == 1  # deduplicated
+
+    def test_unresolved_reference_dropped(self):
+        from structlog.testing import capture_logs
+
+        ext = Extraction(
+            entities=[_ent("a", "threat-actor", "FIN7")],
+            identity_relationship_edges=[
+                IdentityRelationshipEdge("a", "impersonates", "UnknownCorp")
+            ],
+        )
+        with capture_logs() as cap:
+            bundle = build_stix_bundle_from_extraction(ext, identities=_IDENTITIES_SIMPLE)
+        x_ident = [o for o in bundle["objects"] if o["type"] == "x-identity-internal"]
+        assert x_ident == []
+        assert any(e.get("event") == "identity_reference_unresolved" for e in cap)
+
+    def test_x_identity_internal_carries_extensions_map(self):
+        ext = Extraction(
+            entities=[_ent("a", "threat-actor", "FIN7")],
+            identity_relationship_edges=[IdentityRelationshipEdge("a", "impersonates", "DHL")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, identities=_IDENTITIES_SIMPLE)
+        x_ident = next(o for o in bundle["objects"] if o["type"] == "x-identity-internal")
+        ext_id = "extension-definition--c1e4d6a7-2f3b-4e8c-9a5f-1b8d7e6c4a3f"
+        assert ext_id in x_ident.get("extensions", {})
+        assert x_ident["extensions"][ext_id]["extension_type"] == "new-sdo"
+
+    def test_no_identities_supplied_drops_edge(self):
+        ext = Extraction(
+            entities=[_ent("a", "threat-actor", "FIN7")],
+            identity_relationship_edges=[IdentityRelationshipEdge("a", "impersonates", "DHL")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext, identities=None)
+        x_ident = [o for o in bundle["objects"] if o["type"] == "x-identity-internal"]
+        assert x_ident == []
