@@ -2031,6 +2031,24 @@ class TestAttributedToImpersonatesEmit:
         rels = [o for o in bundle["objects"] if o.get("relationship_type") == "impersonates"]
         assert len(rels) == 1
 
+    def test_threat_actor_attributed_to_x_identity_internal(self):
+        # F2 fix: x-identity-internal target (BEACON-resolved identity) must not
+        # be silently dropped by the _RELATIONSHIP_TYPE_TABLE guard.
+        ext = Extraction(
+            entities=[
+                _ent("a", "threat-actor", "APT29"),
+                ExtractedEntity(
+                    local_id="xi1",
+                    type="x-identity-internal",
+                    properties={"identity_id": "id-supplier-dhl", "name": "DHL"},
+                ),
+            ],
+            relationships=[ExtractedRelationship("a", "xi1", "attributed-to")],
+        )
+        bundle = build_stix_bundle_from_extraction(ext)
+        rels = [o for o in bundle["objects"] if o.get("relationship_type") == "attributed-to"]
+        assert len(rels) == 1
+
 
 class TestAttributedToImpersonatesDrop:
     """5 §3.1.1 out-of-spec combos must be dropped with relationship_type_mismatch_dropped."""

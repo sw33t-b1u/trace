@@ -221,7 +221,7 @@ _RELATIONSHIP_TYPE_TABLE: dict[tuple[str, str], frozenset[str]] = {
     # 5 emit-ready combos; incident source is a stub SDO (§3.1.1 pending).
     ("campaign", "attributed-to"): frozenset({"intrusion-set", "threat-actor"}),
     ("intrusion-set", "attributed-to"): frozenset({"threat-actor"}),
-    ("threat-actor", "attributed-to"): frozenset({"identity"}),
+    ("threat-actor", "attributed-to"): frozenset({"identity", "x-identity-internal"}),
     # impersonates (1.5.0 / Initiative C) — threat-actor source only (spec).
     # intrusion-set source is §3.1.1 pending; drop at the guard below.
     ("threat-actor", "impersonates"): frozenset({"identity", "x-identity-internal"}),
