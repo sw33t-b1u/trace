@@ -6,7 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
-## [1.5.0] — 2026-05-XX
+## [1.5.0] — 2026-05-12
 
 ### Added — Initiative C Phase 1: `attributed-to` / `impersonates` SRO support
 
