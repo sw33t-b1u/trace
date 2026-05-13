@@ -1333,8 +1333,7 @@ def build_stix_bundle_from_extraction(
             asset_internal_objects=len(asset_internal_ids),
         )
 
-    # 1.4.0 — User-account observations (Initiative B Phase 2).
-    # Each observation produces:
+    # User-account observations. Each observation produces:
     #   - 1 STIX 2.1 §6.4 user-account SCO (id is UUID5 from
     #     account_login + account_type so re-emissions of the same
     #     login in subsequent crawls hit the same SAGE row).
