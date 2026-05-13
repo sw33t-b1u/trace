@@ -6,6 +6,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [Unreleased]
+
+### Tests
+
+- `tests/fixtures/initiative_c/spec_compliant_bundle.json` (canonical):
+  added an executive-role `identity` SDO (`roles=["cfo"]`) and a second
+  `impersonates` relationship (`confidence=60`) targeting it. Closes the
+  Phase 1 post-impl gap where the §6.6 `effective_priority` multiplier=1.5
+  path was unit-covered but not exercised end-to-end via the synthetic
+  bundle (HLD §8.5 required "executive-role vs non-privileged identities"
+  coverage). `tests/test_initiative_c_e2e.py` relationship-count
+  assertion bumped from 5 to 6. The bundle still covers all 5 §3.4
+  emit-ready type combinations — combination 5 simply has two instances.
+  No source-code or wire-format change.
+
 ## [1.5.0] — 2026-05-12
 
 ### Added — Initiative C Phase 1: `attributed-to` / `impersonates` SRO support

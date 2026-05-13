@@ -20,12 +20,19 @@ def _load(name: str) -> dict:
 
 
 class TestSpecCompliantBundle:
-    """spec_compliant_bundle.json — all 5 emit-ready rows, no semantic errors."""
+    """spec_compliant_bundle.json — covers all 5 §3.4 emit-ready combinations.
 
-    def test_five_relationships_present(self):
+    Combination 5 (threat-actor → impersonates → identity / x-identity-internal)
+    has two instances: one targeting an x-identity-internal with no roles
+    (multiplier=1.0, eff=30) and one targeting an executive-role identity
+    (roles=[cfo], multiplier=1.5, eff=90) to exercise the §6.6 boost path
+    end-to-end (HLD §8.5).
+    """
+
+    def test_six_relationships_present(self):
         bundle = _load("spec_compliant_bundle.json")
         rels = [o for o in bundle["objects"] if o.get("type") == "relationship"]
-        assert len(rels) == 5
+        assert len(rels) == 6
 
     def test_no_relationship_type_match_errors(self):
         bundle = _load("spec_compliant_bundle.json")
