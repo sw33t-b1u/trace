@@ -98,7 +98,7 @@ class TestRule2TypeDrift:
 
     def test_format_mismatch_alone_not_error(self):
         """BEACON `valid_from: string` vs TRACE `valid_from: string/format=date`
-        is tolerated per §2.3 known drift."""
+        is tolerated per §2.3 known drift — base type matches, no Rule-2 ERROR."""
         beacon = _beacon_schema({"valid_from": {"type": "string"}}, required=[])
         trace = _trace_schema(
             {"valid_from": {"type": "string", "format": "date"}},
@@ -106,6 +106,45 @@ class TestRule2TypeDrift:
         )
         errors, _ = drift.check_drift(beacon, trace)
         assert not any("RULE 2" in e for e in errors)
+
+
+class TestRule6FormatDrift:
+    def test_format_mismatch_emits_warning(self):
+        """BEACON `valid_from: string` vs TRACE `valid_from: string/format=date`
+        surfaces as a Rule-6 WARNING (per §2.3)."""
+        beacon = _beacon_schema({"valid_from": {"type": "string"}}, required=[])
+        trace = _trace_schema(
+            {"valid_from": {"type": "string", "format": "date"}},
+            required=[],
+        )
+        _, warnings = drift.check_drift(beacon, trace)
+        assert any("RULE 6" in w and "valid_from" in w for w in warnings)
+
+    def test_format_match_no_warning(self):
+        """Both sides declare the same format — no Rule-6 WARNING."""
+        beacon = _beacon_schema(
+            {"valid_from": {"type": "string", "format": "date"}}, required=[]
+        )
+        trace = _trace_schema(
+            {"valid_from": {"type": "string", "format": "date"}}, required=[]
+        )
+        _, warnings = drift.check_drift(beacon, trace)
+        assert not any("RULE 6" in w for w in warnings)
+
+    def test_format_drift_inside_anyof(self):
+        """TRACE optional `valid_until: anyOf(string/format=date, null)` vs BEACON
+        `valid_until: string` surfaces Rule-6 from inside the anyOf branch."""
+        beacon = _beacon_schema({"valid_until": {"type": "string"}}, required=[])
+        trace = _trace_schema(
+            {
+                "valid_until": {
+                    "anyOf": [{"type": "string", "format": "date"}, {"type": "null"}]
+                }
+            },
+            required=[],
+        )
+        _, warnings = drift.check_drift(beacon, trace)
+        assert any("RULE 6" in w and "valid_until" in w for w in warnings)
 
 
 class TestRule3StrictRejectDrift:

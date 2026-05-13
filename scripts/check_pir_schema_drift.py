@@ -8,7 +8,7 @@ as a follow-up. Standard library only — no DeepDiff, no jsondiff.
 Usage:
     python scripts/check_pir_schema_drift.py BEACON.schema.json TRACE.schema.json
 
-Drift rules (per plan §2.2):
+Drift rules (per plan §2.2 + §2.3 format-aware extension):
 
     1. TRACE.required ⊄ BEACON.required               → ERROR
     2. Field type mismatch on a shared property        → ERROR
@@ -17,6 +17,11 @@ Drift rules (per plan §2.2):
     4. BEACON.properties ⊋ TRACE.properties AND
        TRACE additionalProperties == true              → WARNING
     5. TRACE.properties ⊋ BEACON.properties            → WARNING
+    6. Shared property, matching base types, mismatched
+       JSON Schema `format` constraint                 → WARNING
+       (covers e.g. BEACON ``valid_from: string`` vs
+        TRACE ``valid_from: string format=date`` — base type matches but
+        TRACE applies an extra constraint BEACON does not enforce.)
 
 Exit codes:
     0  no ERROR drift detected (WARNINGs may have been emitted to stderr)
@@ -70,6 +75,27 @@ def _comparable_types(spec: dict) -> set[str]:
     return _normalize_types(spec) - {"null"}
 
 
+def _format(spec: dict) -> str | None:
+    """Return the JSON Schema ``format`` constraint, or None.
+
+    Looks at the top-level ``format`` key and inside ``anyOf`` / ``oneOf``
+    branches so Pydantic-style ``anyOf: [{type: string, format: date},
+    {type: null}]`` is detected.
+    """
+    fmt = spec.get("format")
+    if isinstance(fmt, str):
+        return fmt
+    for sub in spec.get("anyOf", []) or []:
+        f = _format(sub)
+        if f:
+            return f
+    for sub in spec.get("oneOf", []) or []:
+        f = _format(sub)
+        if f:
+            return f
+    return None
+
+
 def _additional_properties(schema: dict) -> bool:
     """Read ``additionalProperties`` with the Pydantic default of True."""
     val = schema.get("additionalProperties", True)
@@ -97,7 +123,8 @@ def check_drift(beacon: dict, trace: dict) -> tuple[list[str], list[str]]:
             + ", ".join(missing)
         )
 
-    # Rule 2: type mismatch on shared properties
+    # Rule 2: type mismatch on shared properties.
+    # Rule 6: format-constraint mismatch when base types agree.
     shared = sorted(set(beacon_props) & set(trace_props))
     for field in shared:
         b_types = _comparable_types(beacon_props[field])
@@ -108,6 +135,14 @@ def check_drift(beacon: dict, trace: dict) -> tuple[list[str], list[str]]:
             errors.append(
                 f"RULE 2 (type drift on '{field}'): BEACON={sorted(b_types)} "
                 f"vs TRACE={sorted(t_types)}"
+            )
+            continue  # rule 6 is only meaningful when base types agree
+        b_fmt = _format(beacon_props[field])
+        t_fmt = _format(trace_props[field])
+        if b_fmt != t_fmt:
+            warnings.append(
+                f"RULE 6 (format drift on '{field}'): "
+                f"BEACON format={b_fmt or '(none)'} vs TRACE format={t_fmt or '(none)'}"
             )
 
     # Rules 3 / 4: BEACON.properties ⊋ TRACE.properties
