@@ -8,6 +8,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ## [Unreleased]
 
+## [1.5.1] — 2026-05-13
+
 ### Added
 
 - `cmd/generate_schemas.py` exporting consumer-canonical JSON Schemas
