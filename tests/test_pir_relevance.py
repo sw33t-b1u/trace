@@ -178,3 +178,93 @@ def test_max_output_tokens_uses_constant(pir_doc: PIRDocument, cfg: Config) -> N
     with patch("trace_engine.pir.relevance.call_llm", side_effect=fake_call):
         pir_relevance.evaluate("article", pir_doc, config=cfg)
     assert captured["max_output_tokens"] == 1024
+
+
+# ---------------------------------------------------------------------------
+# Initiative C Phase 2 (TRACE 1.6.0): high-value identity boost
+# ---------------------------------------------------------------------------
+
+
+class TestHighValueIdentityBoost:
+    def test_boost_applied_when_flagged_name_present(
+        self, pir_doc: PIRDocument, cfg: Config
+    ) -> None:
+        payload = json.dumps({"score": 0.5, "matched_pir_ids": [], "rationale": "neutral"})
+        with patch("trace_engine.pir.relevance.call_llm", return_value=payload):
+            v = pir_relevance.evaluate(
+                "Sample Victim CFO was the target of a phishing attempt.",
+                pir_doc,
+                config=cfg,
+                high_value_identity_names=["Sample Victim CFO"],
+            )
+        assert v.score == pytest.approx(0.7)
+
+    def test_no_boost_when_flagged_name_absent(
+        self, pir_doc: PIRDocument, cfg: Config
+    ) -> None:
+        payload = json.dumps({"score": 0.5, "matched_pir_ids": []})
+        with patch("trace_engine.pir.relevance.call_llm", return_value=payload):
+            v = pir_relevance.evaluate(
+                "Generic phishing report with no specific identity match.",
+                pir_doc,
+                config=cfg,
+                high_value_identity_names=["Sample Victim CFO"],
+            )
+        assert v.score == pytest.approx(0.5)
+
+    def test_boost_caps_at_one(self, pir_doc: PIRDocument, cfg: Config) -> None:
+        payload = json.dumps({"score": 0.95, "matched_pir_ids": []})
+        with patch("trace_engine.pir.relevance.call_llm", return_value=payload):
+            v = pir_relevance.evaluate(
+                "Article references Sample Victim CFO.",
+                pir_doc,
+                config=cfg,
+                high_value_identity_names=["Sample Victim CFO"],
+            )
+        assert v.score == pytest.approx(1.0)
+
+    def test_case_insensitive_match(self, pir_doc: PIRDocument, cfg: Config) -> None:
+        payload = json.dumps({"score": 0.4, "matched_pir_ids": []})
+        with patch("trace_engine.pir.relevance.call_llm", return_value=payload):
+            v = pir_relevance.evaluate(
+                "article mentions sample victim cfo in lowercase",
+                pir_doc,
+                config=cfg,
+                high_value_identity_names=["Sample Victim CFO"],
+            )
+        assert v.score == pytest.approx(0.6)
+
+    def test_no_boost_when_verdict_failed(self, pir_doc: PIRDocument, cfg: Config) -> None:
+        """Failed verdicts (LLM call/parse error) preserve fail-open semantics
+        and are not boosted."""
+        with patch("trace_engine.pir.relevance.call_llm", return_value="not json at all"):
+            v = pir_relevance.evaluate(
+                "Article mentions Sample Victim CFO multiple times.",
+                pir_doc,
+                config=cfg,
+                high_value_identity_names=["Sample Victim CFO"],
+            )
+        assert v.failed is True
+        assert v.score == pytest.approx(0.0)
+
+    def test_empty_names_list_is_noop(self, pir_doc: PIRDocument, cfg: Config) -> None:
+        payload = json.dumps({"score": 0.5, "matched_pir_ids": []})
+        with patch("trace_engine.pir.relevance.call_llm", return_value=payload):
+            v = pir_relevance.evaluate(
+                "Article mentions Sample Victim CFO.",
+                pir_doc,
+                config=cfg,
+                high_value_identity_names=[],
+            )
+        assert v.score == pytest.approx(0.5)
+
+    def test_none_names_list_is_noop(self, pir_doc: PIRDocument, cfg: Config) -> None:
+        payload = json.dumps({"score": 0.5, "matched_pir_ids": []})
+        with patch("trace_engine.pir.relevance.call_llm", return_value=payload):
+            v = pir_relevance.evaluate(
+                "Article mentions Sample Victim CFO.",
+                pir_doc,
+                config=cfg,
+                high_value_identity_names=None,
+            )
+        assert v.score == pytest.approx(0.5)

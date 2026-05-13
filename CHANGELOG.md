@@ -8,6 +8,43 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-05-13
+
+### Added — Initiative C Phase 2 (consumer side)
+
+Paired release with BEACON 0.13.0 + SAGE 0.9.0. TRACE 1.6.0 consumes the
+new `is_high_value_impersonation_target` flag (and adjacent
+`impersonation_risk_factors` list) that BEACON 0.13.0 emits into
+`identity_assets.json` for high-value impersonation targets.
+
+- `IdentityEntry` Pydantic model
+  (`src/trace_engine/validate/schema/models.py`) gains two optional
+  fields matching BEACON's Identity schema:
+  - `is_high_value_impersonation_target: bool = False`
+  - `impersonation_risk_factors: list[str] = []`
+  Defaults preserve backward compat with BEACON 0.12.x identity_assets
+  (which omit the fields).
+- PIR L2 relevance gate (`src/trace_engine/pir/relevance.py`):
+  - `evaluate()` accepts a new optional
+    `high_value_identity_names: list[str] | None` parameter.
+  - Helper `_apply_high_value_boost` adds a `+0.2` boost (capped at 1.0)
+    to the LLM verdict when the crawled document mentions any flagged
+    identity name (case-insensitive substring match).
+  - Boost is skipped on failed verdicts (preserves fail-open semantics).
+  - Structured-log event `high_value_identity_boost_applied` records the
+    matched names, score before / after, and boost magnitude.
+- `cmd/crawl_single.py`: new `--identity-assets` CLI option that loads
+  BEACON's `identity_assets.json`, extracts the names of flagged
+  identities, and threads them into the PIR L2 gate.
+
+### Tests
+
+- `tests/test_pir_relevance.py`: new `TestHighValueIdentityBoost` class
+  with seven cases covering the boost (match / no match / case-insensitive
+  / cap at 1.0 / failed-verdict no-op / empty list no-op / None no-op).
+- `tests/test_validate_identity_assets.py`: two new cases verifying that
+  the flag defaults to False and round-trips with risk factors.
+
 ## [1.5.1] — 2026-05-13
 
 ### Added

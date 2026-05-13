@@ -51,6 +51,26 @@ class TestSchema:
                 revoked_at="2024-01-01",
             )
 
+    def test_high_value_impersonation_flag_defaults_false(self):
+        """Initiative C Phase 2 (BEACON 0.13.0 / TRACE 1.6.0): the new flag
+        defaults to False so BEACON 0.12.x identity_assets without it
+        remain valid."""
+        ident = IdentityEntry(id="id-x", name="X")
+        assert ident.is_high_value_impersonation_target is False
+        assert ident.impersonation_risk_factors == []
+
+    def test_high_value_impersonation_flag_roundtrips(self):
+        ident = IdentityEntry(
+            id="id-cfo",
+            name="Sample Victim CFO",
+            identity_class="individual",
+            roles=["cfo"],
+            is_high_value_impersonation_target=True,
+            impersonation_risk_factors=["executive", "public-facing-brand"],
+        )
+        assert ident.is_high_value_impersonation_target is True
+        assert ident.impersonation_risk_factors == ["executive", "public-facing-brand"]
+
     def test_document_accepts_optional_comment_field(self):
         # BEACON's generator emits a `_comment` hint at the top level;
         # IdentityAssetsDocument uses `extra='ignore'` to accept it.

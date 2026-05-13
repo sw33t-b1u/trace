@@ -202,6 +202,14 @@ class IdentityEntry(_StrictModel):
     sectors: list[str] = Field(default_factory=list)
     roles: list[str] = Field(default_factory=list)
     description: str = ""
+    # Initiative C Phase 2 (BEACON 0.13.0 / TRACE 1.6.0 / SAGE 0.9.0):
+    # producer-side flag set when an identity is a high-value impersonation
+    # target. SAGE reads this to set `effective_priority` multiplier=1.5
+    # via the flag-first path; TRACE's PIR L2 gate consumes it for
+    # pre-extraction prioritisation. Optional defaults preserve backward
+    # compat with BEACON 0.12.x output.
+    is_high_value_impersonation_target: bool = False
+    impersonation_risk_factors: list[str] = Field(default_factory=list)
 
 
 class HasAccessEntry(_StrictModel):

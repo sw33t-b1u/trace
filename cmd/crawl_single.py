@@ -131,6 +131,19 @@ def main() -> None:
             "cannot be resolved to known asset_ids)."
         ),
     )
+    parser.add_argument(
+        "--identity-assets",
+        type=Path,
+        default=None,
+        help=(
+            "Path to BEACON identity_assets.json. Initiative C Phase 2 "
+            "(TRACE 1.6.0): identities flagged "
+            "is_high_value_impersonation_target=true contribute a +0.2 "
+            "boost to the L2 relevance score when their name appears in "
+            "the crawled document, prioritising extraction of articles "
+            "that touch high-value impersonation targets."
+        ),
+    )
     args = parser.parse_args()
     cfg = load_config()
 
@@ -160,7 +173,25 @@ def main() -> None:
             if args.relevance_threshold is not None
             else cfg.relevance_threshold
         )
-        verdict = pir_relevance.evaluate(text, pir_doc, config=cfg)
+        high_value_identity_names: list[str] | None = None
+        if args.identity_assets is not None:
+            if not args.identity_assets.exists():
+                logger.error("identity_assets_not_found", path=str(args.identity_assets))
+                sys.exit(2)
+            with args.identity_assets.open() as f:
+                ia_payload = json.load(f)
+            high_value_identity_names = [
+                entry["name"]
+                for entry in ia_payload.get("identities", [])
+                if entry.get("is_high_value_impersonation_target")
+                and entry.get("name")
+            ]
+        verdict = pir_relevance.evaluate(
+            text,
+            pir_doc,
+            config=cfg,
+            high_value_identity_names=high_value_identity_names,
+        )
         if not verdict.keep(threshold):
             logger.info(
                 "skipped_below_threshold",

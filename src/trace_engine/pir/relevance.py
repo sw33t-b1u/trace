@@ -32,6 +32,11 @@ _PIR_LIST_FIELD_MAX_ITEMS = 8
 # Verdict JSON is small (score + ids + short rationale) but Gemini occasionally
 # truncates at 512; 1024 leaves comfortable headroom without inviting prose.
 _RELEVANCE_MAX_OUTPUT_TOKENS = 1024
+# Initiative C Phase 2 (TRACE 1.6.0): additive score boost applied when the
+# crawled document mentions an identity flagged
+# ``is_high_value_impersonation_target`` in BEACON 0.13.0+ identity_assets.json.
+# The score range is 0-1; the boost is capped at 1.0.
+_HIGH_VALUE_IDENTITY_BOOST = 0.2
 
 
 @dataclass(frozen=True)
@@ -92,6 +97,42 @@ def _build_pir_context(doc: PIRDocument, *, restrict_to: list[str] | None = None
     return json.dumps([_summarise_pir(i) for i in items], indent=2, ensure_ascii=False)
 
 
+def _apply_high_value_boost(
+    verdict: RelevanceVerdict,
+    text: str,
+    high_value_identity_names: list[str] | None,
+) -> RelevanceVerdict:
+    """Add ``_HIGH_VALUE_IDENTITY_BOOST`` to ``verdict.score`` (capped at 1.0)
+    when ``text`` mentions any name in ``high_value_identity_names``.
+
+    Names are matched case-insensitively as substrings. The boost is skipped
+    when the verdict already failed (LLM/parse error) so fail-open semantics
+    are preserved.
+    """
+    if not high_value_identity_names or verdict.failed:
+        return verdict
+    text_lower = text.lower()
+    matched = sorted(
+        {n for n in high_value_identity_names if n and n.lower() in text_lower}
+    )
+    if not matched:
+        return verdict
+    boosted = min(1.0, verdict.score + _HIGH_VALUE_IDENTITY_BOOST)
+    logger.info(
+        "high_value_identity_boost_applied",
+        names_matched=matched,
+        score_before=verdict.score,
+        score_after=boosted,
+        boost=_HIGH_VALUE_IDENTITY_BOOST,
+    )
+    return RelevanceVerdict(
+        score=boosted,
+        matched_pir_ids=verdict.matched_pir_ids,
+        rationale=verdict.rationale,
+        failed=verdict.failed,
+    )
+
+
 def evaluate(
     text: str,
     pir_doc: PIRDocument,
@@ -99,11 +140,19 @@ def evaluate(
     config: Config | None = None,
     restrict_to: list[str] | None = None,
     max_chars: int = _RELEVANCE_INPUT_MAX_CHARS,
+    high_value_identity_names: list[str] | None = None,
 ) -> RelevanceVerdict:
     """Ask the L2 LLM whether ``text`` is relevant to any PIR in ``pir_doc``.
 
     ``restrict_to`` (optional) is a list of pir_ids — when supplied, only those
     PIRs are passed to the LLM. Used by ``sources.yaml`` per-source pinning.
+
+    ``high_value_identity_names`` (optional, Initiative C Phase 2 / TRACE
+    1.6.0) — when supplied, the LLM verdict's score is boosted by
+    ``_HIGH_VALUE_IDENTITY_BOOST`` (capped at 1.0) if the document
+    mentions any of those identity names. Callers typically extract this
+    list from ``identity_assets.json`` entries with
+    ``is_high_value_impersonation_target=True``.
     """
     cfg = config or load_config()
     template = load_prompt("relevance_check.md")
@@ -135,7 +184,9 @@ def evaluate(
 
     parsed = _extract_json_from_text(raw)
     if isinstance(parsed, dict):
-        return _verdict_from_dict(parsed)
+        return _apply_high_value_boost(
+            _verdict_from_dict(parsed), text, high_value_identity_names
+        )
 
     # Full JSON parse failed — try the salvage path. Truncation typically
     # happens inside `rationale`, after `score` and `matched_pir_ids` have
@@ -147,7 +198,7 @@ def evaluate(
             score=salvaged.score,
             matched_pir_ids=salvaged.matched_pir_ids,
         )
-        return salvaged
+        return _apply_high_value_boost(salvaged, text, high_value_identity_names)
 
     logger.warning(
         "relevance_parse_failed",
