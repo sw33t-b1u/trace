@@ -16,8 +16,9 @@ of each piece.
 | `tests/test_report_reader.py` | (re-introduced in TRACE Phase D when crawler tests are added) |
 | `markitdown[pdf]` runtime dep | `pyproject.toml` (TRACE) |
 
-`BEACON/cmd/stix_from_report.py` remains in BEACON 0.9.x as a deprecation
-stub: running it prints a redirect message and exits 2. It will be
+`BEACON/cmd/stix_from_report.py` shipped as a deprecation stub in BEACON
+0.9.x (redirect message + exit 2) and was deleted in BEACON 0.10.0.
+`BEACON/cmd/validate_pir.py` followed the same lifecycle and was also
 deleted in BEACON 0.10.0.
 
 ## What was copied (not moved)

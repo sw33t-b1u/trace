@@ -117,10 +117,22 @@ uv run python cmd/crawl_batch.py --dry-run
 ### Validation gate
 
 ```bash
-uv run python cmd/validate_assets.py --input ../BEACON/output/assets.json
-uv run python cmd/validate_pir.py    --input ../BEACON/output/pir_output.json \
+uv run python cmd/validate_assets.py --assets ../BEACON/output/assets.json
+uv run python cmd/validate_pir.py    --pir    ../BEACON/output/pir_output.json \
                                      --assets ../BEACON/output/assets.json
 uv run python cmd/validate_stix.py   --bundle output/stix_bundle.json [--strict]
+
+# Initiative A / Initiative C Phase 2 — Identity SDO + has_access edges.
+# Cross-checks each has_access[].asset_id against assets.json and validates
+# is_high_value_impersonation_target / impersonation_risk_factors (Phase 2).
+uv run python cmd/validate_identity_assets.py \
+  --identity-assets ../BEACON/output/identity_assets.json \
+  --assets          ../BEACON/output/assets.json
+
+# Initiative B — UserAccount SCO + account_on_asset edges.
+uv run python cmd/validate_user_accounts.py \
+  --user-accounts ../BEACON/output/user_accounts.json \
+  --assets        ../BEACON/output/assets.json
 
 uv run python cmd/validate_all.py \
   --assets ../BEACON/output/assets.json \

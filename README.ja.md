@@ -31,13 +31,20 @@ CTI ベンダーブログ・ニュース記事・PDF レポート・任意の UR
                    [SAGE ETL]
 
 
-  BEACON 出力 (assets.json, pir_output.json)
+  BEACON 出力 (assets.json, pir_output.json,
+               identity_assets.json, user_accounts.json)
          │
-         └───► cmd/validate_assets.py  (Pydantic + 参照整合性)
+         └───► cmd/validate_assets.py            (Pydantic + 参照整合性)
          │
-         └───► cmd/validate_pir.py     (Pydantic + タクソノミ + asset タグ照合)
+         └───► cmd/validate_pir.py               (Pydantic + タクソノミ + asset タグ照合)
          │
-         └───► cmd/validate_all.py     (集約 Markdown レポート)
+         └───► cmd/validate_identity_assets.py   (Identity + has_access の assets.json クロス参照、
+         │                                        Initiative A / Initiative C Phase 2 フラグ検証)
+         │
+         └───► cmd/validate_user_accounts.py     (UserAccount + account_on_asset クロス参照、
+         │                                        Initiative B)
+         │
+         └───► cmd/validate_all.py               (集約 Markdown レポート)
                          │
                          ▼
               cmd/submit_review.py [--open-issue]

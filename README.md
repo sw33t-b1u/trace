@@ -31,13 +31,20 @@ Collects CTI from public web sources (vendor blogs, news articles, PDF reports),
                    [SAGE ETL]
 
 
-  BEACON output (assets.json, pir_output.json)
+  BEACON output (assets.json, pir_output.json,
+                 identity_assets.json, user_accounts.json)
          │
-         └───► cmd/validate_assets.py  (Pydantic + semantic refcheck)
+         └───► cmd/validate_assets.py            (Pydantic + semantic refcheck)
          │
-         └───► cmd/validate_pir.py     (Pydantic + taxonomy + asset-tag match)
+         └───► cmd/validate_pir.py               (Pydantic + taxonomy + asset-tag match)
          │
-         └───► cmd/validate_all.py     (one combined Markdown report)
+         └───► cmd/validate_identity_assets.py   (Identity + has_access cross-ref vs assets.json;
+         │                                        Initiative A / Initiative C Phase 2 flags)
+         │
+         └───► cmd/validate_user_accounts.py     (UserAccount + account_on_asset cross-ref;
+         │                                        Initiative B)
+         │
+         └───► cmd/validate_all.py               (one combined Markdown report)
                          │
                          ▼
               cmd/submit_review.py [--open-issue]
