@@ -8,6 +8,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ## [Unreleased]
 
+### Added
+
+- `cmd/generate_schemas.py` exporting consumer-canonical JSON Schemas
+  (`schema/pir.schema.json` from `PIRItem`,
+  `schema/assets.schema.json` from `AssetsDocument`). Both schemas are
+  committed to git as the wire-format contract that TRACE enforces on
+  SAGE input artifacts.
+- `scripts/check_pir_schema_drift.py` — standard-library drift detector
+  comparing BEACON's producer canonical against TRACE's consumer
+  canonical per plan §2.2 rules. ERROR rules (1 / 2 / 3) cause non-zero
+  exit; WARNING rules (4 / 5) surface known acceptable drift on stderr.
+- `make check-pir-schema-drift` target chained into `check`. Skips
+  gracefully when the BEACON sibling repo is not present so TRACE-only
+  contributors can still run the full quality gate.
+
 ### Tests
 
 - `tests/fixtures/initiative_c/spec_compliant_bundle.json` (canonical):

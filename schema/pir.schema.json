@@ -1,0 +1,101 @@
+{
+  "$defs": {
+    "AssetWeightRule": {
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "minLength": 1,
+          "title": "Tag",
+          "type": "string"
+        },
+        "criticality_multiplier": {
+          "exclusiveMinimum": 0.0,
+          "title": "Criticality Multiplier",
+          "type": "number"
+        }
+      },
+      "required": [
+        "tag",
+        "criticality_multiplier"
+      ],
+      "title": "AssetWeightRule",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "description": "Single PIR entry.\n\nMirrors SAGE's ``PIRFilter.from_file`` consumer in shape, while\naccepting the richer field set BEACON's generator emits\n(``intelligence_level``, ``rationale``, ``risk_score`` etc.) so\nBEACON-authored PIRs round-trip without loss.",
+  "properties": {
+    "pir_id": {
+      "minLength": 1,
+      "title": "Pir Id",
+      "type": "string"
+    },
+    "threat_actor_tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Threat Actor Tags",
+      "type": "array"
+    },
+    "asset_weight_rules": {
+      "items": {
+        "$ref": "#/$defs/AssetWeightRule"
+      },
+      "title": "Asset Weight Rules",
+      "type": "array"
+    },
+    "valid_from": {
+      "format": "date",
+      "title": "Valid From",
+      "type": "string"
+    },
+    "valid_until": {
+      "format": "date",
+      "title": "Valid Until",
+      "type": "string"
+    },
+    "organizational_scope": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Organizational Scope"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "intelligence_level": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Intelligence Level"
+    }
+  },
+  "required": [
+    "pir_id",
+    "valid_from",
+    "valid_until"
+  ],
+  "title": "PIRItem",
+  "type": "object"
+}

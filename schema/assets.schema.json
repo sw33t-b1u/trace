@@ -1,0 +1,328 @@
+{
+  "$defs": {
+    "ActorTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "actor_stix_id_ref": {
+          "minLength": 1,
+          "title": "Actor Stix Id Ref",
+          "type": "string"
+        },
+        "asset_id": {
+          "minLength": 1,
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "confidence": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence"
+        }
+      },
+      "required": [
+        "actor_stix_id_ref",
+        "asset_id"
+      ],
+      "title": "ActorTarget",
+      "type": "object"
+    },
+    "Asset": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "asset_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Type"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Environment"
+        },
+        "criticality": {
+          "default": 5.0,
+          "maximum": 10.0,
+          "minimum": 0.0,
+          "title": "Criticality",
+          "type": "number"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner"
+        },
+        "network_segment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Network Segment Id"
+        },
+        "exposed_to_internet": {
+          "default": false,
+          "title": "Exposed To Internet",
+          "type": "boolean"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "security_control_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Security Control Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "Asset",
+      "type": "object"
+    },
+    "AssetConnection": {
+      "additionalProperties": false,
+      "properties": {
+        "src": {
+          "minLength": 1,
+          "title": "Src",
+          "type": "string"
+        },
+        "dst": {
+          "minLength": 1,
+          "title": "Dst",
+          "type": "string"
+        },
+        "protocol": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Protocol"
+        },
+        "port": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Port"
+        }
+      },
+      "required": [
+        "src",
+        "dst"
+      ],
+      "title": "AssetConnection",
+      "type": "object"
+    },
+    "AssetVulnerability": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "minLength": 1,
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "vuln_stix_id_ref": {
+          "minLength": 1,
+          "title": "Vuln Stix Id Ref",
+          "type": "string"
+        },
+        "remediation_status": {
+          "default": "open",
+          "title": "Remediation Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "asset_id",
+        "vuln_stix_id_ref"
+      ],
+      "title": "AssetVulnerability",
+      "type": "object"
+    },
+    "NetworkSegment": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "cidr": {
+          "minLength": 1,
+          "title": "Cidr",
+          "type": "string"
+        },
+        "zone": {
+          "minLength": 1,
+          "title": "Zone",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "cidr",
+        "zone"
+      ],
+      "title": "NetworkSegment",
+      "type": "object"
+    },
+    "SecurityControl": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "control_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Control Type"
+        },
+        "coverage": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Coverage",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "title": "SecurityControl",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "description": "Top-level shape of ``assets.json`` consumed by SAGE.",
+  "properties": {
+    "network_segments": {
+      "items": {
+        "$ref": "#/$defs/NetworkSegment"
+      },
+      "title": "Network Segments",
+      "type": "array"
+    },
+    "security_controls": {
+      "items": {
+        "$ref": "#/$defs/SecurityControl"
+      },
+      "title": "Security Controls",
+      "type": "array"
+    },
+    "assets": {
+      "items": {
+        "$ref": "#/$defs/Asset"
+      },
+      "title": "Assets",
+      "type": "array"
+    },
+    "asset_vulnerabilities": {
+      "items": {
+        "$ref": "#/$defs/AssetVulnerability"
+      },
+      "title": "Asset Vulnerabilities",
+      "type": "array"
+    },
+    "asset_connections": {
+      "items": {
+        "$ref": "#/$defs/AssetConnection"
+      },
+      "title": "Asset Connections",
+      "type": "array"
+    },
+    "actor_targets": {
+      "items": {
+        "$ref": "#/$defs/ActorTarget"
+      },
+      "title": "Actor Targets",
+      "type": "array"
+    }
+  },
+  "title": "AssetsDocument",
+  "type": "object"
+}
