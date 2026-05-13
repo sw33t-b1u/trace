@@ -168,6 +168,27 @@ omit the extension definition entirely.
 | `x_trace_relevance_score` | L2 gate ran | float `[0.0, 1.0]` |
 | `x_trace_relevance_rationale` | L2 gate ran | short LLM-authored justification (or `parse_failed`/`call_failed` when the gate fell open) |
 
+#### Identity_assets schema evolution (Initiative C Phase 2 / TRACE 1.6.0)
+
+`IdentityEntry` (the `identity_assets.json[*].identities[]` row shape
+mirrored from BEACON's `Identity` model) gained two optional fields in
+TRACE 1.6.0, matching BEACON 0.13.0's emit-side additions:
+
+| Field | Type | Default | Purpose |
+|-------|------|---------|---------|
+| `is_high_value_impersonation_target` | `bool` | `false` | When `true`, TRACE's PIR L2 relevance gate adds a `+0.2` boost (capped at 1.0) to the LLM verdict if the crawled document mentions this identity's name (case-insensitive substring). SAGE 0.9.0+ consumes the flag in its `effective_priority` formula. |
+| `impersonation_risk_factors` | `list[str]` | `[]` | Free-form tags (`["public-facing-brand", "executive", "trusted-supplier"]` are the canonical examples). Passed through to SAGE for analyst-facing dashboards; not consumed by TRACE itself. |
+
+Both fields are accepted (not just tolerated) on `IdentityEntry`'s strict
+Pydantic model — without the explicit declaration, BEACON 0.13.0+
+`identity_assets.json` would be rejected by `_StrictModel`'s
+`extra="forbid"`. Defaults preserve backward compat with BEACON 0.12.x
+artifacts (no flag emitted).
+
+CLI access: `cmd/crawl_single.py --identity-assets PATH` loads the file,
+extracts flagged identity names, and threads them into
+`pir_relevance.evaluate(..., high_value_identity_names=...)`.
+
 #### Why the extension id is fixed
 
 STIX 2.1 §7.3 expects `extension-definition` ids to be stable across
