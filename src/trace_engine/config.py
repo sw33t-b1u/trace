@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Literal
 
 RelevanceTier = Literal["simple", "medium", "complex"]
@@ -87,6 +88,33 @@ class Config:
     # range 1..8.
     crawl_concurrency: int = field(
         default_factory=lambda: int(os.environ.get("TRACE_CRAWL_CONCURRENCY", "4"))
+    )
+
+    # Taxonomy enrichment (Phase 1.7)
+    # threat_taxonomy_cache_path: local TRACE snapshot; constant by design.
+    # beacon_taxonomy_source_path: path to the BEACON master file used by
+    # ensure_taxonomy_fresh at crawl startup; override via
+    # TRACE_BEACON_TAXONOMY_SOURCE when the two repos are not siblings.
+    threat_taxonomy_cache_path: Path = field(
+        default_factory=lambda: Path(
+            os.environ.get(
+                "TRACE_TAXONOMY_CACHE_PATH",
+                str(Path(__file__).resolve().parents[2] / "schema" / "threat_taxonomy.cached.json"),
+            )
+        )
+    )
+    beacon_taxonomy_source_path: Path = field(
+        default_factory=lambda: Path(
+            os.environ.get(
+                "TRACE_BEACON_TAXONOMY_SOURCE",
+                str(
+                    Path(__file__).resolve().parents[3]
+                    / "BEACON"
+                    / "schema"
+                    / "threat_taxonomy.json"
+                ),
+            )
+        )
     )
 
     # GitHub / GHE review workflow

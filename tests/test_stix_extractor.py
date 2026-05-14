@@ -789,7 +789,7 @@ class TestSophisticationDemotion:
         assert "sophistication" not in actor
         assert "advanced" in actor["labels"]
 
-    def test_intrusion_set_sophistication_dedup_in_existing_labels(self):
+    def test_intrusion_set_sophistication_dedup_in_existing_labels(self, tmp_path):
         ext = Extraction(
             entities=[
                 ExtractedEntity(
@@ -803,7 +803,11 @@ class TestSophisticationDemotion:
                 )
             ]
         )
-        bundle = build_stix_bundle_from_extraction(ext)
+        # Disable taxonomy enrichment so only sophistication-demotion logic is tested.
+        cfg = Config()
+        cfg.threat_taxonomy_cache_path = tmp_path / "no-taxonomy.json"
+        cfg.external_ref_hash_enabled = False
+        bundle = build_stix_bundle_from_extraction(ext, config=cfg)
         actor = next(o for o in bundle["objects"] if o["type"] == "intrusion-set")
         assert "sophistication" not in actor
         # No duplicate "advanced".
@@ -832,7 +836,7 @@ class TestSophisticationDemotion:
 
 
 class TestEmptyArrayScrub:
-    def test_empty_aliases_removed(self):
+    def test_empty_aliases_removed(self, tmp_path):
         ext = Extraction(
             entities=[
                 ExtractedEntity(
@@ -842,7 +846,11 @@ class TestEmptyArrayScrub:
                 )
             ]
         )
-        bundle = build_stix_bundle_from_extraction(ext)
+        # Disable taxonomy enrichment so the empty-array scrub can be tested in isolation.
+        cfg = Config()
+        cfg.threat_taxonomy_cache_path = tmp_path / "no-taxonomy.json"
+        cfg.external_ref_hash_enabled = False
+        bundle = build_stix_bundle_from_extraction(ext, config=cfg)
         actor = next(o for o in bundle["objects"] if o["type"] == "intrusion-set")
         assert "aliases" not in actor
         assert "labels" not in actor
@@ -1481,11 +1489,15 @@ class TestIndicatorMissingPattern:
 class TestAttackMotivationDemotion:
     """1.0.3: primary_motivation / secondary_motivations outside attack-motivation-ov."""
 
-    def test_intrusion_set_in_vocab_motivation_kept(self):
+    def test_intrusion_set_in_vocab_motivation_kept(self, tmp_path):
         ext = Extraction(
             entities=[_ent("a", "intrusion-set", "FIN7", primary_motivation="organizational-gain")]
         )
-        bundle = build_stix_bundle_from_extraction(ext)
+        # Disable taxonomy enrichment so only motivation-demotion logic is tested.
+        cfg = Config()
+        cfg.threat_taxonomy_cache_path = tmp_path / "no-taxonomy.json"
+        cfg.external_ref_hash_enabled = False
+        bundle = build_stix_bundle_from_extraction(ext, config=cfg)
         actor = next(o for o in bundle["objects"] if o["type"] == "intrusion-set")
         assert actor["primary_motivation"] == "organizational-gain"
         assert "labels" not in actor

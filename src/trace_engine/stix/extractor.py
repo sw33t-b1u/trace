@@ -35,6 +35,7 @@ from trace_engine.config import Config, load_config
 from trace_engine.llm.client import TaskType, call_llm, load_prompt
 from trace_engine.stix.asset_resolver import resolve_asset_reference
 from trace_engine.stix.identity_resolver import resolve_identity_reference
+from trace_engine.stix.taxonomy_enrich import enrich_threat_actor_object, load_taxonomy_index
 from trace_engine.validate.schema import PIRDocument, PIRItem
 
 logger = structlog.get_logger(__name__)
@@ -1138,6 +1139,13 @@ def build_stix_bundle_from_extraction(
     """
     ts = (now or datetime.now(tz=UTC)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
+    cfg = config or load_config()
+    taxonomy_index: dict[str, list[str]] | None = None
+    try:
+        taxonomy_index = load_taxonomy_index(cfg.threat_taxonomy_cache_path)
+    except (FileNotFoundError, OSError, ValueError) as _exc:
+        logger.warning("taxonomy_enrich_disabled", reason=str(_exc))
+
     objects: list[dict] = []
     local_to_stix: dict[str, str] = {}
     local_to_type: dict[str, str] = {}
@@ -1163,6 +1171,10 @@ def build_stix_bundle_from_extraction(
         # for domain knowledge only — it does not know which STIX wire-format
         # fields are mandatory per type, so the bundle assembler fills them in.
         _apply_required_property_defaults(obj, ts)
+        # Inject PIR taxonomy tags (apt-china, apt-russia, …) so SAGE's
+        # pir_filter.is_relevant_actor can match actors against PIR vocab.
+        if taxonomy_index is not None and entity.type in ("threat-actor", "intrusion-set"):
+            enrich_threat_actor_object(obj, taxonomy_index)
         # Strip empty list properties before validator sees them. STIX 2.1
         # disallows `aliases: []`, `labels: []`, etc.; the LLM occasionally
         # emits them when nothing is known.
@@ -1595,7 +1607,6 @@ def build_stix_bundle_from_extraction(
 
     # 0.5.0: augment external_references[*].hashes (SHA-256) for entries
     # that have a URL but no hash, removing the OASIS {302} warnings.
-    cfg = config or load_config()
     if cfg.external_ref_hash_enabled:
         from trace_engine.stix.external_ref_hash import augment_external_references
 
