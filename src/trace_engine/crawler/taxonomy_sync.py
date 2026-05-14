@@ -20,6 +20,8 @@ from pathlib import Path
 
 import structlog
 
+from trace_engine.config import Config
+
 logger = structlog.get_logger(__name__)
 
 _REQUIRED_KEYS: frozenset[str] = frozenset(
@@ -50,7 +52,7 @@ def _atomic_write_json(path: Path, payload: dict) -> None:
     os.replace(tmp_path, path)
 
 
-def ensure_taxonomy_fresh(source: Path, output: Path) -> Path:
+def _sync_taxonomy(source: Path, output: Path) -> Path:
     """Copy *source* to *output* with a ``_trace_cache`` stamp.
 
     If *source* does not exist or cannot be read, logs
@@ -104,3 +106,18 @@ def ensure_taxonomy_fresh(source: Path, output: Path) -> Path:
         upstream_last_auto_sync=upstream_meta.get("last_auto_sync"),
     )
     return output
+
+
+def ensure_taxonomy_fresh(config: Config) -> Path:
+    """Sync the taxonomy cache using paths from *config*.
+
+    Delegates to ``_sync_taxonomy`` using
+    ``config.beacon_taxonomy_source_path`` and
+    ``config.threat_taxonomy_cache_path``.  Best-effort: logs
+    ``taxonomy_sync_skipped`` when the BEACON source is unavailable and
+    returns the existing cache path.
+    """
+    return _sync_taxonomy(
+        config.beacon_taxonomy_source_path,
+        config.threat_taxonomy_cache_path,
+    )

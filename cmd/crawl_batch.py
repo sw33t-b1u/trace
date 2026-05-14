@@ -35,6 +35,7 @@ from trace_engine.config import load_config  # noqa: E402
 from trace_engine.crawler.batch import crawl_batch  # noqa: E402
 from trace_engine.crawler.sources import load_sources  # noqa: E402
 from trace_engine.crawler.state import CrawlState  # noqa: E402
+from trace_engine.crawler.taxonomy_sync import ensure_taxonomy_fresh  # noqa: E402
 from trace_engine.pir.loader import load_pir  # noqa: E402
 
 load_dotenv()
@@ -104,7 +105,21 @@ def main() -> None:
             "are emitted."
         ),
     )
+    parser.add_argument(
+        "--no-sync-taxonomy",
+        action="store_true",
+        help=(
+            "Skip the automatic taxonomy cache sync at startup. "
+            "Use in CI or air-gapped environments where BEACON is not available."
+        ),
+    )
     args = parser.parse_args()
+
+    if not args.no_sync_taxonomy:
+        try:
+            ensure_taxonomy_fresh(cfg)
+        except Exception as exc:
+            logger.warning("taxonomy_sync_failed", error=str(exc))
 
     if not args.sources.exists():
         logger.error("sources_not_found", path=str(args.sources))

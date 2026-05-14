@@ -38,6 +38,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from trace_engine.cli import _metrics  # noqa: E402
 from trace_engine.cli._logging import configure as configure_logging  # noqa: E402
 from trace_engine.config import load_config  # noqa: E402
+from trace_engine.crawler.taxonomy_sync import ensure_taxonomy_fresh  # noqa: E402
 from trace_engine.ingest.report_reader import _MAX_CHARS, read_report  # noqa: E402
 from trace_engine.pir import relevance as pir_relevance  # noqa: E402
 from trace_engine.pir.loader import load_pir  # noqa: E402
@@ -144,8 +145,22 @@ def main() -> None:
             "that touch high-value impersonation targets."
         ),
     )
+    parser.add_argument(
+        "--no-sync-taxonomy",
+        action="store_true",
+        help=(
+            "Skip the automatic taxonomy cache sync at startup. "
+            "Use in CI or air-gapped environments where BEACON is not available."
+        ),
+    )
     args = parser.parse_args()
     cfg = load_config()
+
+    if not args.no_sync_taxonomy:
+        try:
+            ensure_taxonomy_fresh(cfg)
+        except Exception as exc:
+            logger.warning("taxonomy_sync_failed", error=str(exc))
 
     collector = _metrics.get_collector()
     if collector is not None:
@@ -183,8 +198,7 @@ def main() -> None:
             high_value_identity_names = [
                 entry["name"]
                 for entry in ia_payload.get("identities", [])
-                if entry.get("is_high_value_impersonation_target")
-                and entry.get("name")
+                if entry.get("is_high_value_impersonation_target") and entry.get("name")
             ]
         verdict = pir_relevance.evaluate(
             text,

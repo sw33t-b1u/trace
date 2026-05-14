@@ -35,7 +35,7 @@ import structlog
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from trace_engine.cli._logging import configure as configure_logging  # noqa: E402
-from trace_engine.crawler.taxonomy_sync import ensure_taxonomy_fresh  # noqa: E402
+from trace_engine.crawler.taxonomy_sync import _sync_taxonomy  # noqa: E402
 
 configure_logging()
 logger = structlog.get_logger(__name__)
@@ -140,7 +140,7 @@ def main() -> None:
         )
         return
 
-    ensure_taxonomy_fresh(args.source, args.output)
+    _sync_taxonomy(args.source, args.output)
     print(
         f"Cached {args.source} → {args.output}\n"
         f"  actor_categories={actor_count}, geographies={geo_count}, "
