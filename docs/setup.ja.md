@@ -142,6 +142,39 @@ uv run python cmd/validate_all.py \
   --report output/validation_report.md
 ```
 
+### タクソノミーエンリッチメント
+
+TRACE バンドルは `threat-actor` / `intrusion-set` オブジェクトに PIR 語彙タグ（`apt-china`、`apt-russia`、`ransomware` など）を付与します。これにより SAGE の `pir_filter.is_relevant_actor` がアクターを保持し、Spanner Graph へのグラフ取り込みが正常に行われます。
+
+**巡回起動時の自動同期**（TRACE 1.7.0）: `crawl_single` / `crawl_batch` は起動時に `ensure_taxonomy_fresh` を呼び出し、BEACON が利用可能な場合は `../BEACON/schema/threat_taxonomy.json` を `schema/threat_taxonomy.cached.json` にコピーします。同期はベストエフォートで、BEACON が不在の場合は既存のキャッシュスナップショットを使用し、`taxonomy_sync_skipped` 警告をログに記録します。
+
+```bash
+# 自動同期をスキップ（CI / エアギャップ環境）:
+uv run python cmd/crawl_single.py --input report.pdf --no-sync-taxonomy
+
+# 明示的なキャッシュ更新:
+uv run python cmd/update_taxonomy_cache.py
+```
+
+**外部バンドルのレスキュー** — OpenCTI フィード、手動作成 STIX、または古い TRACE バンドルにはタグが不足している場合があります。SAGE へ渡す前にエンリッチしてください:
+
+```bash
+uv run python cmd/enrich_bundle.py \
+    --input  external.json \
+    --output enriched.json
+
+# その後 SAGE へ投入:
+cd ../SAGE
+uv run python cmd/run_etl.py --manual-bundle ../TRACE/enriched.json
+```
+
+必要に応じて `--taxonomy <path>` でスナップショットを上書き可能（デフォルト: `schema/threat_taxonomy.cached.json`）。
+
+| 環境変数 | デフォルト | 説明 |
+|---------|-----------|------|
+| `TRACE_TAXONOMY_CACHE_PATH` | `schema/threat_taxonomy.cached.json` | TRACE 側キャッシュパス |
+| `TRACE_BEACON_TAXONOMY_SOURCE` | `../BEACON/schema/threat_taxonomy.json` | 自動同期元 BEACON マスターファイル |
+
 ### レビュー依頼
 
 ```bash

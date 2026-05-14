@@ -8,6 +8,38 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-05-15
+
+### Added — Taxonomy enrichment for PIR binding
+
+Paired release with SAGE 0.10.0 (no code changes in SAGE required).
+Fixes the silent zero-ingest issue where `run_etl --manual-bundle` dropped
+all actors/edges because TRACE bundles lacked the PIR vocabulary tags
+(`apt-china`, `apt-russia`, …) that SAGE's `pir_filter.is_relevant_actor`
+requires.
+
+- `src/trace_engine/stix/taxonomy_enrich.py` — new module:
+  - `load_taxonomy_index(path)` builds a `{normalized_group_name: [tag, ...]}` lookup from the cached taxonomy.
+  - `enrich_threat_actor_object(obj, index)` merges matching tags into `labels` (dedup, order-preserving).
+  - `enrich_bundle_objects(objects, index)` applies enrichment to all `threat-actor` / `intrusion-set` objects.
+- `src/trace_engine/crawler/taxonomy_sync.py` — new module:
+  - `ensure_taxonomy_fresh(config)` — best-effort sync from BEACON source to TRACE cache; logs `taxonomy_sync_skipped` when BEACON is unavailable and falls back to the existing snapshot.
+  - `_sync_taxonomy(source, output)` — low-level write path used by the explicit CLI.
+- `src/trace_engine/stix/extractor.py` — `build_stix_bundle_from_extraction` now loads the taxonomy index once at function entry and enriches each `threat-actor` / `intrusion-set` object before bundle assembly. Logs `taxonomy_enrich_disabled` and continues if the cache is absent.
+- `src/trace_engine/config.py` — two new config fields:
+  - `threat_taxonomy_cache_path` (env `TRACE_TAXONOMY_CACHE_PATH`) — path to the TRACE-side cache; defaults to `schema/threat_taxonomy.cached.json`.
+  - `beacon_taxonomy_source_path` (env `TRACE_BEACON_TAXONOMY_SOURCE`) — path to the BEACON master file for auto-sync; defaults to `../BEACON/schema/threat_taxonomy.json`.
+- `cmd/crawl_single.py`, `cmd/crawl_batch.py` — call `ensure_taxonomy_fresh(config)` at startup (best-effort). New `--no-sync-taxonomy` flag to opt out (CI / air-gapped environments).
+- `cmd/enrich_bundle.py` — rescue CLI for external bundles (OpenCTI feeds, hand-authored STIX, old TRACE output). Reads a bundle, enriches actors, writes atomically. Use before `run_etl --manual-bundle`.
+- `cmd/update_taxonomy_cache.py` — refactored to delegate the write path to `taxonomy_sync._sync_taxonomy`; CLI behavior unchanged.
+
+### Tests
+
+- `tests/test_taxonomy_enrich.py` — 21 cases covering index build, per-object enrichment, bundle enrichment, idempotency, and alias-only match.
+- `tests/test_extractor_enrich_integration.py` — 5 cases: MirrorFace → `apt-china`, Sandworm Team → `apt-russia`, cache-missing graceful path, non-actor types untouched, idempotency.
+- `tests/test_enrich_bundle_cli.py` — 6 cases: round-trip, idempotency, exit codes, atomic write.
+- `tests/test_stix_extractor.py` — three existing tests updated to pass `config` with a nonexistent taxonomy path, isolating label-demotion behavior from enrichment.
+
 ## [1.6.0] — 2026-05-13
 
 ### Added — Initiative C Phase 2 (consumer side)

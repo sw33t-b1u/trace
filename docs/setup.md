@@ -141,6 +141,39 @@ uv run python cmd/validate_all.py \
   --report output/validation_report.md
 ```
 
+### Taxonomy enrichment
+
+TRACE bundles carry PIR vocabulary tags (`apt-china`, `apt-russia`, `ransomware`, …) on `threat-actor` and `intrusion-set` objects so that SAGE's `pir_filter.is_relevant_actor` retains actors for downstream graph ingestion.
+
+**Auto-sync at crawl startup** (TRACE 1.7.0): `crawl_single` and `crawl_batch` call `ensure_taxonomy_fresh` at startup, which copies `../BEACON/schema/threat_taxonomy.json` to `schema/threat_taxonomy.cached.json` when BEACON is available. The sync is best-effort — if BEACON is absent, the existing cached snapshot is used and a `taxonomy_sync_skipped` warning is logged.
+
+```bash
+# Opt out of auto-sync (CI / air-gapped):
+uv run python cmd/crawl_single.py --input report.pdf --no-sync-taxonomy
+
+# Explicit cache refresh:
+uv run python cmd/update_taxonomy_cache.py
+```
+
+**External-bundle rescue** — OpenCTI feeds, hand-authored STIX, or old TRACE bundles often lack these tags. Enrich them before feeding SAGE:
+
+```bash
+uv run python cmd/enrich_bundle.py \
+    --input  external.json \
+    --output enriched.json
+
+# Then feed to SAGE:
+cd ../SAGE
+uv run python cmd/run_etl.py --manual-bundle ../TRACE/enriched.json
+```
+
+Override the taxonomy snapshot with `--taxonomy <path>` if needed (default: `schema/threat_taxonomy.cached.json`).
+
+| Env var | Default | Description |
+|---------|---------|-------------|
+| `TRACE_TAXONOMY_CACHE_PATH` | `schema/threat_taxonomy.cached.json` | TRACE-side cache |
+| `TRACE_BEACON_TAXONOMY_SOURCE` | `../BEACON/schema/threat_taxonomy.json` | BEACON master file for auto-sync |
+
 ### Reviewer handoff
 
 ```bash
