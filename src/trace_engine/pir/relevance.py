@@ -112,9 +112,7 @@ def _apply_high_value_boost(
     if not high_value_identity_names or verdict.failed:
         return verdict
     text_lower = text.lower()
-    matched = sorted(
-        {n for n in high_value_identity_names if n and n.lower() in text_lower}
-    )
+    matched = sorted({n for n in high_value_identity_names if n and n.lower() in text_lower})
     if not matched:
         return verdict
     boosted = min(1.0, verdict.score + _HIGH_VALUE_IDENTITY_BOOST)
@@ -184,9 +182,7 @@ def evaluate(
 
     parsed = _extract_json_from_text(raw)
     if isinstance(parsed, dict):
-        return _apply_high_value_boost(
-            _verdict_from_dict(parsed), text, high_value_identity_names
-        )
+        return _apply_high_value_boost(_verdict_from_dict(parsed), text, high_value_identity_names)
 
     # Full JSON parse failed — try the salvage path. Truncation typically
     # happens inside `rationale`, after `score` and `matched_pir_ids` have

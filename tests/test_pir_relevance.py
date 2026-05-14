@@ -199,9 +199,7 @@ class TestHighValueIdentityBoost:
             )
         assert v.score == pytest.approx(0.7)
 
-    def test_no_boost_when_flagged_name_absent(
-        self, pir_doc: PIRDocument, cfg: Config
-    ) -> None:
+    def test_no_boost_when_flagged_name_absent(self, pir_doc: PIRDocument, cfg: Config) -> None:
         payload = json.dumps({"score": 0.5, "matched_pir_ids": []})
         with patch("trace_engine.pir.relevance.call_llm", return_value=payload):
             v = pir_relevance.evaluate(

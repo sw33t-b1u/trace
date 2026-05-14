@@ -122,12 +122,8 @@ class TestRule6FormatDrift:
 
     def test_format_match_no_warning(self):
         """Both sides declare the same format — no Rule-6 WARNING."""
-        beacon = _beacon_schema(
-            {"valid_from": {"type": "string", "format": "date"}}, required=[]
-        )
-        trace = _trace_schema(
-            {"valid_from": {"type": "string", "format": "date"}}, required=[]
-        )
+        beacon = _beacon_schema({"valid_from": {"type": "string", "format": "date"}}, required=[])
+        trace = _trace_schema({"valid_from": {"type": "string", "format": "date"}}, required=[])
         _, warnings = drift.check_drift(beacon, trace)
         assert not any("RULE 6" in w for w in warnings)
 
@@ -136,11 +132,7 @@ class TestRule6FormatDrift:
         `valid_until: string` surfaces Rule-6 from inside the anyOf branch."""
         beacon = _beacon_schema({"valid_until": {"type": "string"}}, required=[])
         trace = _trace_schema(
-            {
-                "valid_until": {
-                    "anyOf": [{"type": "string", "format": "date"}, {"type": "null"}]
-                }
-            },
+            {"valid_until": {"anyOf": [{"type": "string", "format": "date"}, {"type": "null"}]}},
             required=[],
         )
         _, warnings = drift.check_drift(beacon, trace)
