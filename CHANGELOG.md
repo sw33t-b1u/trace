@@ -12,7 +12,6 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ### Added — Taxonomy enrichment for PIR binding
 
-Paired release with SAGE 0.10.0 (no code changes in SAGE required).
 Fixes the silent zero-ingest issue where `run_etl --manual-bundle` dropped
 all actors/edges because TRACE bundles lacked the PIR vocabulary tags
 (`apt-china`, `apt-russia`, …) that SAGE's `pir_filter.is_relevant_actor`
