@@ -28,7 +28,6 @@ import json
 import os
 import sys
 import tempfile
-from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
@@ -36,6 +35,7 @@ import structlog
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from trace_engine.cli._logging import configure as configure_logging  # noqa: E402
+from trace_engine.crawler.taxonomy_sync import ensure_taxonomy_fresh  # noqa: E402
 
 configure_logging()
 logger = structlog.get_logger(__name__)
@@ -111,13 +111,6 @@ def main() -> None:
         sys.exit(3)
 
     upstream_meta = data.get("_metadata", {}) if isinstance(data.get("_metadata"), dict) else {}
-    data["_trace_cache"] = {
-        "source": str(args.source),
-        "cached_at": datetime.now(tz=UTC).isoformat(timespec="seconds"),
-        "upstream_last_auto_sync": upstream_meta.get("last_auto_sync"),
-        "upstream_generator": upstream_meta.get("generator"),
-    }
-
     actor_count = sum(
         len(v) if isinstance(v, dict) else 1 for v in data["actor_categories"].values()
     )
@@ -147,15 +140,7 @@ def main() -> None:
         )
         return
 
-    _atomic_write_json(args.output, data)
-    logger.info(
-        "taxonomy_cache_updated",
-        source=str(args.source),
-        output=str(args.output),
-        upstream_last_auto_sync=upstream_meta.get("last_auto_sync"),
-        actor_categories=actor_count,
-        geographies=geo_count,
-    )
+    ensure_taxonomy_fresh(args.source, args.output)
     print(
         f"Cached {args.source} → {args.output}\n"
         f"  actor_categories={actor_count}, geographies={geo_count}, "
