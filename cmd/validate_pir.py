@@ -7,8 +7,8 @@ Layers:
      and asset-tag match for ``asset_weight_rules`` when ``--assets`` is
      supplied.
 
-Supersedes the schema-only ``BEACON/cmd/validate_pir.py``; that command is
-kept for one BEACON release as a deprecation stub.
+Supersedes the schema-only ``BEACON/cmd/validate_pir.py``, which shipped as
+a deprecation stub in BEACON 0.9.x and was deleted in BEACON 0.10.0.
 
 Usage:
     uv run python cmd/validate_pir.py --pir pir_output.json
