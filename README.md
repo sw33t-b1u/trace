@@ -74,8 +74,9 @@ When `--pir` is supplied, articles are filtered through a lightweight relevance 
 | Data model | [data-model.md](docs/data-model.md) / [ja](docs/data-model.ja.md) | Validation contracts: `assets.json`, `pir_output.json`, STIX bundle, `ValidationFinding` |
 | Crawl design | [crawl_design.md](docs/crawl_design.md) / [ja](docs/crawl_design.ja.md) | `sources.yaml` schema (with annotated example), `crawl_state.json` semantics, L2/L3/L4 flow, dedupe strategy |
 | Dependencies | [dependencies.md](docs/dependencies.md) / [ja](docs/dependencies.ja.md) | Dependency rationale and license information |
-| BEACON handoff | [beacon_handoff.md](docs/beacon_handoff.md) | What moved out of BEACON and why |
-| `high-level-design.md` | local-only; gitignored | Architecture, data model, algorithms |
+| BEACON handoff | [beacon_handoff.md](docs/beacon_handoff.md) / [ja](docs/beacon_handoff.ja.md) | What moved out of BEACON and why |
+| Directory structure | [structure.md](docs/structure.md) / [ja](docs/structure.ja.md) | Top-level layout and Rule 26 adaptation notes |
+| `docs/high-level-design.md` | local-only; gitignored | Architecture, data model, algorithms |
 
 ## Quick Start
 

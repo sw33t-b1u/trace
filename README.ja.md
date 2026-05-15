@@ -74,8 +74,9 @@ CTI ベンダーブログ・ニュース記事・PDF レポート・任意の UR
 | Data model | [ja](docs/data-model.ja.md) / [en](docs/data-model.md) | 検証契約: `assets.json`, `pir_output.json`, STIX バンドル, `ValidationFinding` |
 | Crawl 設計 | [ja](docs/crawl_design.ja.md) / [en](docs/crawl_design.md) | `sources.yaml` スキーマ（注釈付き例）・`crawl_state.json` 意味論・L2/L3/L4 フロー・dedupe 戦略 |
 | Dependencies | [ja](docs/dependencies.ja.md) / [en](docs/dependencies.md) | 依存ライブラリの採用理由とライセンス |
-| BEACON 移管 | [beacon_handoff.md](docs/beacon_handoff.md) | BEACON から移管した範囲とその理由 |
-| `high-level-design.md` | local-only / gitignored | アーキテクチャ・データモデル・主要アルゴリズム |
+| BEACON 移管 | [ja](docs/beacon_handoff.ja.md) / [en](docs/beacon_handoff.md) | BEACON から移管した範囲とその理由 |
+| ディレクトリ構成 | [ja](docs/structure.ja.md) / [en](docs/structure.md) | トップレベル構成と Rule 26 からの逸脱記録 |
+| `docs/high-level-design.md` | local-only / gitignored | アーキテクチャ・データモデル・主要アルゴリズム |
 
 ## クイックスタート
 
