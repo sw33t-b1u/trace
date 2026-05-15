@@ -1,5 +1,7 @@
 # TRACE — Setup Guide
 
+> 動作確認済 Python: 3.12
+
 Japanese translation: [`docs/setup.ja.md`](setup.ja.md)
 
 For data flow / responsibility split with BEACON / SAGE, see `high-level-design.md`.
