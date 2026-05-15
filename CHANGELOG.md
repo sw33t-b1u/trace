@@ -8,6 +8,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ## [Unreleased]
 
+### Changed — RULES.md compliance pass
+
+- `.env.example` now documents every `TRACE_*` env var read by `Config.from_env()`,
+  including the 1.7.0 taxonomy-sync settings and the previously undocumented
+  `TRACE_CRAWL_CONCURRENCY` / `TRACE_EXTERNAL_REF_HASH_*` /
+  `TRACE_EXTRACTION_CHUNK_CHARS` (Rule 24).
+- `docs/beacon_handoff.ja.md` added as the Japanese counterpart of
+  `docs/beacon_handoff.md` (Rule 11).
+- `docs/structure.md` + `docs/structure.ja.md` added to document TRACE's
+  top-level layout and the `src/` deviation from Rule 26's suggested
+  `internal/` / `pkg/` shape.
+- `high-level-design.md` moved from project root to `docs/` so the location
+  matches Rule 27. `.gitignore` updated to keep the new path out of VCS
+  per maintainer policy. README links updated.
+
 ## [1.7.0] — 2026-05-15
 
 ### Added — Taxonomy enrichment for PIR binding
