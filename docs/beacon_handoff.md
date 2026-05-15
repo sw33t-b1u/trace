@@ -1,5 +1,7 @@
 # BEACON → TRACE migration handoff
 
+Japanese translation: [`docs/beacon_handoff.ja.md`](beacon_handoff.ja.md)
+
 This note records what moved out of BEACON when TRACE was introduced
 (BEACON 0.9.0 / TRACE 0.1.0), the rationale, and how to find the new home
 of each piece.
