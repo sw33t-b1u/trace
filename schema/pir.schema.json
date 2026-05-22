@@ -1,17 +1,122 @@
 {
   "$defs": {
+    "ActorRationale": {
+      "additionalProperties": true,
+      "description": "Human-readable and structured rationale for ActorTriageEntry.",
+      "properties": {
+        "capability_factors": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Capability Factors",
+          "type": "object"
+        },
+        "intent_factors": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Intent Factors",
+          "type": "object"
+        },
+        "opportunity_factors": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Opportunity Factors",
+          "type": "object"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "ActorRationale",
+      "type": "object"
+    },
+    "ActorScoreBreakdown": {
+      "additionalProperties": true,
+      "description": "Structured score breakdown for ActorTriageEntry.",
+      "properties": {
+        "capability": {
+          "$ref": "#/$defs/ScoreComponent"
+        },
+        "data_quality": {
+          "$ref": "#/$defs/DataQuality"
+        },
+        "intent": {
+          "$ref": "#/$defs/ScoreComponent"
+        },
+        "opportunity": {
+          "$ref": "#/$defs/ScoreComponent"
+        }
+      },
+      "required": [
+        "intent",
+        "capability",
+        "opportunity"
+      ],
+      "title": "ActorScoreBreakdown",
+      "type": "object"
+    },
+    "ActorTriageEntry": {
+      "additionalProperties": true,
+      "description": "Single actor triage entry from BEACON 0.15.0 ``prioritized_actors[]``.\n\nBEACON 0.15.0+ emits one entry per scored threat actor; TRACE 1.8.0+\nvalidates each entry.  ``extra='allow'`` ensures forward compatibility\nwith future BEACON sub-fields without requiring a TRACE version bump.\nCanonical sub-factor names (per plan §3.3):\n  Capability: ttp_count_norm, sophistication_score, recency_active_campaigns_90d\n  Opportunity: victimology_match, geographic_match, surface_ttp_coverage",
+      "properties": {
+        "actor_id": {
+          "minLength": 1,
+          "title": "Actor Id",
+          "type": "string"
+        },
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        },
+        "likelihood": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Likelihood",
+          "type": "number"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "rationale": {
+          "$ref": "#/$defs/ActorRationale"
+        },
+        "score_breakdown": {
+          "$ref": "#/$defs/ActorScoreBreakdown"
+        }
+      },
+      "required": [
+        "actor_id",
+        "name",
+        "likelihood",
+        "score_breakdown",
+        "rationale"
+      ],
+      "title": "ActorTriageEntry",
+      "type": "object"
+    },
     "AssetWeightRule": {
       "additionalProperties": false,
       "properties": {
-        "tag": {
-          "minLength": 1,
-          "title": "Tag",
-          "type": "string"
-        },
         "criticality_multiplier": {
           "exclusiveMinimum": 0.0,
           "title": "Criticality Multiplier",
           "type": "number"
+        },
+        "tag": {
+          "minLength": 1,
+          "title": "Tag",
+          "type": "string"
         }
       },
       "required": [
@@ -20,51 +125,54 @@
       ],
       "title": "AssetWeightRule",
       "type": "object"
+    },
+    "DataQuality": {
+      "additionalProperties": true,
+      "description": "Data quality metadata for actor triage entries.",
+      "properties": {
+        "degraded": {
+          "default": false,
+          "title": "Degraded",
+          "type": "boolean"
+        },
+        "missing_sources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missing Sources",
+          "type": "array"
+        }
+      },
+      "title": "DataQuality",
+      "type": "object"
+    },
+    "ScoreComponent": {
+      "additionalProperties": true,
+      "description": "Generic I×C×O score component — extra='allow' for forward compat.\n\nUsed for intent / capability / opportunity sub-breakdowns in\nActorTriageEntry.  Sub-factor fields (motivation_alignment, ttp_count_norm\netc.) are accepted via extra='allow' without explicit enumeration so\nfuture BEACON sub-factors are validated without schema breakage.",
+      "properties": {
+        "score": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "score"
+      ],
+      "title": "ScoreComponent",
+      "type": "object"
     }
   },
   "additionalProperties": true,
   "description": "Single PIR entry.\n\nMirrors SAGE's ``PIRFilter.from_file`` consumer in shape, while\naccepting the richer field set BEACON's generator emits\n(``intelligence_level``, ``rationale``, ``risk_score`` etc.) so\nBEACON-authored PIRs round-trip without loss.",
   "properties": {
-    "pir_id": {
-      "minLength": 1,
-      "title": "Pir Id",
-      "type": "string"
-    },
-    "threat_actor_tags": {
-      "items": {
-        "type": "string"
-      },
-      "title": "Threat Actor Tags",
-      "type": "array"
-    },
     "asset_weight_rules": {
       "items": {
         "$ref": "#/$defs/AssetWeightRule"
       },
       "title": "Asset Weight Rules",
       "type": "array"
-    },
-    "valid_from": {
-      "format": "date",
-      "title": "Valid From",
-      "type": "string"
-    },
-    "valid_until": {
-      "format": "date",
-      "title": "Valid Until",
-      "type": "string"
-    },
-    "organizational_scope": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Organizational Scope"
     },
     "description": {
       "anyOf": [
@@ -89,6 +197,47 @@
       ],
       "default": null,
       "title": "Intelligence Level"
+    },
+    "organizational_scope": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Organizational Scope"
+    },
+    "pir_id": {
+      "minLength": 1,
+      "title": "Pir Id",
+      "type": "string"
+    },
+    "prioritized_actors": {
+      "items": {
+        "$ref": "#/$defs/ActorTriageEntry"
+      },
+      "title": "Prioritized Actors",
+      "type": "array"
+    },
+    "threat_actor_tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Threat Actor Tags",
+      "type": "array"
+    },
+    "valid_from": {
+      "format": "date",
+      "title": "Valid From",
+      "type": "string"
+    },
+    "valid_until": {
+      "format": "date",
+      "title": "Valid Until",
+      "type": "string"
     }
   },
   "required": [

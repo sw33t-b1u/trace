@@ -32,7 +32,9 @@ def main() -> int:
 
 
 def _write(path: Path, schema: dict) -> None:
-    path.write_text(json.dumps(schema, ensure_ascii=False, indent=2), encoding="utf-8")
+    # sort_keys=True ensures byte-identical output across runs (idempotent).
+    content = json.dumps(schema, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    path.write_text(content, encoding="utf-8")
     print(f"Written: {path}")
 
 

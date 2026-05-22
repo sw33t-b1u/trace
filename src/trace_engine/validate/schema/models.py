@@ -98,6 +98,72 @@ class AssetWeightRule(_StrictModel):
     criticality_multiplier: float = Field(gt=0.0)
 
 
+# ---------------------------------------------------------------------------
+# Actor triage (BEACON 0.15.0 / TRACE 1.8.0 — Phase 5)
+# ---------------------------------------------------------------------------
+
+
+class ScoreComponent(BaseModel):
+    """Generic I×C×O score component — extra='allow' for forward compat.
+
+    Used for intent / capability / opportunity sub-breakdowns in
+    ActorTriageEntry.  Sub-factor fields (motivation_alignment, ttp_count_norm
+    etc.) are accepted via extra='allow' without explicit enumeration so
+    future BEACON sub-factors are validated without schema breakage.
+    """
+
+    model_config = ConfigDict(extra="allow")
+    score: float = Field(ge=0.0, le=1.0)
+
+
+class DataQuality(BaseModel):
+    """Data quality metadata for actor triage entries."""
+
+    model_config = ConfigDict(extra="allow")
+    degraded: bool = False
+    missing_sources: list[str] = Field(default_factory=list)
+
+
+class ActorScoreBreakdown(BaseModel):
+    """Structured score breakdown for ActorTriageEntry."""
+
+    model_config = ConfigDict(extra="allow")
+    intent: ScoreComponent
+    capability: ScoreComponent
+    opportunity: ScoreComponent
+    data_quality: DataQuality = Field(default_factory=DataQuality)
+
+
+class ActorRationale(BaseModel):
+    """Human-readable and structured rationale for ActorTriageEntry."""
+
+    model_config = ConfigDict(extra="allow")
+    text: str
+    intent_factors: dict[str, float] = Field(default_factory=dict)
+    capability_factors: dict[str, float] = Field(default_factory=dict)
+    opportunity_factors: dict[str, float] = Field(default_factory=dict)
+
+
+class ActorTriageEntry(BaseModel):
+    """Single actor triage entry from BEACON 0.15.0 ``prioritized_actors[]``.
+
+    BEACON 0.15.0+ emits one entry per scored threat actor; TRACE 1.8.0+
+    validates each entry.  ``extra='allow'`` ensures forward compatibility
+    with future BEACON sub-fields without requiring a TRACE version bump.
+    Canonical sub-factor names (per plan §3.3):
+      Capability: ttp_count_norm, sophistication_score, recency_active_campaigns_90d
+      Opportunity: victimology_match, geographic_match, surface_ttp_coverage
+    """
+
+    model_config = ConfigDict(extra="allow")
+    actor_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    aliases: list[str] = Field(default_factory=list)
+    likelihood: float = Field(ge=0.0, le=1.0)
+    score_breakdown: ActorScoreBreakdown
+    rationale: ActorRationale
+
+
 class PIRItem(BaseModel):
     """Single PIR entry.
 
@@ -118,6 +184,9 @@ class PIRItem(BaseModel):
     organizational_scope: str | None = None
     description: str | None = None
     intelligence_level: str | None = None  # strategic / operational / tactical
+    # Actor triage — BEACON 0.15.0+ emits this field; legacy PIR omits it.
+    # default_factory=list preserves backward compat with pre-0.15.0 PIR files.
+    prioritized_actors: list[ActorTriageEntry] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_validity_window(self) -> PIRItem:

@@ -6,6 +6,27 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.8.0] - 2026-05-22
+
+### Added — Actor triage validation for `prioritized_actors[]`
+
+- `ActorTriageEntry`, `ScoreComponent`, `ActorScoreBreakdown`, `ActorRationale`,
+  `DataQuality` Pydantic models added to `validate/schema/models.py`.
+- `PIRItem.prioritized_actors: list[ActorTriageEntry]` field added (default `[]`
+  for backward compat — legacy PIR without this field validates cleanly).
+- `schema/pir.schema.json` regenerated to include `ActorTriageEntry` and sub-models
+  with native `minimum`/`maximum` bounds on `likelihood` (sourced from BEACON 0.15.0
+  commit `94fd299`; plan §7 Phase 5).
+- `cmd/generate_schemas.py` uses `sort_keys=True` for byte-identical idempotent output.
+- Tests: `tests/test_validate_pir_actor_triage.py` — backward compat, valid actor
+  entries, rejection of out-of-range likelihood, missing required fields.
+
+### Paired release
+
+BEACON 0.15.0 emits `prioritized_actors[]` via I×C×O actor triage (plan §7 Phase 3–5).
+TRACE 1.8.0 accepts and validates this field; rejects malformed entries.
+Consumers of legacy PIR (no `prioritized_actors` key) are unaffected.
+
 ## [Unreleased]
 
 ### Changed — RULES.md compliance pass
