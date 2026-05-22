@@ -6,6 +6,17 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.8.1] - 2026-05-22
+
+Security patch release.
+
+### Security
+
+- Pin `idna>=3.15` to mitigate CVE-2026-45409 (GHSA-65pc-fj4g-8rjx). The previous
+  transitive resolution to idna 3.13 was vulnerable to specially crafted inputs that
+  could bypass the CVE-2024-3651 fix.
+- Paired security release: BEACON 0.15.1 + SAGE 0.10.1 ship the same patch.
+
 ## [1.8.0] - 2026-05-22
 
 ### Added — Actor triage validation for `prioritized_actors[]`

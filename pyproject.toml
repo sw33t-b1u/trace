@@ -1,6 +1,6 @@
 [project]
 name = "trace"
-version = "1.8.0"
+version = "1.8.1"
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.0",
@@ -12,6 +12,7 @@ dependencies = [
     "stix2-validator>=3.2",  # OASIS cti-stix-validator
     "pyyaml>=6.0",  # input/sources.yaml parsing
     "python-dotenv>=1.0",  # load .env into os.environ at startup
+    "idna>=3.15",  # CVE-2026-45409 fix; transitive via anyio/httpx
 ]
 
 [project.optional-dependencies]
