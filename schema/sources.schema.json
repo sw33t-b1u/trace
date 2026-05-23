@@ -1,0 +1,99 @@
+{
+  "$defs": {
+    "SourceEntry": {
+      "additionalProperties": false,
+      "description": "One entry in ``input/sources.yaml``.\n\nFields beyond ``url`` are optional and supply per-source policy used by\n``cmd/crawl_batch.py``.",
+      "properties": {
+        "feed_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "html",
+                "rss",
+                "atom"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional override for the URL's feed type. When unset, ``crawler/feed_detector.py`` infers the type from the HTTP Content-Type header. Set this only when an upstream server returns an incorrect Content-Type (e.g. ``application/octet-stream`` for an RSS feed) and feed expansion is required.",
+          "title": "Feed Type"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "max_chars": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Chars"
+        },
+        "pir_ids": {
+          "description": "Optional restriction: only run the L2 relevance gate against these PIR ids. Empty list (default) means evaluate against all PIRs.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Pir Ids",
+          "type": "array"
+        },
+        "task": {
+          "default": "medium",
+          "enum": [
+            "simple",
+            "medium",
+            "complex"
+          ],
+          "title": "Task",
+          "type": "string"
+        },
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "SourceEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/SourceEntry"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "version": {
+      "default": 1,
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "title": "SourcesDocument",
+  "type": "object"
+}
