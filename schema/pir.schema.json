@@ -146,6 +146,91 @@
       "title": "DataQuality",
       "type": "object"
     },
+    "PIRItem": {
+      "additionalProperties": true,
+      "description": "Single PIR entry.\n\nMirrors SAGE's ``PIRFilter.from_file`` consumer in shape, while\naccepting the richer field set BEACON's generator emits\n(``intelligence_level``, ``rationale``, ``risk_score`` etc.) so\nBEACON-authored PIRs round-trip without loss.",
+      "properties": {
+        "asset_weight_rules": {
+          "items": {
+            "$ref": "#/$defs/AssetWeightRule"
+          },
+          "title": "Asset Weight Rules",
+          "type": "array"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "intelligence_level": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Intelligence Level"
+        },
+        "organizational_scope": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Organizational Scope"
+        },
+        "pir_id": {
+          "minLength": 1,
+          "title": "Pir Id",
+          "type": "string"
+        },
+        "prioritized_actors": {
+          "items": {
+            "$ref": "#/$defs/ActorTriageEntry"
+          },
+          "title": "Prioritized Actors",
+          "type": "array"
+        },
+        "threat_actor_tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Threat Actor Tags",
+          "type": "array"
+        },
+        "valid_from": {
+          "format": "date",
+          "title": "Valid From",
+          "type": "string"
+        },
+        "valid_until": {
+          "format": "date",
+          "title": "Valid Until",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pir_id",
+        "valid_from",
+        "valid_until"
+      ],
+      "title": "PIRItem",
+      "type": "object"
+    },
     "ScoreComponent": {
       "additionalProperties": true,
       "description": "Generic I×C×O score component — extra='allow' for forward compat.\n\nUsed for intent / capability / opportunity sub-breakdowns in\nActorTriageEntry.  Sub-factor fields (motivation_alignment, ttp_count_norm\netc.) are accepted via extra='allow' without explicit enumeration so\nfuture BEACON sub-factors are validated without schema breakage.",
@@ -165,86 +250,25 @@
     }
   },
   "additionalProperties": true,
-  "description": "Single PIR entry.\n\nMirrors SAGE's ``PIRFilter.from_file`` consumer in shape, while\naccepting the richer field set BEACON's generator emits\n(``intelligence_level``, ``rationale``, ``risk_score`` etc.) so\nBEACON-authored PIRs round-trip without loss.",
+  "description": "Document-level schema for pir_output.json (BEACON 0.16.0+).\n\nMirrors BEACON's PIROutputDocument shape for drift-check alignment.\nschema_version is optional (for backward compat with pre-0.16.0 files);\npirs holds the ordered list of PIR decision-point records.",
   "properties": {
-    "asset_weight_rules": {
+    "pirs": {
       "items": {
-        "$ref": "#/$defs/AssetWeightRule"
+        "$ref": "#/$defs/PIRItem"
       },
-      "title": "Asset Weight Rules",
+      "title": "Pirs",
       "type": "array"
     },
-    "description": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Description"
-    },
-    "intelligence_level": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Intelligence Level"
-    },
-    "organizational_scope": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "default": null,
-      "title": "Organizational Scope"
-    },
-    "pir_id": {
-      "minLength": 1,
-      "title": "Pir Id",
-      "type": "string"
-    },
-    "prioritized_actors": {
-      "items": {
-        "$ref": "#/$defs/ActorTriageEntry"
-      },
-      "title": "Prioritized Actors",
-      "type": "array"
-    },
-    "threat_actor_tags": {
-      "items": {
-        "type": "string"
-      },
-      "title": "Threat Actor Tags",
-      "type": "array"
-    },
-    "valid_from": {
-      "format": "date",
-      "title": "Valid From",
-      "type": "string"
-    },
-    "valid_until": {
-      "format": "date",
-      "title": "Valid Until",
+    "schema_version": {
+      "default": "0.16.0",
+      "description": "Semantic version of the pir_output schema.",
+      "title": "Schema Version",
       "type": "string"
     }
   },
   "required": [
-    "pir_id",
-    "valid_from",
-    "valid_until"
+    "pirs"
   ],
-  "title": "PIRItem",
+  "title": "PIROutputDocument",
   "type": "object"
 }

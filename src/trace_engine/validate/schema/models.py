@@ -200,12 +200,39 @@ class PIRItem(BaseModel):
 
 class PIRDocument(RootModel[list[PIRItem]]):
     """A PIR file is a JSON list of PIRItem (single-object form is normalized
-    to a one-element list before validation)."""
+    to a one-element list before validation).
+
+    BEACON 0.16.0+ emits a wrapped object {"schema_version": ..., "pirs": [...]};
+    from_payload extracts pirs[] transparently so downstream consumers are
+    unaffected by the format change.
+    """
 
     @classmethod
     def from_payload(cls, payload: object) -> PIRDocument:
-        items = payload if isinstance(payload, list) else [payload]
+        if isinstance(payload, dict) and "pirs" in payload:
+            # BEACON 0.16.0+ wrapped format — extract the list
+            items = payload["pirs"]
+        elif isinstance(payload, list):
+            items = payload
+        else:
+            items = [payload]
         return cls.model_validate(items)
+
+
+class PIROutputDocument(BaseModel):
+    """Document-level schema for pir_output.json (BEACON 0.16.0+).
+
+    Mirrors BEACON's PIROutputDocument shape for drift-check alignment.
+    schema_version is optional (for backward compat with pre-0.16.0 files);
+    pirs holds the ordered list of PIR decision-point records.
+    """
+
+    model_config = ConfigDict(extra="allow")
+    schema_version: str = Field(
+        default="0.16.0",
+        description="Semantic version of the pir_output schema.",
+    )
+    pirs: list[PIRItem]
 
 
 # ---------------------------------------------------------------------------
