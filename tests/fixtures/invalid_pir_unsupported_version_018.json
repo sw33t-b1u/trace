@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.18.0",
+  "pirs": [
+    {
+      "pir_id": "PIR-FUTURE-001",
+      "intelligence_level": "operational",
+      "threat_actor_tags": ["apt-china"],
+      "asset_weight_rules": [
+        {"tag": "external-facing", "criticality_multiplier": 2.0}
+      ],
+      "valid_from": "2026-05-23",
+      "valid_until": "2027-05-23",
+      "prioritized_actors": []
+    }
+  ]
+}

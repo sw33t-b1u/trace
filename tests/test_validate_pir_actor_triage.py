@@ -52,7 +52,7 @@ _VALID_ACTOR_ENTRY = {
             "score": 0.15,
             "sophistication_score": 0.667,
             "ttp_count_norm": 0.66,
-            "recency_active_campaigns_90d": 0.25,
+            "recency_active_campaigns": 0.25,
         },
         "opportunity": {
             "score": 0.03,
@@ -71,7 +71,7 @@ _VALID_ACTOR_ENTRY = {
         "capability_factors": {
             "sophistication_score": 0.667,
             "ttp_count_norm": 0.66,
-            "recency_active_campaigns_90d": 0.25,
+            "recency_active_campaigns": 0.25,
         },
         "opportunity_factors": {
             "victimology_match": 1.0,
@@ -297,7 +297,7 @@ def test_beacon_shaped_pir_passes_trace_validator():
                         "score": 0.14,
                         "sophistication_score": 0.667,
                         "ttp_count_norm": 0.82,
-                        "recency_active_campaigns_90d": 0.25,
+                        "recency_active_campaigns": 0.25,
                     },
                     "opportunity": {
                         "score": 0.02,
@@ -313,7 +313,7 @@ def test_beacon_shaped_pir_passes_trace_validator():
                     "capability_factors": {
                         "sophistication_score": 0.667,
                         "ttp_count_norm": 0.82,
-                        "recency_active_campaigns_90d": 0.25,
+                        "recency_active_campaigns": 0.25,
                     },
                     "opportunity_factors": {
                         "victimology_match": 1.0,
@@ -360,15 +360,30 @@ class TestActorTriageEntryDirectly:
             ScoreComponent.model_validate({"score": -0.001})
 
     def test_score_component_accepts_enumerated_sub_factors(self):
-        """Canonical sub-factor names listed on ``ScoreComponent`` pass."""
+        """Canonical sub-factor names listed on ``ScoreComponent`` pass.
+
+        The Capability ``recency_active_campaigns`` name reflects the
+        Initiative F (TRACE 1.10.0) rename; payloads gated to
+        schema_version 0.16.0 still use the legacy ``_90d`` suffix,
+        which the ``PIROutputDocument`` per-version normaliser rewrites
+        to this canonical key before validation.
+        """
         from trace_engine.validate.schema import ScoreComponent  # noqa: PLC0415
 
         sc = ScoreComponent.model_validate(
-            {"score": 0.5, "ttp_count_norm": 0.9, "recency_active_campaigns_90d": 0.25}
+            {"score": 0.5, "ttp_count_norm": 0.9, "recency_active_campaigns": 0.25}
         )
         assert sc.score == 0.5
         assert sc.ttp_count_norm == pytest.approx(0.9)
-        assert sc.recency_active_campaigns_90d == pytest.approx(0.25)
+        assert sc.recency_active_campaigns == pytest.approx(0.25)
+
+    def test_score_component_rejects_legacy_recency_field_directly(self):
+        """The bare model has no alias for the renamed field — extra='forbid'."""
+        from trace_engine.validate.schema import ScoreComponent  # noqa: PLC0415
+
+        with pytest.raises(ValidationError) as exc:
+            ScoreComponent.model_validate({"score": 0.5, "recency_active_campaigns_90d": 0.25})
+        assert "recency_active_campaigns_90d" in str(exc.value)
 
     def test_score_component_rejects_unknown_sub_factor(self):
         """TRACE 1.9.0 strict mode — unknown sub-factor keys raise."""

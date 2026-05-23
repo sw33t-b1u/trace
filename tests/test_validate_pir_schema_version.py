@@ -142,8 +142,11 @@ class TestSchemaVersionGate:
         assert "'0.15.0'" in msg
 
     def test_unsupported_higher_version_rejected(self):
+        # 0.17.0 was added to the supported set by Initiative F Phase 6;
+        # 0.18.0 stays out so the gate still fires for unannounced
+        # producer schema bumps.
         payload = {
-            "schema_version": "0.17.0",
+            "schema_version": "0.18.0",
             "pirs": [
                 {
                     "pir_id": "PIR-FUTURE-001",
@@ -160,7 +163,7 @@ class TestSchemaVersionGate:
             PIROutputDocument.model_validate(payload)
         msg = str(exc.value)
         assert "unsupported schema version" in msg
-        assert "'0.17.0'" in msg
+        assert "'0.18.0'" in msg
 
     def test_unsupported_version_rejected_via_from_payload(self):
         payload = _load("invalid_pir_unsupported_version.json")

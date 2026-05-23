@@ -113,12 +113,20 @@ class ScoreComponent(BaseModel):
     sub-factor requires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and
     extending this model.
 
-    Sub-factor sets (per plan §3.3 + Initiative E §2.3/§2.4):
+    Sub-factor sets (per plan §3.3 + Initiative E §2.3/§2.4 + Initiative F §3):
       Intent:       motivation_alignment, industry_match
       Capability:   ttp_count_norm, sophistication_score,
-                    recency_active_campaigns_90d, tool_sophistication,
+                    recency_active_campaigns, tool_sophistication,
                     targeting_persistence, evasion_capability, depth, breadth
       Opportunity:  victimology_match, geographic_match, surface_ttp_coverage
+
+    Field rename (Initiative F / TRACE 1.10.0 paired with BEACON 0.17.0):
+      ``recency_active_campaigns_90d`` → ``recency_active_campaigns``.
+      No Pydantic alias is exposed; the per-version normaliser on
+      ``PIROutputDocument`` rewrites ``_90d``-suffixed keys to the
+      canonical name for ``schema_version == "0.16.0"`` and rejects the
+      legacy key for ``"0.17.0"``. The schema_version gate enforces a
+      clean transition rather than indefinitely tolerating both names.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -132,7 +140,7 @@ class ScoreComponent(BaseModel):
     # Depth × Breadth aggregation introduced in BEACON 0.16.0 / plan §2.4).
     ttp_count_norm: float | None = Field(default=None, ge=0.0, le=1.0)
     sophistication_score: float | None = Field(default=None, ge=0.0, le=1.0)
-    recency_active_campaigns_90d: float | None = Field(default=None, ge=0.0, le=1.0)
+    recency_active_campaigns: float | None = Field(default=None, ge=0.0, le=1.0)
     tool_sophistication: float | None = Field(default=None, ge=0.0, le=1.0)
     targeting_persistence: float | None = Field(default=None, ge=0.0, le=1.0)
     evasion_capability: float | None = Field(default=None, ge=0.0, le=1.0)
@@ -179,8 +187,8 @@ class ActorTriageEntry(BaseModel):
     BEACON 0.15.0+ emits one entry per scored threat actor; TRACE 1.8.0+
     validates each entry.  ``extra='allow'`` ensures forward compatibility
     with future BEACON sub-fields without requiring a TRACE version bump.
-    Canonical sub-factor names (per plan §3.3):
-      Capability: ttp_count_norm, sophistication_score, recency_active_campaigns_90d
+    Canonical sub-factor names (per plan §3.3, renamed in Initiative F §3):
+      Capability: ttp_count_norm, sophistication_score, recency_active_campaigns
       Opportunity: victimology_match, geographic_match, surface_ttp_coverage
     """
 
@@ -255,9 +263,66 @@ class PIRDocument(RootModel[list[PIRItem]]):
 # Version negotiation: only ``schema_version`` values listed here are accepted
 # in wrapped ``pir_output.json`` bundles.  A set is used (rather than an
 # equality check) so future minor releases — Initiative F adds ``"0.17.0"``
-# without refactoring per plan §6 Phase 4 forward-compat note — can extend the
+# alongside Initiative E's ``"0.16.0"`` per plan §6 Phase 6 — can extend the
 # supported window in one line.
-SUPPORTED_PIR_SCHEMA_VERSIONS: set[str] = {"0.16.0"}
+SUPPORTED_PIR_SCHEMA_VERSIONS: set[str] = {"0.16.0", "0.17.0"}
+
+
+# Initiative F (TRACE 1.10.0): the Capability sub-factor
+# ``recency_active_campaigns_90d`` was renamed to
+# ``recency_active_campaigns`` in BEACON 0.17.0 / schema_version 0.17.0.
+# The per-version normaliser below rewrites the legacy key to the
+# canonical name for 0.16.0 payloads and rejects the legacy key for
+# 0.17.0 payloads. No Pydantic alias is exposed on ``ScoreComponent`` so
+# the schema_version gate is the single source of truth.
+_RECENCY_LEGACY = "recency_active_campaigns_90d"
+_RECENCY_CURRENT = "recency_active_campaigns"
+
+
+def _normalise_capability_recency(payload: dict, schema_version: str) -> None:
+    """Rewrite or reject the recency sub-factor key in-place.
+
+    Walks ``pirs[*].prioritized_actors[*]`` and inspects
+    ``score_breakdown.capability`` plus ``rationale.capability_factors``.
+    Raises ``ValueError`` (caught by Pydantic as ValidationError) when a
+    payload mixes the schema version and field name.
+    """
+    pirs = payload.get("pirs")
+    if not isinstance(pirs, list):
+        return
+    for pir in pirs:
+        if not isinstance(pir, dict):
+            continue
+        for actor in pir.get("prioritized_actors") or []:
+            if not isinstance(actor, dict):
+                continue
+            capability = (actor.get("score_breakdown") or {}).get("capability")
+            if isinstance(capability, dict):
+                _apply_recency_rule(capability, schema_version, where="score_breakdown.capability")
+            factors = (actor.get("rationale") or {}).get("capability_factors")
+            if isinstance(factors, dict):
+                _apply_recency_rule(factors, schema_version, where="rationale.capability_factors")
+
+
+def _apply_recency_rule(target: dict, schema_version: str, *, where: str) -> None:
+    has_legacy = _RECENCY_LEGACY in target
+    has_current = _RECENCY_CURRENT in target
+    if schema_version == "0.16.0":
+        if has_current:
+            raise ValueError(
+                f"schema_version 0.16.0 must use {_RECENCY_LEGACY!r}, not "
+                f"{_RECENCY_CURRENT!r} (found in {where}); the field rename "
+                f"is gated to schema_version 0.17.0"
+            )
+        if has_legacy:
+            target[_RECENCY_CURRENT] = target.pop(_RECENCY_LEGACY)
+    elif schema_version == "0.17.0":
+        if has_legacy:
+            raise ValueError(
+                f"schema_version 0.17.0 must use {_RECENCY_CURRENT!r}, not "
+                f"{_RECENCY_LEGACY!r} (found in {where}); the field was "
+                f"renamed in Initiative F"
+            )
 
 
 class PIROutputDocument(BaseModel):
@@ -274,6 +339,16 @@ class PIROutputDocument(BaseModel):
         description="Semantic version of the pir_output schema.",
     )
     pirs: list[PIRItem]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalise_per_version(cls, data: object) -> object:
+        if not isinstance(data, dict):
+            return data
+        schema_version = data.get("schema_version")
+        if isinstance(schema_version, str) and schema_version in SUPPORTED_PIR_SCHEMA_VERSIONS:
+            _normalise_capability_recency(data, schema_version)
+        return data
 
     @field_validator("schema_version")
     @classmethod

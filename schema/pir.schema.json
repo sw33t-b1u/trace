@@ -63,7 +63,7 @@
     },
     "ActorTriageEntry": {
       "additionalProperties": true,
-      "description": "Single actor triage entry from BEACON 0.15.0 ``prioritized_actors[]``.\n\nBEACON 0.15.0+ emits one entry per scored threat actor; TRACE 1.8.0+\nvalidates each entry.  ``extra='allow'`` ensures forward compatibility\nwith future BEACON sub-fields without requiring a TRACE version bump.\nCanonical sub-factor names (per plan §3.3):\n  Capability: ttp_count_norm, sophistication_score, recency_active_campaigns_90d\n  Opportunity: victimology_match, geographic_match, surface_ttp_coverage",
+      "description": "Single actor triage entry from BEACON 0.15.0 ``prioritized_actors[]``.\n\nBEACON 0.15.0+ emits one entry per scored threat actor; TRACE 1.8.0+\nvalidates each entry.  ``extra='allow'`` ensures forward compatibility\nwith future BEACON sub-fields without requiring a TRACE version bump.\nCanonical sub-factor names (per plan §3.3, renamed in Initiative F §3):\n  Capability: ttp_count_norm, sophistication_score, recency_active_campaigns\n  Opportunity: victimology_match, geographic_match, surface_ttp_coverage",
       "properties": {
         "actor_id": {
           "minLength": 1,
@@ -233,7 +233,7 @@
     },
     "ScoreComponent": {
       "additionalProperties": false,
-      "description": "Generic I×C×O score component — strict mode (TRACE 1.9.0).\n\nUsed for intent / capability / opportunity sub-breakdowns in\nActorTriageEntry.  As of TRACE 1.9.0 (paired with BEACON 0.16.0) the\ncanonical sub-factor names are enumerated and ``extra='forbid'`` rejects\nunknown fields, catching typos and silent producer drift.  Adding a new\nsub-factor requires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and\nextending this model.\n\nSub-factor sets (per plan §3.3 + Initiative E §2.3/§2.4):\n  Intent:       motivation_alignment, industry_match\n  Capability:   ttp_count_norm, sophistication_score,\n                recency_active_campaigns_90d, tool_sophistication,\n                targeting_persistence, evasion_capability, depth, breadth\n  Opportunity:  victimology_match, geographic_match, surface_ttp_coverage",
+      "description": "Generic I×C×O score component — strict mode (TRACE 1.9.0).\n\nUsed for intent / capability / opportunity sub-breakdowns in\nActorTriageEntry.  As of TRACE 1.9.0 (paired with BEACON 0.16.0) the\ncanonical sub-factor names are enumerated and ``extra='forbid'`` rejects\nunknown fields, catching typos and silent producer drift.  Adding a new\nsub-factor requires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and\nextending this model.\n\nSub-factor sets (per plan §3.3 + Initiative E §2.3/§2.4 + Initiative F §3):\n  Intent:       motivation_alignment, industry_match\n  Capability:   ttp_count_norm, sophistication_score,\n                recency_active_campaigns, tool_sophistication,\n                targeting_persistence, evasion_capability, depth, breadth\n  Opportunity:  victimology_match, geographic_match, surface_ttp_coverage\n\nField rename (Initiative F / TRACE 1.10.0 paired with BEACON 0.17.0):\n  ``recency_active_campaigns_90d`` → ``recency_active_campaigns``.\n  No Pydantic alias is exposed; the per-version normaliser on\n  ``PIROutputDocument`` rewrites ``_90d``-suffixed keys to the\n  canonical name for ``schema_version == \"0.16.0\"`` and rejects the\n  legacy key for ``\"0.17.0\"``. The schema_version gate enforces a\n  clean transition rather than indefinitely tolerating both names.",
       "properties": {
         "breadth": {
           "anyOf": [
@@ -319,7 +319,7 @@
           "default": null,
           "title": "Motivation Alignment"
         },
-        "recency_active_campaigns_90d": {
+        "recency_active_campaigns": {
           "anyOf": [
             {
               "maximum": 1.0,
@@ -331,7 +331,7 @@
             }
           ],
           "default": null,
-          "title": "Recency Active Campaigns 90D"
+          "title": "Recency Active Campaigns"
         },
         "score": {
           "maximum": 1.0,
