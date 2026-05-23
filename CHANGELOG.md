@@ -6,6 +6,51 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.10.0] - 2026-05-24
+
+Initiative F (Temporal Window + Collection Plan + Summary API + RSS)
+release — paired with BEACON 0.17.0 + SAGE 0.12.0.
+
+### Added
+
+- **`schema/sources.schema.json`** (Phase 3, `ba2bf13`): JSON Schema
+  (draft 2020-12) for `input/sources.yaml`, regenerated from the
+  Pydantic `SourcesDocument` in `validate/schema/models.py`. Used by
+  BEACON tests via `jsonschema` to validate `sources_candidate.yaml`
+  output without crossing repo boundaries through Python imports.
+- **RSS/Atom feed expansion** (Phase 4, `a3378b1`):
+  `crawler/feed_detector.py` (Content-Type auto-detect:
+  `application/rss+xml` → rss; `application/atom+xml` → atom; HEAD
+  fallback to html on failure + warning); `crawler/feed_expander.py`
+  (feedparser-based RSS/Atom parsing); `crawler/retry.py` (3-retry
+  exponential backoff for transient feed failures); `crawler/batch.py`
+  wires feed detection + expansion + dedup. `feedparser>=6.0` added
+  to `pyproject.toml`. `crawl_state.json` continues to key by entry
+  URL (per-article), so dedup remains stable across feed refreshes.
+- **`sources.yaml.feed_type` optional override** (Phase 4,
+  `a3378b1`): operator can force `html|rss|atom` when servers return
+  incorrect Content-Type.
+- **`TRACE_FEED_MAX_ENTRIES` env var** (Phase 4, `a3378b1`, default
+  50): caps the number of entries expanded from a single RSS/Atom
+  feed per crawl run.
+- **`TRACE_FEED_SINCE_DAYS` env var** (Phase 4, `a3378b1`, default
+  90, falls back to `ACTIVITY_WINDOW_DAYS` if unset): filters feed
+  entries by `published` date. AND condition with max_entries cap.
+
+### Changed
+
+- **`SUPPORTED_PIR_SCHEMA_VERSIONS` extended to `{"0.16.0",
+  "0.17.0"}`** (Phase 6, `04f9e83`): both Initiative E and Initiative
+  F payloads validate. `PIROutputDocument` `mode="before"` normaliser
+  rewrites `recency_active_campaigns_90d` (0.16.0 legacy) → canonical
+  `recency_active_campaigns` (0.17.0). Cross-version contamination
+  (using 0.17.0 key under 0.16.0 schema_version, or vice versa) is
+  rejected in both `score_breakdown.capability` and
+  `rationale.capability_factors`.
+- **Unsupported version reject extended to `"0.18.0"`** (Phase 6,
+  `04f9e83`): previously rejected `"0.17.0"`; now `"0.17.0"` is
+  supported, `"0.18.0"` is the forward-compat reject target.
+
 ## [1.9.0] - 2026-05-23
 
 Initiative E (Actor Triage Phase 2) release — paired with BEACON 0.16.0 + SAGE 0.11.0.
