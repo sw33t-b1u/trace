@@ -6,6 +6,59 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.9.0] - 2026-05-23
+
+Initiative E (Actor Triage Phase 2) release — paired with BEACON 0.16.0 + SAGE 0.11.0.
+
+### Added — PIROutputDocument wrapper validation (Phase 3 cross-repo coord, commit 4d8fcbc)
+
+- `PIROutputDocument` Pydantic mirror model added to `validate/schema/models.py`
+  to track BEACON 0.16.0's new top-level wrapper shape
+  (`{"schema_version": ..., "pirs": [...]}`). Mirror keeps cross-repo schema
+  drift check (`make check-pir-schema-drift`) clean.
+- `PIRDocument.from_payload` now dispatches based on payload shape:
+  wrapped (`{"pirs": [...]}`) goes through `PIROutputDocument.model_validate`
+  (enforcing `schema_version`); bare list path retained for pre-0.16.0
+  artifacts (backward compat).
+- `schema/pir.schema.json` regenerated to match the wrapper shape.
+
+### Added — Strict ScoreComponent + schema_version gate (Phase 4, commit dbce72a)
+
+- `ScoreComponent` dropped `model_config = ConfigDict(extra="allow")` —
+  unknown sub-factor field names now rejected at validation time. Fields
+  enumerated exactly to match BEACON 0.16.0's producer:
+  `motivation_alignment`, `industry_match`, `victimology_match`,
+  `geographic_match`, `surface_ttp_coverage`, `sophistication_score`,
+  `ttp_count_norm`, `recency_active_campaigns_90d`, `tool_sophistication`,
+  `targeting_persistence`, `evasion_capability`, `depth`, `breadth`.
+- `SUPPORTED_PIR_SCHEMA_VERSIONS: set[str] = {"0.16.0"}` introduced at module
+  level. Bundles without `schema_version`, or with an unsupported version
+  (e.g., `"0.15.0"`, `"0.17.0"`), are now rejected with a clear error.
+  Implemented as `set[str]` (not equality) per Initiative F forward-compat
+  plan — F will add `"0.17.0"` without refactoring.
+- `ActorTriageEntry` and `ActorScoreBreakdown` retain `extra="allow"` for
+  forward compatibility with additive consumer fields.
+- 5 negative-case fixtures + 4 positive-case fixtures added to
+  `tests/fixtures/`.
+
+### Changed
+
+- `from_payload` semantics: previously extracted `pirs[]` silently from a
+  wrapped payload. Now routes through `PIROutputDocument` validation, which
+  enforces the `schema_version` gate. Callers that load a 0.16.0+ bundle
+  without a valid `schema_version` will receive a `ValidationError` instead
+  of a silent partial load.
+
+### Fixed
+
+- (none — `idna` pin shipped in 1.8.1)
+
+### Infrastructure
+
+- `.githooks/pre-commit` exports `UV_CACHE_DIR` to handle sandbox env
+  without writable global cache (harmonized with BEACON Phase 7 fix;
+  commit `f5fe37a`).
+
 ## [1.8.1] - 2026-05-22
 
 Security patch release.
