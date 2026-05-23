@@ -19,6 +19,7 @@ add a new dependency, update both files in the same commit.
 | `stix2-validator` | `>=3.2` | OASIS `cti-stix-validator`. Schema + best-practice checks on STIX 2.1 bundles before they enter SAGE. We layer local id/refcheck/kill-chain checks on top in `validate/semantic/stix_refcheck.py`. | BSD-3 |
 | `pyyaml` | `>=6.0` | Parser for `input/sources.yaml` (loaded via `crawler/sources.py`). | MIT |
 | `python-dotenv` | `>=1.0` | Load `.env` into `os.environ` at CLI startup so `GCP_PROJECT_ID`, `TRACE_GHE_TOKEN`, etc. are picked up without exporting manually. | BSD-3 |
+| `feedparser` | `>=6.0` | RSS / Atom feed expansion. `crawler/feed_detector.py` classifies a fetched URL as `html`/`rss`/`atom` by `Content-Type`, and `crawler/feed_expander.py` parses RSS/Atom payloads via feedparser to yield per-entry article URLs that the batch crawler then runs through the L2 PIR gate. Added in TRACE 1.10.0 (Initiative F). | BSD-2 |
 
 ## Development
 
@@ -33,7 +34,6 @@ add a new dependency, update both files in the same commit.
 
 | Package | Reason |
 |---------|--------|
-| `feedparser` | RSS / Atom expansion is not in the MVP. `sources.yaml` is a flat URL list. Re-evaluate when batch crawl operators ask for it. |
 | `sqlite3` (separate dep) | A single JSON state file with `tmp + os.replace` is sufficient at MVP scale. Re-evaluate if concurrent batch crawls become a requirement. |
 | `fastapi` / `uvicorn` | Web UI is deferred to Phase 2 of TRACE. Keeping the dependency surface small until that's actually built. |
 | `stix2` | TRACE assembles bundles as plain `dict` objects keyed by the STIX 2.1 spec; we don't need the full `stix2` object model. The OASIS validator covers spec compliance. |

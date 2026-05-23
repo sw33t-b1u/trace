@@ -117,6 +117,26 @@ class Config:
         )
     )
 
+    # RSS / Atom feed expansion (Initiative F — TRACE 1.10.0)
+    # ``feed_max_entries`` caps the per-feed entry count after expansion
+    # so a 10-year archive index doesn't dominate a batch run.
+    # ``feed_since_days`` discards entries older than ``now - N days``;
+    # both filters apply (AND) before the L2 PIR gate is invoked. The
+    # since-days default chains through ``ACTIVITY_WINDOW_DAYS`` so
+    # operators can move the time window for the whole pipeline by
+    # setting a single env var.
+    feed_max_entries: int = field(
+        default_factory=lambda: int(os.environ.get("TRACE_FEED_MAX_ENTRIES", "50"))
+    )
+    feed_since_days: int = field(
+        default_factory=lambda: int(
+            os.environ.get(
+                "TRACE_FEED_SINCE_DAYS",
+                os.environ.get("ACTIVITY_WINDOW_DAYS", "90"),
+            )
+        )
+    )
+
     # GitHub / GHE review workflow
     ghe_token: str = field(default_factory=lambda: os.environ.get("TRACE_GHE_TOKEN", ""))
     ghe_repo: str = field(default_factory=lambda: os.environ.get("GHE_REPO", ""))

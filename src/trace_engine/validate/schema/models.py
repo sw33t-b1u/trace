@@ -307,6 +307,16 @@ class SourceEntry(_StrictModel):
             "these PIR ids. Empty list (default) means evaluate against all PIRs."
         ),
     )
+    feed_type: Literal["html", "rss", "atom"] | None = Field(
+        default=None,
+        description=(
+            "Optional override for the URL's feed type. When unset, "
+            "``crawler/feed_detector.py`` infers the type from the HTTP "
+            "Content-Type header. Set this only when an upstream server "
+            "returns an incorrect Content-Type (e.g. ``application/octet-stream`` "
+            "for an RSS feed) and feed expansion is required."
+        ),
+    )
 
 
 class SourcesDocument(_StrictModel):

@@ -23,10 +23,15 @@ SCHEMA_DIR = Path(__file__).parent.parent / "schema"
 def main() -> int:
     SCHEMA_DIR.mkdir(exist_ok=True)
 
-    from trace_engine.validate.schema.models import AssetsDocument, PIROutputDocument
+    from trace_engine.validate.schema.models import (
+        AssetsDocument,
+        PIROutputDocument,
+        SourcesDocument,
+    )
 
     _write(SCHEMA_DIR / "pir.schema.json", PIROutputDocument.model_json_schema())
     _write(SCHEMA_DIR / "assets.schema.json", AssetsDocument.model_json_schema())
+    _write(SCHEMA_DIR / "sources.schema.json", SourcesDocument.model_json_schema())
 
     return 0
 

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example CSIRT Advisories</title>
+  <link href="https://csirt.example.org/" rel="alternate"/>
+  <id>urn:uuid:csirt-example-feed</id>
+  <updated>2026-05-22T12:00:00Z</updated>
+  <entry>
+    <title>Advisory 2026-001: zero-day in MailGateway</title>
+    <link rel="alternate" href="https://csirt.example.org/advisory/2026-001"/>
+    <id>urn:uuid:csirt-example-advisory-2026-001</id>
+    <updated>2026-05-22T11:30:00Z</updated>
+    <published>2026-05-22T11:30:00Z</published>
+    <summary>Synthetic Atom entry one</summary>
+  </entry>
+  <entry>
+    <title>Advisory 2026-002: phishing wave</title>
+    <link rel="alternate" href="https://csirt.example.org/advisory/2026-002"/>
+    <id>urn:uuid:csirt-example-advisory-2026-002</id>
+    <updated>2026-05-21T15:00:00Z</updated>
+    <published>2026-05-21T15:00:00Z</published>
+    <summary>Synthetic Atom entry two</summary>
+  </entry>
+</feed>

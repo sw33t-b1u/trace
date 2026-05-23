@@ -9,3 +9,11 @@ sources:
     max_chars: 12000
     pir_ids:
       - PIR-TEST-001
+  # feed_type override — used when an upstream server returns an
+  # incorrect Content-Type and feed expansion is required.
+  - url: https://example.org/atom-with-wrong-content-type
+    label: ExampleCSIRT Atom Feed
+    task: medium
+    feed_type: atom
+    pir_ids:
+      - PIR-TEST-001
