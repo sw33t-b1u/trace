@@ -142,12 +142,18 @@ class TestValidActors:
         )
         assert len(doc.root[0].prioritized_actors) == 2
 
-    def test_extra_sub_factors_accepted_via_extra_allow(self):
-        """Future BEACON sub-factors in score_breakdown components pass via extra='allow'."""
+    def test_unknown_score_component_subfactor_rejected(self):
+        """TRACE 1.9.0 strict mode — unknown ScoreComponent sub-factors fail.
+
+        Replaces the prior ``extra='allow'`` forward-compat carve-out: adding
+        a new sub-factor now requires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS``
+        and extending ``ScoreComponent``.
+        """
         entry = copy.deepcopy(_VALID_ACTOR_ENTRY)
         entry["score_breakdown"]["intent"]["future_sub_factor"] = 0.99
-        doc = PIRDocument.from_payload([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}])
-        assert len(doc.root[0].prioritized_actors) == 1
+        with pytest.raises(ValidationError) as exc:
+            PIRDocument.from_payload([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}])
+        assert "future_sub_factor" in str(exc.value)
 
     def test_empty_prioritized_actors_list_passes(self):
         doc = PIRDocument.from_payload([{**_PIR_WITH_ACTORS, "prioritized_actors": []}])
@@ -353,10 +359,21 @@ class TestActorTriageEntryDirectly:
         with pytest.raises(ValidationError):
             ScoreComponent.model_validate({"score": -0.001})
 
-    def test_score_component_accepts_extra_sub_factors(self):
+    def test_score_component_accepts_enumerated_sub_factors(self):
+        """Canonical sub-factor names listed on ``ScoreComponent`` pass."""
         from trace_engine.validate.schema import ScoreComponent  # noqa: PLC0415
 
         sc = ScoreComponent.model_validate(
             {"score": 0.5, "ttp_count_norm": 0.9, "recency_active_campaigns_90d": 0.25}
         )
         assert sc.score == 0.5
+        assert sc.ttp_count_norm == pytest.approx(0.9)
+        assert sc.recency_active_campaigns_90d == pytest.approx(0.25)
+
+    def test_score_component_rejects_unknown_sub_factor(self):
+        """TRACE 1.9.0 strict mode — unknown sub-factor keys raise."""
+        from trace_engine.validate.schema import ScoreComponent  # noqa: PLC0415
+
+        with pytest.raises(ValidationError) as exc:
+            ScoreComponent.model_validate({"score": 0.5, "made_up_field": 0.1})
+        assert "made_up_field" in str(exc.value)

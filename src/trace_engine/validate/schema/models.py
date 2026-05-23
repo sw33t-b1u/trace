@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, RootModel, model_validator
+from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator, model_validator
 
 
 class _StrictModel(BaseModel):
@@ -104,16 +104,45 @@ class AssetWeightRule(_StrictModel):
 
 
 class ScoreComponent(BaseModel):
-    """Generic I×C×O score component — extra='allow' for forward compat.
+    """Generic I×C×O score component — strict mode (TRACE 1.9.0).
 
     Used for intent / capability / opportunity sub-breakdowns in
-    ActorTriageEntry.  Sub-factor fields (motivation_alignment, ttp_count_norm
-    etc.) are accepted via extra='allow' without explicit enumeration so
-    future BEACON sub-factors are validated without schema breakage.
+    ActorTriageEntry.  As of TRACE 1.9.0 (paired with BEACON 0.16.0) the
+    canonical sub-factor names are enumerated and ``extra='forbid'`` rejects
+    unknown fields, catching typos and silent producer drift.  Adding a new
+    sub-factor requires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and
+    extending this model.
+
+    Sub-factor sets (per plan §3.3 + Initiative E §2.3/§2.4):
+      Intent:       motivation_alignment, industry_match
+      Capability:   ttp_count_norm, sophistication_score,
+                    recency_active_campaigns_90d, tool_sophistication,
+                    targeting_persistence, evasion_capability, depth, breadth
+      Opportunity:  victimology_match, geographic_match, surface_ttp_coverage
     """
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="forbid")
     score: float = Field(ge=0.0, le=1.0)
+
+    # Intent sub-factors (BEACON IntentComponent).
+    motivation_alignment: float | None = Field(default=None, ge=0.0, le=1.0)
+    industry_match: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    # Capability sub-factors (BEACON CapabilityComponent — 6-factor
+    # Depth × Breadth aggregation introduced in BEACON 0.16.0 / plan §2.4).
+    ttp_count_norm: float | None = Field(default=None, ge=0.0, le=1.0)
+    sophistication_score: float | None = Field(default=None, ge=0.0, le=1.0)
+    recency_active_campaigns_90d: float | None = Field(default=None, ge=0.0, le=1.0)
+    tool_sophistication: float | None = Field(default=None, ge=0.0, le=1.0)
+    targeting_persistence: float | None = Field(default=None, ge=0.0, le=1.0)
+    evasion_capability: float | None = Field(default=None, ge=0.0, le=1.0)
+    depth: float | None = Field(default=None, ge=0.0, le=1.0)
+    breadth: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    # Opportunity sub-factors (BEACON OpportunityComponent).
+    victimology_match: float | None = Field(default=None, ge=0.0, le=1.0)
+    geographic_match: float | None = Field(default=None, ge=0.0, le=1.0)
+    surface_ttp_coverage: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class DataQuality(BaseModel):
@@ -203,36 +232,56 @@ class PIRDocument(RootModel[list[PIRItem]]):
     to a one-element list before validation).
 
     BEACON 0.16.0+ emits a wrapped object {"schema_version": ..., "pirs": [...]};
-    from_payload extracts pirs[] transparently so downstream consumers are
-    unaffected by the format change.
+    from_payload routes the wrapped form through ``PIROutputDocument`` so the
+    schema_version gate (see ``SUPPORTED_PIR_SCHEMA_VERSIONS``) fires before
+    the items are accepted.  Legacy list / single-object payloads bypass the
+    gate for backward compatibility with pre-0.16.0 fixtures.
     """
 
     @classmethod
     def from_payload(cls, payload: object) -> PIRDocument:
         if isinstance(payload, dict) and "pirs" in payload:
-            # BEACON 0.16.0+ wrapped format — extract the list
-            items = payload["pirs"]
-        elif isinstance(payload, list):
+            # BEACON 0.16.0+ wrapped format — validate via PIROutputDocument
+            # so the schema_version gate runs before per-item validation.
+            wrapper = PIROutputDocument.model_validate(payload)
+            return cls(root=wrapper.pirs)
+        if isinstance(payload, list):
             items = payload
         else:
             items = [payload]
         return cls.model_validate(items)
 
 
+# Version negotiation: only ``schema_version`` values listed here are accepted
+# in wrapped ``pir_output.json`` bundles.  A set is used (rather than an
+# equality check) so future minor releases — Initiative F adds ``"0.17.0"``
+# without refactoring per plan §6 Phase 4 forward-compat note — can extend the
+# supported window in one line.
+SUPPORTED_PIR_SCHEMA_VERSIONS: set[str] = {"0.16.0"}
+
+
 class PIROutputDocument(BaseModel):
     """Document-level schema for pir_output.json (BEACON 0.16.0+).
 
-    Mirrors BEACON's PIROutputDocument shape for drift-check alignment.
-    schema_version is optional (for backward compat with pre-0.16.0 files);
-    pirs holds the ordered list of PIR decision-point records.
+    Mirrors BEACON's ``PIROutputDocument`` shape for drift-check alignment.
+    ``schema_version`` is required; bundles without it or with a value outside
+    ``SUPPORTED_PIR_SCHEMA_VERSIONS`` are rejected so unannounced producer
+    schema changes cannot slip through to SAGE ingestion.
     """
 
     model_config = ConfigDict(extra="allow")
     schema_version: str = Field(
-        default="0.16.0",
         description="Semantic version of the pir_output schema.",
     )
     pirs: list[PIRItem]
+
+    @field_validator("schema_version")
+    @classmethod
+    def _check_supported_schema_version(cls, v: str) -> str:
+        if v not in SUPPORTED_PIR_SCHEMA_VERSIONS:
+            supported = ", ".join(sorted(SUPPORTED_PIR_SCHEMA_VERSIONS))
+            raise ValueError(f"unsupported schema version {v!r}; supported versions: {supported}")
+        return v
 
 
 # ---------------------------------------------------------------------------

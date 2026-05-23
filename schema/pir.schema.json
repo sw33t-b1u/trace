@@ -232,14 +232,196 @@
       "type": "object"
     },
     "ScoreComponent": {
-      "additionalProperties": true,
-      "description": "Generic I×C×O score component — extra='allow' for forward compat.\n\nUsed for intent / capability / opportunity sub-breakdowns in\nActorTriageEntry.  Sub-factor fields (motivation_alignment, ttp_count_norm\netc.) are accepted via extra='allow' without explicit enumeration so\nfuture BEACON sub-factors are validated without schema breakage.",
+      "additionalProperties": false,
+      "description": "Generic I×C×O score component — strict mode (TRACE 1.9.0).\n\nUsed for intent / capability / opportunity sub-breakdowns in\nActorTriageEntry.  As of TRACE 1.9.0 (paired with BEACON 0.16.0) the\ncanonical sub-factor names are enumerated and ``extra='forbid'`` rejects\nunknown fields, catching typos and silent producer drift.  Adding a new\nsub-factor requires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and\nextending this model.\n\nSub-factor sets (per plan §3.3 + Initiative E §2.3/§2.4):\n  Intent:       motivation_alignment, industry_match\n  Capability:   ttp_count_norm, sophistication_score,\n                recency_active_campaigns_90d, tool_sophistication,\n                targeting_persistence, evasion_capability, depth, breadth\n  Opportunity:  victimology_match, geographic_match, surface_ttp_coverage",
       "properties": {
+        "breadth": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Breadth"
+        },
+        "depth": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Depth"
+        },
+        "evasion_capability": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evasion Capability"
+        },
+        "geographic_match": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Geographic Match"
+        },
+        "industry_match": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Industry Match"
+        },
+        "motivation_alignment": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Motivation Alignment"
+        },
+        "recency_active_campaigns_90d": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recency Active Campaigns 90D"
+        },
         "score": {
           "maximum": 1.0,
           "minimum": 0.0,
           "title": "Score",
           "type": "number"
+        },
+        "sophistication_score": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sophistication Score"
+        },
+        "surface_ttp_coverage": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Surface Ttp Coverage"
+        },
+        "targeting_persistence": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Targeting Persistence"
+        },
+        "tool_sophistication": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool Sophistication"
+        },
+        "ttp_count_norm": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ttp Count Norm"
+        },
+        "victimology_match": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Victimology Match"
         }
       },
       "required": [
@@ -250,7 +432,7 @@
     }
   },
   "additionalProperties": true,
-  "description": "Document-level schema for pir_output.json (BEACON 0.16.0+).\n\nMirrors BEACON's PIROutputDocument shape for drift-check alignment.\nschema_version is optional (for backward compat with pre-0.16.0 files);\npirs holds the ordered list of PIR decision-point records.",
+  "description": "Document-level schema for pir_output.json (BEACON 0.16.0+).\n\nMirrors BEACON's ``PIROutputDocument`` shape for drift-check alignment.\n``schema_version`` is required; bundles without it or with a value outside\n``SUPPORTED_PIR_SCHEMA_VERSIONS`` are rejected so unannounced producer\nschema changes cannot slip through to SAGE ingestion.",
   "properties": {
     "pirs": {
       "items": {
@@ -260,13 +442,13 @@
       "type": "array"
     },
     "schema_version": {
-      "default": "0.16.0",
       "description": "Semantic version of the pir_output schema.",
       "title": "Schema Version",
       "type": "string"
     }
   },
   "required": [
+    "schema_version",
     "pirs"
   ],
   "title": "PIROutputDocument",

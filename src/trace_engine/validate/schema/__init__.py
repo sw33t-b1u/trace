@@ -1,6 +1,7 @@
 """Pydantic v2 schema models for SAGE input contracts."""
 
 from trace_engine.validate.schema.models import (
+    SUPPORTED_PIR_SCHEMA_VERSIONS,
     AccountOnAssetEntry,
     ActorRationale,
     ActorScoreBreakdown,
@@ -46,6 +47,7 @@ __all__ = [
     "PIRItem",
     "PIRDocument",
     "PIROutputDocument",
+    "SUPPORTED_PIR_SCHEMA_VERSIONS",
     "ScoreComponent",
     "SecurityControl",
     "SourceEntry",
