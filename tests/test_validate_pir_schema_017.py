@@ -45,7 +45,9 @@ class TestSupportedVersionSet:
         assert "0.17.0" in SUPPORTED_PIR_SCHEMA_VERSIONS
 
     def test_set_excludes_unsupported_future(self):
-        assert "0.18.0" not in SUPPORTED_PIR_SCHEMA_VERSIONS
+        # 0.18.0 was added to the supported set by Initiative G Phase 7
+        # (BEACON 0.18.0 IR-boost). The forward-bound now sits at 0.19.0.
+        assert "0.19.0" not in SUPPORTED_PIR_SCHEMA_VERSIONS
 
     def test_016_fixture_still_validates_with_legacy_key(self):
         payload = _load("valid_pir_with_actor_triage.json")
@@ -62,11 +64,14 @@ class TestSupportedVersionSet:
         assert actor.score_breakdown.capability.recency_active_campaigns == pytest.approx(0.25)
         assert actor.score_breakdown.capability.tool_sophistication == pytest.approx(0.4)
 
-    def test_unsupported_018_rejected(self):
-        payload = _load("invalid_pir_unsupported_version_018.json")
+    def test_unsupported_019_rejected(self):
+        # Forward-bound test: bumped from 0.18.0 → 0.19.0 by Initiative G
+        # Phase 7 once BEACON 0.18.0 IR-boost was admitted to the
+        # supported set.
+        payload = _load("invalid_pir_unsupported_version_019.json")
         with pytest.raises(ValidationError) as exc:
             PIRDocument.from_payload(payload)
-        assert "0.18.0" in str(exc.value)
+        assert "0.19.0" in str(exc.value)
 
 
 class TestCrossVersionFieldNameEnforcement:
@@ -129,10 +134,10 @@ class TestNormaliserNonInvasive:
         rejection — so the user sees the version error, not a stray
         field-name error."""
         payload = copy.deepcopy(_load("valid_pir_017_renamed_recency.json"))
-        payload["schema_version"] = "0.18.0"
+        payload["schema_version"] = "0.19.0"
         with pytest.raises(ValidationError) as exc:
             PIROutputDocument.model_validate(payload)
-        assert "0.18.0" in str(exc.value)
+        assert "0.19.0" in str(exc.value)
 
 
 class TestRoundTripDrift:

@@ -128,11 +128,16 @@
     },
     "DataQuality": {
       "additionalProperties": true,
-      "description": "Data quality metadata for actor triage entries.",
+      "description": "Data quality metadata for actor triage entries.\n\n``ir_boost_skipped`` is added in schema_version 0.18.0 (Initiative G)\nand flags actors whose IR-boost SAGE call was skipped (``--no-sage``\nflag, SAGE unreachable, etc.). ``extra='allow'`` is preserved so\nfuture quality flags can be added without a TRACE version bump; the\nper-version normaliser enforces that ``ir_boost_skipped`` does not\nappear in 0.16.0 / 0.17.0 payloads.",
       "properties": {
         "degraded": {
           "default": false,
           "title": "Degraded",
+          "type": "boolean"
+        },
+        "ir_boost_skipped": {
+          "default": false,
+          "title": "Ir Boost Skipped",
           "type": "boolean"
         },
         "missing_sources": {
@@ -233,7 +238,7 @@
     },
     "ScoreComponent": {
       "additionalProperties": false,
-      "description": "Generic I×C×O score component — strict mode (TRACE 1.9.0).\n\nUsed for intent / capability / opportunity sub-breakdowns in\nActorTriageEntry.  As of TRACE 1.9.0 (paired with BEACON 0.16.0) the\ncanonical sub-factor names are enumerated and ``extra='forbid'`` rejects\nunknown fields, catching typos and silent producer drift.  Adding a new\nsub-factor requires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and\nextending this model.\n\nSub-factor sets (per plan §3.3 + Initiative E §2.3/§2.4 + Initiative F §3):\n  Intent:       motivation_alignment, industry_match\n  Capability:   ttp_count_norm, sophistication_score,\n                recency_active_campaigns, tool_sophistication,\n                targeting_persistence, evasion_capability, depth, breadth\n  Opportunity:  victimology_match, geographic_match, surface_ttp_coverage\n\nField rename (Initiative F / TRACE 1.10.0 paired with BEACON 0.17.0):\n  ``recency_active_campaigns_90d`` → ``recency_active_campaigns``.\n  No Pydantic alias is exposed; the per-version normaliser on\n  ``PIROutputDocument`` rewrites ``_90d``-suffixed keys to the\n  canonical name for ``schema_version == \"0.16.0\"`` and rejects the\n  legacy key for ``\"0.17.0\"``. The schema_version gate enforces a\n  clean transition rather than indefinitely tolerating both names.",
+      "description": "Generic I×C×O score component — strict mode (TRACE 1.9.0).\n\nUsed for intent / capability / opportunity sub-breakdowns in\nActorTriageEntry.  As of TRACE 1.9.0 (paired with BEACON 0.16.0) the\ncanonical sub-factor names are enumerated and ``extra='forbid'`` rejects\nunknown fields, catching typos and silent producer drift.  Adding a new\nsub-factor requires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and\nextending this model.\n\nSub-factor sets (per plan §3.3 + Initiative E §2.3/§2.4 + Initiative F §3):\n  Intent:       motivation_alignment, industry_match\n  Capability:   ttp_count_norm, sophistication_score,\n                recency_active_campaigns, tool_sophistication,\n                targeting_persistence, evasion_capability, depth, breadth\n  Opportunity:  victimology_match, geographic_match, surface_ttp_coverage\n\nField rename (Initiative F / TRACE 1.10.0 paired with BEACON 0.17.0):\n  ``recency_active_campaigns_90d`` → ``recency_active_campaigns``.\n  No Pydantic alias is exposed; the per-version normaliser on\n  ``PIROutputDocument`` rewrites ``_90d``-suffixed keys to the\n  canonical name for ``schema_version == \"0.16.0\"`` and rejects the\n  legacy key for ``\"0.17.0\"``. The schema_version gate enforces a\n  clean transition rather than indefinitely tolerating both names.\n\nIR-boost factors (Initiative G / TRACE 1.11.0 paired with BEACON 0.18.0):\n  ``ir_observed_capability`` (Capability) and\n  ``ir_observed_opportunity`` (Opportunity) are added in\n  schema_version 0.18.0. Both default to 1.0 on the BEACON producer\n  side (geometric-mean identity → SAGE-absent runs preserve the E\n  numerics). Under 0.16.0 / 0.17.0 these fields are rejected by the\n  per-version normaliser so a downgrade or sidegrade cannot leak\n  future-version factors into an older bundle.",
       "properties": {
         "breadth": {
           "anyOf": [
@@ -304,6 +309,34 @@
           ],
           "default": null,
           "title": "Industry Match"
+        },
+        "ir_observed_capability": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ir Observed Capability"
+        },
+        "ir_observed_opportunity": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ir Observed Opportunity"
         },
         "motivation_alignment": {
           "anyOf": [

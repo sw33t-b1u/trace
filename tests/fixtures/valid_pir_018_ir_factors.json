@@ -1,0 +1,71 @@
+{
+  "schema_version": "0.18.0",
+  "pirs": [
+    {
+      "pir_id": "PIR-G-001",
+      "intelligence_level": "operational",
+      "description": "Initiative G (TRACE 1.11.0 paired with BEACON 0.18.0) — IR-boost Capability/Opportunity factors.",
+      "threat_actor_tags": ["apt-china"],
+      "asset_weight_rules": [
+        {"tag": "external-facing", "criticality_multiplier": 2.0}
+      ],
+      "valid_from": "2026-05-24",
+      "valid_until": "2027-05-24",
+      "prioritized_actors": [
+        {
+          "actor_id": "threat-actor--00000000-0000-4000-8000-000000000001",
+          "name": "TestActorAlpha",
+          "aliases": ["test-alias-1"],
+          "likelihood": 0.07,
+          "score_breakdown": {
+            "intent": {
+              "score": 0.25,
+              "motivation_alignment": 0.5,
+              "industry_match": 0.5
+            },
+            "capability": {
+              "score": 0.18,
+              "sophistication_score": 0.667,
+              "ttp_count_norm": 0.66,
+              "recency_active_campaigns": 0.25,
+              "tool_sophistication": 0.4,
+              "targeting_persistence": 0.5,
+              "evasion_capability": 0.6,
+              "ir_observed_capability": 1.0,
+              "depth": 0.62,
+              "breadth": 0.48
+            },
+            "opportunity": {
+              "score": 0.05,
+              "victimology_match": 1.0,
+              "geographic_match": 0.05,
+              "surface_ttp_coverage": 0.62,
+              "ir_observed_opportunity": 0.7
+            },
+            "data_quality": {
+              "degraded": false,
+              "missing_sources": [],
+              "ir_boost_skipped": false
+            }
+          },
+          "rationale": {
+            "text": "Likelihood = Intent(0.250) x Capability(0.18) x Opportunity(0.05) — IR boost applied",
+            "intent_factors": {"motivation_alignment": 0.5, "industry_match": 0.5},
+            "capability_factors": {
+              "sophistication_score": 0.667,
+              "ttp_count_norm": 0.66,
+              "recency_active_campaigns": 0.25,
+              "ir_observed_capability": 1.0
+            },
+            "opportunity_factors": {
+              "victimology_match": 1.0,
+              "geographic_match": 0.05,
+              "surface_ttp_coverage": 0.62,
+              "ir_observed_opportunity": 0.7
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

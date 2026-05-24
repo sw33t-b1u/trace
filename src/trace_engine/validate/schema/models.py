@@ -127,6 +127,15 @@ class ScoreComponent(BaseModel):
       canonical name for ``schema_version == "0.16.0"`` and rejects the
       legacy key for ``"0.17.0"``. The schema_version gate enforces a
       clean transition rather than indefinitely tolerating both names.
+
+    IR-boost factors (Initiative G / TRACE 1.11.0 paired with BEACON 0.18.0):
+      ``ir_observed_capability`` (Capability) and
+      ``ir_observed_opportunity`` (Opportunity) are added in
+      schema_version 0.18.0. Both default to 1.0 on the BEACON producer
+      side (geometric-mean identity → SAGE-absent runs preserve the E
+      numerics). Under 0.16.0 / 0.17.0 these fields are rejected by the
+      per-version normaliser so a downgrade or sidegrade cannot leak
+      future-version factors into an older bundle.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -146,19 +155,32 @@ class ScoreComponent(BaseModel):
     evasion_capability: float | None = Field(default=None, ge=0.0, le=1.0)
     depth: float | None = Field(default=None, ge=0.0, le=1.0)
     breadth: float | None = Field(default=None, ge=0.0, le=1.0)
+    # IR-boost factor (Initiative G / schema_version 0.18.0 only).
+    ir_observed_capability: float | None = Field(default=None, ge=0.0, le=1.0)
 
     # Opportunity sub-factors (BEACON OpportunityComponent).
     victimology_match: float | None = Field(default=None, ge=0.0, le=1.0)
     geographic_match: float | None = Field(default=None, ge=0.0, le=1.0)
     surface_ttp_coverage: float | None = Field(default=None, ge=0.0, le=1.0)
+    # IR-boost factor (Initiative G / schema_version 0.18.0 only).
+    ir_observed_opportunity: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class DataQuality(BaseModel):
-    """Data quality metadata for actor triage entries."""
+    """Data quality metadata for actor triage entries.
+
+    ``ir_boost_skipped`` is added in schema_version 0.18.0 (Initiative G)
+    and flags actors whose IR-boost SAGE call was skipped (``--no-sage``
+    flag, SAGE unreachable, etc.). ``extra='allow'`` is preserved so
+    future quality flags can be added without a TRACE version bump; the
+    per-version normaliser enforces that ``ir_boost_skipped`` does not
+    appear in 0.16.0 / 0.17.0 payloads.
+    """
 
     model_config = ConfigDict(extra="allow")
     degraded: bool = False
     missing_sources: list[str] = Field(default_factory=list)
+    ir_boost_skipped: bool = False
 
 
 class ActorScoreBreakdown(BaseModel):
@@ -265,7 +287,7 @@ class PIRDocument(RootModel[list[PIRItem]]):
 # equality check) so future minor releases — Initiative F adds ``"0.17.0"``
 # alongside Initiative E's ``"0.16.0"`` per plan §6 Phase 6 — can extend the
 # supported window in one line.
-SUPPORTED_PIR_SCHEMA_VERSIONS: set[str] = {"0.16.0", "0.17.0"}
+SUPPORTED_PIR_SCHEMA_VERSIONS: set[str] = {"0.16.0", "0.17.0", "0.18.0"}
 
 
 # Initiative F (TRACE 1.10.0): the Capability sub-factor
@@ -277,6 +299,15 @@ SUPPORTED_PIR_SCHEMA_VERSIONS: set[str] = {"0.16.0", "0.17.0"}
 # the schema_version gate is the single source of truth.
 _RECENCY_LEGACY = "recency_active_campaigns_90d"
 _RECENCY_CURRENT = "recency_active_campaigns"
+
+# Initiative G (TRACE 1.11.0 / BEACON 0.18.0): IR-boost factors added
+# to ``score_breakdown.capability``, ``score_breakdown.opportunity``,
+# and ``score_breakdown.data_quality``. The per-version normaliser
+# enforces these fields appear ONLY under schema_version 0.18.0 — the
+# same "clean transition" pattern as the recency rename.
+_IR_CAPABILITY_KEY = "ir_observed_capability"
+_IR_OPPORTUNITY_KEY = "ir_observed_opportunity"
+_IR_BOOST_SKIPPED_KEY = "ir_boost_skipped"
 
 
 def _normalise_capability_recency(payload: dict, schema_version: str) -> None:
@@ -316,13 +347,89 @@ def _apply_recency_rule(target: dict, schema_version: str, *, where: str) -> Non
             )
         if has_legacy:
             target[_RECENCY_CURRENT] = target.pop(_RECENCY_LEGACY)
-    elif schema_version == "0.17.0":
+    elif schema_version in {"0.17.0", "0.18.0"}:
+        # 0.18.0 inherits the canonical recency name from 0.17.0;
+        # the legacy ``_90d`` suffix is rejected on both versions.
         if has_legacy:
             raise ValueError(
-                f"schema_version 0.17.0 must use {_RECENCY_CURRENT!r}, not "
+                f"schema_version {schema_version} must use {_RECENCY_CURRENT!r}, not "
                 f"{_RECENCY_LEGACY!r} (found in {where}); the field was "
                 f"renamed in Initiative F"
             )
+
+
+def _normalise_ir_factors(payload: dict, schema_version: str) -> None:
+    """Reject IR-boost factor keys in-place when the schema_version is < 0.18.0.
+
+    The IR-boost factors (Initiative G) were added in BEACON 0.18.0 to
+    feed SAGE-observed incidents back into the Capability and Opportunity
+    aggregation. They must NOT appear under 0.16.0 / 0.17.0 — same
+    "clean transition" pattern as ``_apply_recency_rule``.
+
+    Walks ``pirs[*].prioritized_actors[*]`` and checks:
+      * ``score_breakdown.capability``    — ``ir_observed_capability``
+      * ``score_breakdown.opportunity``   — ``ir_observed_opportunity``
+      * ``score_breakdown.data_quality``  — ``ir_boost_skipped``
+      * ``rationale.capability_factors``  — ``ir_observed_capability``
+      * ``rationale.opportunity_factors`` — ``ir_observed_opportunity``
+
+    For 0.18.0 the keys pass through to ``ScoreComponent`` and
+    ``DataQuality`` for type / range validation.
+    """
+    if schema_version == "0.18.0":
+        return  # accept; downstream models handle the range check
+    pirs = payload.get("pirs")
+    if not isinstance(pirs, list):
+        return
+    for pir in pirs:
+        if not isinstance(pir, dict):
+            continue
+        for actor in pir.get("prioritized_actors") or []:
+            if not isinstance(actor, dict):
+                continue
+            breakdown = actor.get("score_breakdown") or {}
+            _reject_ir_key(
+                breakdown.get("capability"),
+                _IR_CAPABILITY_KEY,
+                schema_version,
+                where="score_breakdown.capability",
+            )
+            _reject_ir_key(
+                breakdown.get("opportunity"),
+                _IR_OPPORTUNITY_KEY,
+                schema_version,
+                where="score_breakdown.opportunity",
+            )
+            _reject_ir_key(
+                breakdown.get("data_quality"),
+                _IR_BOOST_SKIPPED_KEY,
+                schema_version,
+                where="score_breakdown.data_quality",
+            )
+            rationale = actor.get("rationale") or {}
+            _reject_ir_key(
+                rationale.get("capability_factors"),
+                _IR_CAPABILITY_KEY,
+                schema_version,
+                where="rationale.capability_factors",
+            )
+            _reject_ir_key(
+                rationale.get("opportunity_factors"),
+                _IR_OPPORTUNITY_KEY,
+                schema_version,
+                where="rationale.opportunity_factors",
+            )
+
+
+def _reject_ir_key(target: object, key: str, schema_version: str, *, where: str) -> None:
+    if not isinstance(target, dict):
+        return
+    if key in target:
+        raise ValueError(
+            f"schema_version {schema_version} must not include {key!r} "
+            f"(found in {where}); the field was introduced in "
+            f"schema_version 0.18.0 (Initiative G IR-boost)"
+        )
 
 
 class PIROutputDocument(BaseModel):
@@ -348,6 +455,7 @@ class PIROutputDocument(BaseModel):
         schema_version = data.get("schema_version")
         if isinstance(schema_version, str) and schema_version in SUPPORTED_PIR_SCHEMA_VERSIONS:
             _normalise_capability_recency(data, schema_version)
+            _normalise_ir_factors(data, schema_version)
         return data
 
     @field_validator("schema_version")
