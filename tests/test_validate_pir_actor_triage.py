@@ -1,10 +1,15 @@
-"""Tests for TRACE 1.8.0 prioritized_actors[] validation (Phase 5).
+"""Tests for ``prioritized_actors[]`` validation under PIR schema_version 1.0.0.
+
+Initiative H (TRACE 1.12.0) tightened ``prioritized_actors`` from
+optional-with-default-list to a required field — the pre-0.15.0 PIR
+backward-compat shim is gone. PIRs without actor triage now declare
+``"prioritized_actors": []`` explicitly.
 
 Verifies:
-  - Legacy PIR (no prioritized_actors) passes — backward compat.
-  - Valid prioritized_actors[] passes.
+  - PIR with empty ``prioritized_actors`` passes.
+  - Valid ``prioritized_actors[]`` entries pass.
   - Malformed entries are rejected (likelihood out of range, missing fields, wrong type).
-  - Integration smoke test: BEACON-shaped PIR with ActorTriageEntry passes.
+  - Integration smoke test: full BEACON-shaped PIR with ActorTriageEntry passes.
 """
 
 from __future__ import annotations
@@ -24,13 +29,14 @@ FIXTURES = Path(__file__).parent / "fixtures"
 # Minimal valid BEACON-shaped PIR (no prioritized_actors) — legacy baseline
 # ---------------------------------------------------------------------------
 
-_LEGACY_PIR = {
-    "pir_id": "PIR-LEGACY-001",
+_BASE_PIR = {
+    "pir_id": "PIR-BASE-001",
     "intelligence_level": "operational",
     "threat_actor_tags": ["apt-china"],
     "asset_weight_rules": [{"tag": "external-facing", "criticality_multiplier": 2.0}],
     "valid_from": "2025-01-01",
     "valid_until": "2025-12-31",
+    "prioritized_actors": [],
 }
 
 # ---------------------------------------------------------------------------
@@ -82,28 +88,42 @@ _VALID_ACTOR_ENTRY = {
 }
 
 _PIR_WITH_ACTORS = {
-    **_LEGACY_PIR,
+    **_BASE_PIR,
     "pir_id": "PIR-TRIAGE-001",
     "prioritized_actors": [_VALID_ACTOR_ENTRY],
 }
 
 
 # ---------------------------------------------------------------------------
-# Backward compat — legacy PIR (no prioritized_actors)
+# prioritized_actors is required as of TRACE 1.12.0 (Initiative H).
+# Empty list is the canonical "no triage data" value.
 # ---------------------------------------------------------------------------
 
 
-class TestBackwardCompat:
-    def test_legacy_pir_without_prioritized_actors_passes(self):
-        doc = PIRDocument.from_payload([_LEGACY_PIR])
+class TestPrioritizedActorsRequired:
+    def test_pir_with_empty_prioritized_actors_passes(self):
+        doc = PIRDocument.from_payload([_BASE_PIR])
         assert len(doc.root) == 1
-        assert doc.root[0].pir_id == "PIR-LEGACY-001"
+        assert doc.root[0].pir_id == "PIR-BASE-001"
         assert doc.root[0].prioritized_actors == []
 
-    def test_legacy_fixture_still_validates(self):
+    def test_bare_list_fixture_with_empty_prioritized_actors_passes(self):
         data = json.loads((FIXTURES / "valid_pir.json").read_text())
         doc = PIRDocument.from_payload(data)
         assert doc.root[0].prioritized_actors == []
+
+    def test_pir_missing_prioritized_actors_rejected(self):
+        """The pre-0.15.0 ``default_factory=list`` shim was removed in
+        Initiative H — payloads must declare ``prioritized_actors`` explicitly."""
+        from copy import deepcopy
+
+        pir = deepcopy(_BASE_PIR)
+        del pir["prioritized_actors"]
+        with pytest.raises(ValidationError) as exc:
+            PIRDocument.from_payload([pir])
+        msg = str(exc.value).lower()
+        assert "prioritized_actors" in msg
+        assert "field required" in msg or "missing" in msg
 
 
 # ---------------------------------------------------------------------------
@@ -362,11 +382,10 @@ class TestActorTriageEntryDirectly:
     def test_score_component_accepts_enumerated_sub_factors(self):
         """Canonical sub-factor names listed on ``ScoreComponent`` pass.
 
-        The Capability ``recency_active_campaigns`` name reflects the
-        Initiative F (TRACE 1.10.0) rename; payloads gated to
-        schema_version 0.16.0 still use the legacy ``_90d`` suffix,
-        which the ``PIROutputDocument`` per-version normaliser rewrites
-        to this canonical key before validation.
+        ``recency_active_campaigns`` has been the canonical name since
+        BEACON 0.17.0 / schema_version 0.17.0 (Initiative F field
+        rename); Initiative H committed it as the 1.0.0 surface and
+        removed the legacy ``_90d``-suffix normaliser.
         """
         from trace_engine.validate.schema import ScoreComponent  # noqa: PLC0415
 

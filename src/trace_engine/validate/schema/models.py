@@ -104,38 +104,23 @@ class AssetWeightRule(_StrictModel):
 
 
 class ScoreComponent(BaseModel):
-    """Generic I×C×O score component — strict mode (TRACE 1.9.0).
+    """Generic I×C×O score component — strict mode.
 
     Used for intent / capability / opportunity sub-breakdowns in
-    ActorTriageEntry.  As of TRACE 1.9.0 (paired with BEACON 0.16.0) the
-    canonical sub-factor names are enumerated and ``extra='forbid'`` rejects
-    unknown fields, catching typos and silent producer drift.  Adding a new
-    sub-factor requires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and
-    extending this model.
+    ActorTriageEntry. ``extra='forbid'`` rejects unknown fields,
+    catching typos and silent producer drift. Adding a new sub-factor
+    requires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and extending
+    this model.
 
-    Sub-factor sets (per plan §3.3 + Initiative E §2.3/§2.4 + Initiative F §3):
+    Canonical sub-factor names (committed surface as of schema_version
+    1.0.0; see ``docs/api-stability.md``):
       Intent:       motivation_alignment, industry_match
       Capability:   ttp_count_norm, sophistication_score,
                     recency_active_campaigns, tool_sophistication,
-                    targeting_persistence, evasion_capability, depth, breadth
-      Opportunity:  victimology_match, geographic_match, surface_ttp_coverage
-
-    Field rename (Initiative F / TRACE 1.10.0 paired with BEACON 0.17.0):
-      ``recency_active_campaigns_90d`` → ``recency_active_campaigns``.
-      No Pydantic alias is exposed; the per-version normaliser on
-      ``PIROutputDocument`` rewrites ``_90d``-suffixed keys to the
-      canonical name for ``schema_version == "0.16.0"`` and rejects the
-      legacy key for ``"0.17.0"``. The schema_version gate enforces a
-      clean transition rather than indefinitely tolerating both names.
-
-    IR-boost factors (Initiative G / TRACE 1.11.0 paired with BEACON 0.18.0):
-      ``ir_observed_capability`` (Capability) and
-      ``ir_observed_opportunity`` (Opportunity) are added in
-      schema_version 0.18.0. Both default to 1.0 on the BEACON producer
-      side (geometric-mean identity → SAGE-absent runs preserve the E
-      numerics). Under 0.16.0 / 0.17.0 these fields are rejected by the
-      per-version normaliser so a downgrade or sidegrade cannot leak
-      future-version factors into an older bundle.
+                    targeting_persistence, evasion_capability, depth,
+                    breadth, ir_observed_capability
+      Opportunity:  victimology_match, geographic_match,
+                    surface_ttp_coverage, ir_observed_opportunity
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -145,8 +130,7 @@ class ScoreComponent(BaseModel):
     motivation_alignment: float | None = Field(default=None, ge=0.0, le=1.0)
     industry_match: float | None = Field(default=None, ge=0.0, le=1.0)
 
-    # Capability sub-factors (BEACON CapabilityComponent — 6-factor
-    # Depth × Breadth aggregation introduced in BEACON 0.16.0 / plan §2.4).
+    # Capability sub-factors (BEACON CapabilityComponent).
     ttp_count_norm: float | None = Field(default=None, ge=0.0, le=1.0)
     sophistication_score: float | None = Field(default=None, ge=0.0, le=1.0)
     recency_active_campaigns: float | None = Field(default=None, ge=0.0, le=1.0)
@@ -155,26 +139,21 @@ class ScoreComponent(BaseModel):
     evasion_capability: float | None = Field(default=None, ge=0.0, le=1.0)
     depth: float | None = Field(default=None, ge=0.0, le=1.0)
     breadth: float | None = Field(default=None, ge=0.0, le=1.0)
-    # IR-boost factor (Initiative G / schema_version 0.18.0 only).
     ir_observed_capability: float | None = Field(default=None, ge=0.0, le=1.0)
 
     # Opportunity sub-factors (BEACON OpportunityComponent).
     victimology_match: float | None = Field(default=None, ge=0.0, le=1.0)
     geographic_match: float | None = Field(default=None, ge=0.0, le=1.0)
     surface_ttp_coverage: float | None = Field(default=None, ge=0.0, le=1.0)
-    # IR-boost factor (Initiative G / schema_version 0.18.0 only).
     ir_observed_opportunity: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class DataQuality(BaseModel):
     """Data quality metadata for actor triage entries.
 
-    ``ir_boost_skipped`` is added in schema_version 0.18.0 (Initiative G)
-    and flags actors whose IR-boost SAGE call was skipped (``--no-sage``
-    flag, SAGE unreachable, etc.). ``extra='allow'`` is preserved so
-    future quality flags can be added without a TRACE version bump; the
-    per-version normaliser enforces that ``ir_boost_skipped`` does not
-    appear in 0.16.0 / 0.17.0 payloads.
+    ``extra='allow'`` is preserved so new additive quality flags can be
+    added without a TRACE major bump (additive changes stay on
+    schema_version 1.0.0 per H-2 / api-stability.md).
     """
 
     model_config = ConfigDict(extra="allow")
@@ -204,14 +183,11 @@ class ActorRationale(BaseModel):
 
 
 class ActorTriageEntry(BaseModel):
-    """Single actor triage entry from BEACON 0.15.0 ``prioritized_actors[]``.
+    """Single actor triage entry from BEACON's ``prioritized_actors[]``.
 
-    BEACON 0.15.0+ emits one entry per scored threat actor; TRACE 1.8.0+
-    validates each entry.  ``extra='allow'`` ensures forward compatibility
-    with future BEACON sub-fields without requiring a TRACE version bump.
-    Canonical sub-factor names (per plan §3.3, renamed in Initiative F §3):
-      Capability: ttp_count_norm, sophistication_score, recency_active_campaigns
-      Opportunity: victimology_match, geographic_match, surface_ttp_coverage
+    ``extra='allow'`` keeps the entry forward-compatible with additive
+    BEACON sub-field additions (allowed in minors per the 90-day BC
+    policy).
     """
 
     model_config = ConfigDict(extra="allow")
@@ -243,9 +219,7 @@ class PIRItem(BaseModel):
     organizational_scope: str | None = None
     description: str | None = None
     intelligence_level: str | None = None  # strategic / operational / tactical
-    # Actor triage — BEACON 0.15.0+ emits this field; legacy PIR omits it.
-    # default_factory=list preserves backward compat with pre-0.15.0 PIR files.
-    prioritized_actors: list[ActorTriageEntry] = Field(default_factory=list)
+    prioritized_actors: list[ActorTriageEntry]
 
     @model_validator(mode="after")
     def _check_validity_window(self) -> PIRItem:
@@ -261,18 +235,16 @@ class PIRDocument(RootModel[list[PIRItem]]):
     """A PIR file is a JSON list of PIRItem (single-object form is normalized
     to a one-element list before validation).
 
-    BEACON 0.16.0+ emits a wrapped object {"schema_version": ..., "pirs": [...]};
-    from_payload routes the wrapped form through ``PIROutputDocument`` so the
-    schema_version gate (see ``SUPPORTED_PIR_SCHEMA_VERSIONS``) fires before
-    the items are accepted.  Legacy list / single-object payloads bypass the
-    gate for backward compatibility with pre-0.16.0 fixtures.
+    BEACON 1.0.0+ emits a wrapped object {"schema_version": ..., "pirs": [...]};
+    ``from_payload`` routes the wrapped form through ``PIROutputDocument`` so
+    the schema_version gate (see ``SUPPORTED_PIR_SCHEMA_VERSIONS``) fires
+    before per-item validation. Bare list / single-object payloads remain
+    accepted for the SAGE-side PIR loader and direct ``PIRItem`` tests.
     """
 
     @classmethod
     def from_payload(cls, payload: object) -> PIRDocument:
         if isinstance(payload, dict) and "pirs" in payload:
-            # BEACON 0.16.0+ wrapped format — validate via PIROutputDocument
-            # so the schema_version gate runs before per-item validation.
             wrapper = PIROutputDocument.model_validate(payload)
             return cls(root=wrapper.pirs)
         if isinstance(payload, list):
@@ -282,163 +254,37 @@ class PIRDocument(RootModel[list[PIRItem]]):
         return cls.model_validate(items)
 
 
-# Version negotiation: only ``schema_version`` values listed here are accepted
-# in wrapped ``pir_output.json`` bundles.  A set is used (rather than an
-# equality check) so future minor releases — Initiative F adds ``"0.17.0"``
-# alongside Initiative E's ``"0.16.0"`` per plan §6 Phase 6 — can extend the
-# supported window in one line.
-SUPPORTED_PIR_SCHEMA_VERSIONS: set[str] = {"0.16.0", "0.17.0", "0.18.0"}
+# Initiative H (TRACE 1.12.0): tightened to ``{"1.0.0"}``. Pre-1.0 versions
+# (0.16.0 / 0.17.0 / 0.18.0) are now rejected with a per-version message
+# (see ``_REJECTED_VERSION_HISTORY`` below) directing the operator to
+# re-emit with BEACON 1.0.0+.
+SUPPORTED_PIR_SCHEMA_VERSIONS: set[str] = {"1.0.0"}
 
+# Plan H-12b: per-version reject message maps each historically supported
+# pre-1.0 schema_version to the TRACE minor that last accepted it. Other
+# unrecognised values (e.g. ``"0.15.0"`` or a future ``"1.1.0"``) fall
+# through to the generic message that names the current TRACE version.
+_REJECTED_VERSION_HISTORY: dict[str, str] = {
+    "0.16.0": "1.9.0",
+    "0.17.0": "1.10.0",
+    "0.18.0": "1.11.0",
+}
 
-# Initiative F (TRACE 1.10.0): the Capability sub-factor
-# ``recency_active_campaigns_90d`` was renamed to
-# ``recency_active_campaigns`` in BEACON 0.17.0 / schema_version 0.17.0.
-# The per-version normaliser below rewrites the legacy key to the
-# canonical name for 0.16.0 payloads and rejects the legacy key for
-# 0.17.0 payloads. No Pydantic alias is exposed on ``ScoreComponent`` so
-# the schema_version gate is the single source of truth.
-_RECENCY_LEGACY = "recency_active_campaigns_90d"
-_RECENCY_CURRENT = "recency_active_campaigns"
-
-# Initiative G (TRACE 1.11.0 / BEACON 0.18.0): IR-boost factors added
-# to ``score_breakdown.capability``, ``score_breakdown.opportunity``,
-# and ``score_breakdown.data_quality``. The per-version normaliser
-# enforces these fields appear ONLY under schema_version 0.18.0 — the
-# same "clean transition" pattern as the recency rename.
-_IR_CAPABILITY_KEY = "ir_observed_capability"
-_IR_OPPORTUNITY_KEY = "ir_observed_opportunity"
-_IR_BOOST_SKIPPED_KEY = "ir_boost_skipped"
-
-
-def _normalise_capability_recency(payload: dict, schema_version: str) -> None:
-    """Rewrite or reject the recency sub-factor key in-place.
-
-    Walks ``pirs[*].prioritized_actors[*]`` and inspects
-    ``score_breakdown.capability`` plus ``rationale.capability_factors``.
-    Raises ``ValueError`` (caught by Pydantic as ValidationError) when a
-    payload mixes the schema version and field name.
-    """
-    pirs = payload.get("pirs")
-    if not isinstance(pirs, list):
-        return
-    for pir in pirs:
-        if not isinstance(pir, dict):
-            continue
-        for actor in pir.get("prioritized_actors") or []:
-            if not isinstance(actor, dict):
-                continue
-            capability = (actor.get("score_breakdown") or {}).get("capability")
-            if isinstance(capability, dict):
-                _apply_recency_rule(capability, schema_version, where="score_breakdown.capability")
-            factors = (actor.get("rationale") or {}).get("capability_factors")
-            if isinstance(factors, dict):
-                _apply_recency_rule(factors, schema_version, where="rationale.capability_factors")
-
-
-def _apply_recency_rule(target: dict, schema_version: str, *, where: str) -> None:
-    has_legacy = _RECENCY_LEGACY in target
-    has_current = _RECENCY_CURRENT in target
-    if schema_version == "0.16.0":
-        if has_current:
-            raise ValueError(
-                f"schema_version 0.16.0 must use {_RECENCY_LEGACY!r}, not "
-                f"{_RECENCY_CURRENT!r} (found in {where}); the field rename "
-                f"is gated to schema_version 0.17.0"
-            )
-        if has_legacy:
-            target[_RECENCY_CURRENT] = target.pop(_RECENCY_LEGACY)
-    elif schema_version in {"0.17.0", "0.18.0"}:
-        # 0.18.0 inherits the canonical recency name from 0.17.0;
-        # the legacy ``_90d`` suffix is rejected on both versions.
-        if has_legacy:
-            raise ValueError(
-                f"schema_version {schema_version} must use {_RECENCY_CURRENT!r}, not "
-                f"{_RECENCY_LEGACY!r} (found in {where}); the field was "
-                f"renamed in Initiative F"
-            )
-
-
-def _normalise_ir_factors(payload: dict, schema_version: str) -> None:
-    """Reject IR-boost factor keys in-place when the schema_version is < 0.18.0.
-
-    The IR-boost factors (Initiative G) were added in BEACON 0.18.0 to
-    feed SAGE-observed incidents back into the Capability and Opportunity
-    aggregation. They must NOT appear under 0.16.0 / 0.17.0 — same
-    "clean transition" pattern as ``_apply_recency_rule``.
-
-    Walks ``pirs[*].prioritized_actors[*]`` and checks:
-      * ``score_breakdown.capability``    — ``ir_observed_capability``
-      * ``score_breakdown.opportunity``   — ``ir_observed_opportunity``
-      * ``score_breakdown.data_quality``  — ``ir_boost_skipped``
-      * ``rationale.capability_factors``  — ``ir_observed_capability``
-      * ``rationale.opportunity_factors`` — ``ir_observed_opportunity``
-
-    For 0.18.0 the keys pass through to ``ScoreComponent`` and
-    ``DataQuality`` for type / range validation.
-    """
-    if schema_version == "0.18.0":
-        return  # accept; downstream models handle the range check
-    pirs = payload.get("pirs")
-    if not isinstance(pirs, list):
-        return
-    for pir in pirs:
-        if not isinstance(pir, dict):
-            continue
-        for actor in pir.get("prioritized_actors") or []:
-            if not isinstance(actor, dict):
-                continue
-            breakdown = actor.get("score_breakdown") or {}
-            _reject_ir_key(
-                breakdown.get("capability"),
-                _IR_CAPABILITY_KEY,
-                schema_version,
-                where="score_breakdown.capability",
-            )
-            _reject_ir_key(
-                breakdown.get("opportunity"),
-                _IR_OPPORTUNITY_KEY,
-                schema_version,
-                where="score_breakdown.opportunity",
-            )
-            _reject_ir_key(
-                breakdown.get("data_quality"),
-                _IR_BOOST_SKIPPED_KEY,
-                schema_version,
-                where="score_breakdown.data_quality",
-            )
-            rationale = actor.get("rationale") or {}
-            _reject_ir_key(
-                rationale.get("capability_factors"),
-                _IR_CAPABILITY_KEY,
-                schema_version,
-                where="rationale.capability_factors",
-            )
-            _reject_ir_key(
-                rationale.get("opportunity_factors"),
-                _IR_OPPORTUNITY_KEY,
-                schema_version,
-                where="rationale.opportunity_factors",
-            )
-
-
-def _reject_ir_key(target: object, key: str, schema_version: str, *, where: str) -> None:
-    if not isinstance(target, dict):
-        return
-    if key in target:
-        raise ValueError(
-            f"schema_version {schema_version} must not include {key!r} "
-            f"(found in {where}); the field was introduced in "
-            f"schema_version 0.18.0 (Initiative G IR-boost)"
-        )
+# Hard-coded current TRACE version name used in reject messages. Kept in
+# sync with ``pyproject.toml`` at each release tag (Initiative H §6
+# Phase 7). A constant rather than ``importlib.metadata.version`` lookup
+# so the validator works during ``uv sync`` first-run before the package
+# is fully installed.
+_TRACE_VERSION = "1.12.0"
 
 
 class PIROutputDocument(BaseModel):
-    """Document-level schema for pir_output.json (BEACON 0.16.0+).
+    """Document-level schema for pir_output.json (BEACON 1.0.0+).
 
     Mirrors BEACON's ``PIROutputDocument`` shape for drift-check alignment.
-    ``schema_version`` is required; bundles without it or with a value outside
-    ``SUPPORTED_PIR_SCHEMA_VERSIONS`` are rejected so unannounced producer
-    schema changes cannot slip through to SAGE ingestion.
+    ``schema_version`` is required; bundles without it or with a value
+    outside ``SUPPORTED_PIR_SCHEMA_VERSIONS`` are rejected so unannounced
+    producer schema changes cannot slip through to SAGE ingestion.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -447,24 +293,22 @@ class PIROutputDocument(BaseModel):
     )
     pirs: list[PIRItem]
 
-    @model_validator(mode="before")
-    @classmethod
-    def _normalise_per_version(cls, data: object) -> object:
-        if not isinstance(data, dict):
-            return data
-        schema_version = data.get("schema_version")
-        if isinstance(schema_version, str) and schema_version in SUPPORTED_PIR_SCHEMA_VERSIONS:
-            _normalise_capability_recency(data, schema_version)
-            _normalise_ir_factors(data, schema_version)
-        return data
-
     @field_validator("schema_version")
     @classmethod
     def _check_supported_schema_version(cls, v: str) -> str:
-        if v not in SUPPORTED_PIR_SCHEMA_VERSIONS:
-            supported = ", ".join(sorted(SUPPORTED_PIR_SCHEMA_VERSIONS))
-            raise ValueError(f"unsupported schema version {v!r}; supported versions: {supported}")
-        return v
+        if v in SUPPORTED_PIR_SCHEMA_VERSIONS:
+            return v
+        legacy_trace = _REJECTED_VERSION_HISTORY.get(v)
+        if legacy_trace is not None:
+            raise ValueError(
+                f'schema_version "{v}" was supported in TRACE {legacy_trace}; '
+                f"please re-emit with BEACON 1.0.0+ output."
+            )
+        supported = "{" + ", ".join(sorted(SUPPORTED_PIR_SCHEMA_VERSIONS)) + "}"
+        raise ValueError(
+            f'schema_version "{v}" is not supported by TRACE {_TRACE_VERSION}; '
+            f"supported: {supported}."
+        )
 
 
 # ---------------------------------------------------------------------------

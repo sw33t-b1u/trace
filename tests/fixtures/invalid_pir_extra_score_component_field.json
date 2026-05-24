@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.16.0",
+  "schema_version": "1.0.0",
   "pirs": [
     {
       "pir_id": "PIR-EXTRA-FIELD-001",
@@ -27,7 +27,7 @@
               "score": 0.15,
               "sophistication_score": 0.667,
               "ttp_count_norm": 0.66,
-              "recency_active_campaigns_90d": 0.25
+              "recency_active_campaigns": 0.25
             },
             "opportunity": {
               "score": 0.03,

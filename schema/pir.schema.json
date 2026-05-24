@@ -63,7 +63,7 @@
     },
     "ActorTriageEntry": {
       "additionalProperties": true,
-      "description": "Single actor triage entry from BEACON 0.15.0 ``prioritized_actors[]``.\n\nBEACON 0.15.0+ emits one entry per scored threat actor; TRACE 1.8.0+\nvalidates each entry.  ``extra='allow'`` ensures forward compatibility\nwith future BEACON sub-fields without requiring a TRACE version bump.\nCanonical sub-factor names (per plan §3.3, renamed in Initiative F §3):\n  Capability: ttp_count_norm, sophistication_score, recency_active_campaigns\n  Opportunity: victimology_match, geographic_match, surface_ttp_coverage",
+      "description": "Single actor triage entry from BEACON's ``prioritized_actors[]``.\n\n``extra='allow'`` keeps the entry forward-compatible with additive\nBEACON sub-field additions (allowed in minors per the 90-day BC\npolicy).",
       "properties": {
         "actor_id": {
           "minLength": 1,
@@ -128,7 +128,7 @@
     },
     "DataQuality": {
       "additionalProperties": true,
-      "description": "Data quality metadata for actor triage entries.\n\n``ir_boost_skipped`` is added in schema_version 0.18.0 (Initiative G)\nand flags actors whose IR-boost SAGE call was skipped (``--no-sage``\nflag, SAGE unreachable, etc.). ``extra='allow'`` is preserved so\nfuture quality flags can be added without a TRACE version bump; the\nper-version normaliser enforces that ``ir_boost_skipped`` does not\nappear in 0.16.0 / 0.17.0 payloads.",
+      "description": "Data quality metadata for actor triage entries.\n\n``extra='allow'`` is preserved so new additive quality flags can be\nadded without a TRACE major bump (additive changes stay on\nschema_version 1.0.0 per H-2 / api-stability.md).",
       "properties": {
         "degraded": {
           "default": false,
@@ -231,14 +231,15 @@
       "required": [
         "pir_id",
         "valid_from",
-        "valid_until"
+        "valid_until",
+        "prioritized_actors"
       ],
       "title": "PIRItem",
       "type": "object"
     },
     "ScoreComponent": {
       "additionalProperties": false,
-      "description": "Generic I×C×O score component — strict mode (TRACE 1.9.0).\n\nUsed for intent / capability / opportunity sub-breakdowns in\nActorTriageEntry.  As of TRACE 1.9.0 (paired with BEACON 0.16.0) the\ncanonical sub-factor names are enumerated and ``extra='forbid'`` rejects\nunknown fields, catching typos and silent producer drift.  Adding a new\nsub-factor requires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and\nextending this model.\n\nSub-factor sets (per plan §3.3 + Initiative E §2.3/§2.4 + Initiative F §3):\n  Intent:       motivation_alignment, industry_match\n  Capability:   ttp_count_norm, sophistication_score,\n                recency_active_campaigns, tool_sophistication,\n                targeting_persistence, evasion_capability, depth, breadth\n  Opportunity:  victimology_match, geographic_match, surface_ttp_coverage\n\nField rename (Initiative F / TRACE 1.10.0 paired with BEACON 0.17.0):\n  ``recency_active_campaigns_90d`` → ``recency_active_campaigns``.\n  No Pydantic alias is exposed; the per-version normaliser on\n  ``PIROutputDocument`` rewrites ``_90d``-suffixed keys to the\n  canonical name for ``schema_version == \"0.16.0\"`` and rejects the\n  legacy key for ``\"0.17.0\"``. The schema_version gate enforces a\n  clean transition rather than indefinitely tolerating both names.\n\nIR-boost factors (Initiative G / TRACE 1.11.0 paired with BEACON 0.18.0):\n  ``ir_observed_capability`` (Capability) and\n  ``ir_observed_opportunity`` (Opportunity) are added in\n  schema_version 0.18.0. Both default to 1.0 on the BEACON producer\n  side (geometric-mean identity → SAGE-absent runs preserve the E\n  numerics). Under 0.16.0 / 0.17.0 these fields are rejected by the\n  per-version normaliser so a downgrade or sidegrade cannot leak\n  future-version factors into an older bundle.",
+      "description": "Generic I×C×O score component — strict mode.\n\nUsed for intent / capability / opportunity sub-breakdowns in\nActorTriageEntry. ``extra='forbid'`` rejects unknown fields,\ncatching typos and silent producer drift. Adding a new sub-factor\nrequires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and extending\nthis model.\n\nCanonical sub-factor names (committed surface as of schema_version\n1.0.0; see ``docs/api-stability.md``):\n  Intent:       motivation_alignment, industry_match\n  Capability:   ttp_count_norm, sophistication_score,\n                recency_active_campaigns, tool_sophistication,\n                targeting_persistence, evasion_capability, depth,\n                breadth, ir_observed_capability\n  Opportunity:  victimology_match, geographic_match,\n                surface_ttp_coverage, ir_observed_opportunity",
       "properties": {
         "breadth": {
           "anyOf": [
@@ -465,7 +466,7 @@
     }
   },
   "additionalProperties": true,
-  "description": "Document-level schema for pir_output.json (BEACON 0.16.0+).\n\nMirrors BEACON's ``PIROutputDocument`` shape for drift-check alignment.\n``schema_version`` is required; bundles without it or with a value outside\n``SUPPORTED_PIR_SCHEMA_VERSIONS`` are rejected so unannounced producer\nschema changes cannot slip through to SAGE ingestion.",
+  "description": "Document-level schema for pir_output.json (BEACON 1.0.0+).\n\nMirrors BEACON's ``PIROutputDocument`` shape for drift-check alignment.\n``schema_version`` is required; bundles without it or with a value\noutside ``SUPPORTED_PIR_SCHEMA_VERSIONS`` are rejected so unannounced\nproducer schema changes cannot slip through to SAGE ingestion.",
   "properties": {
     "pirs": {
       "items": {

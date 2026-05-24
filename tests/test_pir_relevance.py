@@ -142,6 +142,7 @@ def test_summarise_truncates_long_description() -> None:
         valid_from="2025-01-01",
         valid_until="2026-01-01",
         description=long,
+        prioritized_actors=[],
     )
     s = _summarise_pir(item)
     assert s["description"] is not None
@@ -161,6 +162,7 @@ def test_summarise_caps_notable_groups() -> None:
             "valid_from": "2025-01-01",
             "valid_until": "2026-01-01",
             "notable_groups": [f"APT{i}" for i in range(50)],
+            "prioritized_actors": [],
         }
     )
     s = _summarise_pir(item)

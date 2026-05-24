@@ -9,6 +9,7 @@
       {"tag": "sensitive-data", "criticality_multiplier": 1.5}
     ],
     "valid_from": "2025-01-01",
-    "valid_until": "2025-12-31"
+    "valid_until": "2025-12-31",
+    "prioritized_actors": []
   }
 ]
