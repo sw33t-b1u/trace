@@ -1,7 +1,7 @@
 """Persistent state for batch crawl dedupe.
 
 State file: ``output/crawl_state.json``. Written atomically via tmp + os.replace.
-Schema (version 1):
+Schema (version 1, additive — see Initiative G Phase 4 below):
 
     {
       "version": 1,
@@ -17,10 +17,25 @@ Schema (version 1):
             "matched_pir_ids": [...],
             "rationale": "<str-or-null>",
             "pir_set_hash": "<sha256-or-null>"
-          }
+          },
+          "iocs": [
+            {
+              "type": "ipv4" | "ipv6" | "fqdn" | "sha256" | "sha1" | "md5" | "cve_id",
+              "value": "<string>",
+              "confidence": <float 0.0 - 1.0>,
+              "context_snippet": "<<= 50 chars>"
+            }
+          ]
         }
       }
     }
+
+The ``iocs`` field was added in Initiative G Phase 4 (TRACE 1.11.0):
+populated by the L2 PIR-relevance gate in the same Vertex round-trip
+that drives the relevance decision. The field is additive — state
+files written by pre-G versions read back with ``iocs = []`` and the
+version number stays at ``1`` so old / new readers and writers
+coexist.
 """
 
 from __future__ import annotations
@@ -33,7 +48,7 @@ import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 STATE_VERSION = 1
 
@@ -80,6 +95,12 @@ class StateEntry:
     content_sha256: str
     bundle_path: str | None
     relevance: RelevanceRecord
+    # Initiative G Phase 4: per-article IoC list emitted by the same L2
+    # LLM call that produced ``relevance``. Each entry is a dict already
+    # validated by :func:`trace_engine.ingest.ioc_extractor.extract_iocs`.
+    # Defaults to an empty list so state files written by pre-G TRACE
+    # versions load without migration.
+    iocs: list[dict[str, Any]] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return {
@@ -88,6 +109,7 @@ class StateEntry:
             "content_sha256": self.content_sha256,
             "bundle_path": self.bundle_path,
             "relevance": self.relevance.as_dict(),
+            "iocs": list(self.iocs),
         }
 
     @classmethod
@@ -98,6 +120,7 @@ class StateEntry:
             content_sha256=raw["content_sha256"],
             bundle_path=raw.get("bundle_path"),
             relevance=RelevanceRecord.from_dict(raw.get("relevance") or {"decision": "no_pir"}),
+            iocs=list(raw.get("iocs") or []),
         )
 
 
@@ -157,6 +180,7 @@ class CrawlState:
         content_sha256: str,
         bundle_path: str | None,
         relevance: RelevanceRecord,
+        iocs: list[dict[str, Any]] | None = None,
         now: str | None = None,
     ) -> StateEntry:
         ts = now or _now_iso()
@@ -169,6 +193,7 @@ class CrawlState:
                 content_sha256=content_sha256,
                 bundle_path=bundle_path,
                 relevance=relevance,
+                iocs=list(iocs) if iocs else [],
             )
             self.entries[url] = entry
         return entry

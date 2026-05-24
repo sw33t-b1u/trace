@@ -16,10 +16,12 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from typing import Any
 
 import structlog
 
 from trace_engine.config import Config, load_config
+from trace_engine.ingest.ioc_extractor import extract_iocs
 from trace_engine.llm.client import call_llm, load_prompt
 from trace_engine.stix.extractor import _extract_json_from_text
 from trace_engine.validate.schema import PIRDocument, PIRItem
@@ -45,6 +47,13 @@ class RelevanceVerdict:
     matched_pir_ids: list[str] = field(default_factory=list)
     rationale: str = ""
     failed: bool = False  # True when extraction itself failed (fail-open)
+    # Initiative G Phase 4: the same L2 call that produces the relevance
+    # verdict also emits an optional ``iocs`` list. Each entry is a
+    # JSON-serialisable dict already validated by
+    # :func:`trace_engine.ingest.ioc_extractor.extract_iocs` so callers
+    # can persist it straight into ``crawl_state.json`` without an
+    # extra pydantic round-trip.
+    iocs: list[dict[str, Any]] = field(default_factory=list)
 
     def keep(self, threshold: float) -> bool:
         """Return True if the caller should proceed with L3 extraction."""
@@ -128,6 +137,7 @@ def _apply_high_value_boost(
         matched_pir_ids=verdict.matched_pir_ids,
         rationale=verdict.rationale,
         failed=verdict.failed,
+        iocs=verdict.iocs,
     )
 
 
@@ -139,6 +149,7 @@ def evaluate(
     restrict_to: list[str] | None = None,
     max_chars: int = _RELEVANCE_INPUT_MAX_CHARS,
     high_value_identity_names: list[str] | None = None,
+    article_url: str | None = None,
 ) -> RelevanceVerdict:
     """Ask the L2 LLM whether ``text`` is relevant to any PIR in ``pir_doc``.
 
@@ -151,6 +162,11 @@ def evaluate(
     mentions any of those identity names. Callers typically extract this
     list from ``identity_assets.json`` entries with
     ``is_high_value_impersonation_target=True``.
+
+    ``article_url`` (optional, Initiative G Phase 4 / TRACE 1.11.0) is
+    surfaced in IoC-validation log warnings so an operator can trace
+    a dropped IoC entry back to the source article. No effect on the
+    verdict shape; threaded through to :func:`_verdict_from_dict`.
     """
     cfg = config or load_config()
     template = load_prompt("relevance_check.md")
@@ -182,7 +198,11 @@ def evaluate(
 
     parsed = _extract_json_from_text(raw)
     if isinstance(parsed, dict):
-        return _apply_high_value_boost(_verdict_from_dict(parsed), text, high_value_identity_names)
+        return _apply_high_value_boost(
+            _verdict_from_dict(parsed, article_url=article_url),
+            text,
+            high_value_identity_names,
+        )
 
     # Full JSON parse failed — try the salvage path. Truncation typically
     # happens inside `rationale`, after `score` and `matched_pir_ids` have
@@ -208,15 +228,26 @@ def evaluate(
     )
 
 
-def _verdict_from_dict(parsed: dict) -> RelevanceVerdict:
+def _verdict_from_dict(parsed: dict, *, article_url: str | None = None) -> RelevanceVerdict:
     score = _coerce_score(parsed.get("score"))
     matched_raw = parsed.get("matched_pir_ids") or []
     matched = [str(m) for m in matched_raw] if isinstance(matched_raw, list) else []
     rationale = (parsed.get("rationale") or "").strip()
     if len(rationale) > 200:
         rationale = rationale[:200]
-    logger.info("relevance_call_done", score=score, matched_pir_ids=matched)
-    return RelevanceVerdict(score=score, matched_pir_ids=matched, rationale=rationale)
+    iocs = extract_iocs(parsed.get("iocs"), article_url=article_url)
+    logger.info(
+        "relevance_call_done",
+        score=score,
+        matched_pir_ids=matched,
+        ioc_count=len(iocs),
+    )
+    return RelevanceVerdict(
+        score=score,
+        matched_pir_ids=matched,
+        rationale=rationale,
+        iocs=iocs,
+    )
 
 
 _SCORE_RE = re.compile(r'"score"\s*:\s*([0-9]+(?:\.[0-9]+)?)')

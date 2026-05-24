@@ -1,0 +1,31 @@
+{
+  "score": 0.85,
+  "matched_pir_ids": ["PIR-G-001"],
+  "rationale": "Active campaign by TestActorAlpha; impacts mail relay",
+  "iocs": [
+    {
+      "type": "fqdn",
+      "value": "evil.example.com",
+      "confidence": 0.95,
+      "context_snippet": "command-and-control endpoint at evil.example.com,"
+    },
+    {
+      "type": "ipv4",
+      "value": "192.0.2.10",
+      "confidence": 0.9,
+      "context_snippet": "evil.example.com, hosted on 192.0.2.10."
+    },
+    {
+      "type": "sha256",
+      "value": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+      "confidence": 0.99,
+      "context_snippet": "The dropper's SHA-256 was abcdef0123"
+    },
+    {
+      "type": "cve_id",
+      "value": "CVE-2026-12345",
+      "confidence": 0.97,
+      "context_snippet": "exploited CVE-2026-12345 to elevate"
+    }
+  ]
+}

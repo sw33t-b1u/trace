@@ -267,6 +267,7 @@ def _process_source_body(
             pir_doc,
             config=cfg,
             restrict_to=source.pir_ids or None,
+            article_url=source.url,
         )
         if not verdict.keep(threshold):
             state.upsert(
@@ -280,6 +281,7 @@ def _process_source_body(
                     rationale=verdict.rationale,
                     pir_set_hash=pir_set_hash,
                 ),
+                iocs=verdict.iocs,
             )
             return BatchOutcome(
                 url=source.url,
@@ -303,6 +305,7 @@ def _process_source_body(
                 rationale=verdict.rationale if verdict else None,
                 pir_set_hash=pir_set_hash,
             ),
+            iocs=verdict.iocs if verdict else None,
         )
         return BatchOutcome(
             url=source.url,
@@ -336,6 +339,7 @@ def _process_source_body(
             rationale=verdict.rationale if verdict else None,
             pir_set_hash=pir_set_hash,
         ),
+        iocs=verdict.iocs if verdict else None,
     )
     return BatchOutcome(
         url=source.url,
