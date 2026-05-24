@@ -6,6 +6,44 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.11.0] - 2026-05-24
+
+Initiative G (IR Feedback Ingestion + Diamond Model Support) release —
+paired with BEACON 0.18.0 + SAGE 0.13.0.
+
+### Added
+
+- **LLM-driven IoC extraction** (Phase 4, `321d55b`): the existing
+  Vertex AI relevance-check call also returns a structured `iocs[]`
+  list in the same response (single LLM round-trip per article — no
+  extra cost). 7 IoC types: IPv4, IPv6, FQDN, SHA256, SHA1, MD5,
+  CVE-ID. Each entry carries `type`, `value`, `confidence`, and a
+  50-char `context_snippet`. Regex-based extraction rejected per
+  2026-05-23 user policy (unacceptable false-positive rate). Persisted
+  to `crawl_state.json[entry_url].iocs[]`; backward-compat to empty
+  list on legacy state files.
+- **`cmd/search_iocs.py` CLI** (Phase 5, `4f4d692`): query the
+  Phase 4 IoC index. Flags `--ioc`, `--type {ipv4|ipv6|fqdn|sha256|sha1|md5|cve_id}`,
+  `--tlp-max {clear|green|amber|red}` (default amber — TLP:RED
+  hidden unless explicit opt-in), `--state-path`, `--json`. Returns
+  matched articles with `matched_url`, `first_seen`, `bundle_path`,
+  `context_snippet`. Recognises 9 canonical TLP marking-definition
+  UUIDs (TLP 1.0 + 2.0); most-restrictive marking wins per bundle;
+  bundles without explicit marking default to TLP:CLEAR.
+- **`SUPPORTED_PIR_SCHEMA_VERSIONS` extended to
+  `{"0.16.0", "0.17.0", "0.18.0"}`** (Phase 7, `1dfd021`): BEACON
+  0.18.0 IR-boost output validates clean. The Phase 6 (Initiative F)
+  `PIROutputDocument` mode="before" normaliser is extended to
+  recognise the new `ir_observed_capability`, `ir_observed_opportunity`,
+  and `ir_boost_skipped` fields under 0.18.0 only. Cross-version
+  contamination (IR field under 0.17.0 schema_version, or vice
+  versa) is rejected in both `score_breakdown.{capability,opportunity}`
+  and `rationale.{capability,opportunity}_factors`.
+- **Unsupported-version reject target moved from `"0.18.0"` to
+  `"0.19.0"`** (Phase 7, `1dfd021`).
+- **`docs/ir-feedback-flow.md`** (Phase 8, `3592b53`): relative
+  symlink to `sage/docs/ir-feedback-flow.md` (authoritative source).
+
 ## [1.10.0] - 2026-05-24
 
 Initiative F (Temporal Window + Collection Plan + Summary API + RSS)
