@@ -19,6 +19,13 @@ Usage:
 
     # Dry-run: report what would change without writing
     uv run python cmd/update_taxonomy_cache.py --dry-run
+
+.. deprecated:: TRACE 1.12.0
+
+    Direct invocation as ``python -m cmd.update_taxonomy_cache`` /
+    ``python cmd/update_taxonomy_cache.py`` is deprecated. Use the
+    unified ``trace taxonomy-refresh`` entry (Initiative H Phase 6).
+    Removal is scheduled for TRACE 2.0.
 """
 
 from __future__ import annotations
@@ -149,4 +156,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    sys.stderr.write(
+        "DeprecationWarning: 'python -m cmd.update_taxonomy_cache' / "
+        "'python cmd/update_taxonomy_cache.py' is deprecated as of TRACE 1.12.0. "
+        "Use 'trace taxonomy-refresh' instead; cmd/* invocations are "
+        "scheduled for removal in TRACE 2.0.\n"
+    )
     main()

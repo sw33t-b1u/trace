@@ -13,6 +13,13 @@ a deprecation stub in BEACON 0.9.x and was deleted in BEACON 0.10.0.
 Usage:
     uv run python cmd/validate_pir.py --pir pir_output.json
     uv run python cmd/validate_pir.py --pir pir.json --assets assets.json
+
+.. deprecated:: TRACE 1.12.0
+
+    Direct invocation as ``python -m cmd.validate_pir`` /
+    ``python cmd/validate_pir.py`` is deprecated. Use the unified
+    ``trace validate-pir`` entry (Initiative H Phase 6). Removal is
+    scheduled for TRACE 2.0.
 """
 
 from __future__ import annotations
@@ -136,4 +143,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    sys.stderr.write(
+        "DeprecationWarning: 'python -m cmd.validate_pir' / "
+        "'python cmd/validate_pir.py' is deprecated as of TRACE 1.12.0. "
+        "Use 'trace validate-pir' instead; cmd/* invocations are "
+        "scheduled for removal in TRACE 2.0.\n"
+    )
     main()

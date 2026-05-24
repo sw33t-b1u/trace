@@ -20,6 +20,13 @@ Usage:
         --input external.json \\
         --output enriched.json \\
         --taxonomy schema/threat_taxonomy.cached.json
+
+.. deprecated:: TRACE 1.12.0
+
+    Direct invocation as ``python -m cmd.enrich_bundle`` /
+    ``python cmd/enrich_bundle.py`` is deprecated. Use the unified
+    ``trace enrich-bundle`` entry (Initiative H Phase 6). Removal is
+    scheduled for TRACE 2.0.
 """
 
 from __future__ import annotations
@@ -127,4 +134,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    sys.stderr.write(
+        "DeprecationWarning: 'python -m cmd.enrich_bundle' / "
+        "'python cmd/enrich_bundle.py' is deprecated as of TRACE 1.12.0. "
+        "Use 'trace enrich-bundle' instead; cmd/* invocations are "
+        "scheduled for removal in TRACE 2.0.\n"
+    )
     main()

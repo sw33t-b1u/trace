@@ -12,6 +12,13 @@ when ``--report`` is supplied.
 Usage:
     uv run python cmd/validate_assets.py --assets path/to/assets.json
     uv run python cmd/validate_assets.py --assets a.json --report output/report.md
+
+.. deprecated:: TRACE 1.12.0
+
+    Direct invocation as ``python -m cmd.validate_assets`` /
+    ``python cmd/validate_assets.py`` is deprecated. Use the unified
+    ``trace validate-assets`` entry (Initiative H Phase 6). Removal is
+    scheduled for TRACE 2.0.
 """
 
 from __future__ import annotations
@@ -99,4 +106,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    sys.stderr.write(
+        "DeprecationWarning: 'python -m cmd.validate_assets' / "
+        "'python cmd/validate_assets.py' is deprecated as of TRACE 1.12.0. "
+        "Use 'trace validate-assets' instead; cmd/* invocations are "
+        "scheduled for removal in TRACE 2.0.\n"
+    )
     main()

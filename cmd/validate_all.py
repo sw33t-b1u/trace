@@ -9,6 +9,13 @@ Default output path is ``output/validation_report_<UTC-iso-compact>.md``.
 
 Usage:
     uv run python cmd/validate_all.py --assets a.json --pir p.json --bundle b.json
+
+.. deprecated:: TRACE 1.12.0
+
+    Direct invocation as ``python -m cmd.validate_all`` /
+    ``python cmd/validate_all.py`` is deprecated. Use the unified
+    ``trace validate-all`` entry (Initiative H Phase 6). Removal is
+    scheduled for TRACE 2.0.
 """
 
 from __future__ import annotations
@@ -152,4 +159,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    sys.stderr.write(
+        "DeprecationWarning: 'python -m cmd.validate_all' / "
+        "'python cmd/validate_all.py' is deprecated as of TRACE 1.12.0. "
+        "Use 'trace validate-all' instead; cmd/* invocations are "
+        "scheduled for removal in TRACE 2.0.\n"
+    )
     main()

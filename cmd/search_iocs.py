@@ -26,6 +26,13 @@ Exit codes:
 
 * ``0`` — query executed successfully (match OR no-match are both 0).
 * ``2`` — state file missing / unreadable / version mismatch.
+
+.. deprecated:: TRACE 1.12.0
+
+    Direct invocation as ``python -m cmd.search_iocs`` /
+    ``python cmd/search_iocs.py`` is deprecated. Use the unified
+    ``trace search-iocs`` entry (Initiative H Phase 6). Removal is
+    scheduled for TRACE 2.0.
 """
 
 from __future__ import annotations
@@ -333,4 +340,10 @@ def main(
 
 
 if __name__ == "__main__":
+    sys.stderr.write(
+        "DeprecationWarning: 'python -m cmd.search_iocs' / "
+        "'python cmd/search_iocs.py' is deprecated as of TRACE 1.12.0. "
+        "Use 'trace search-iocs' instead; cmd/* invocations are "
+        "scheduled for removal in TRACE 2.0.\n"
+    )
     main()

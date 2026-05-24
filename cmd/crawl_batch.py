@@ -15,6 +15,14 @@ Usage:
 
 Exit codes: 0 success / 1 if any source produced fetch_failed or
 extraction_failed / 2 input/argument error.
+
+.. deprecated:: TRACE 1.12.0
+
+    Direct invocation as ``python -m cmd.crawl_batch`` /
+    ``python cmd/crawl_batch.py`` is deprecated. Use the unified
+    ``trace crawl-batch`` entry (Initiative H Phase 6). The ``cmd/*``
+    module remains importable for the 1.x line; removal is scheduled
+    for TRACE 2.0.
 """
 
 from __future__ import annotations
@@ -228,4 +236,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    sys.stderr.write(
+        "DeprecationWarning: 'python -m cmd.crawl_batch' / "
+        "'python cmd/crawl_batch.py' is deprecated as of TRACE 1.12.0. "
+        "Use 'trace crawl-batch' instead; cmd/* invocations are "
+        "scheduled for removal in TRACE 2.0.\n"
+    )
     main()

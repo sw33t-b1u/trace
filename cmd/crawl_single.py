@@ -21,6 +21,13 @@ Usage:
 
 The resulting STIX bundle can be fed directly to SAGE ETL after passing
 TRACE's validate_stix gate.
+
+.. deprecated:: TRACE 1.12.0
+
+    Direct invocation as ``python -m cmd.crawl_single`` /
+    ``python cmd/crawl_single.py`` is deprecated. Use the unified
+    ``trace crawl-single`` entry (Initiative H Phase 6). Removal is
+    scheduled for TRACE 2.0.
 """
 
 from __future__ import annotations
@@ -271,4 +278,10 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    sys.stderr.write(
+        "DeprecationWarning: 'python -m cmd.crawl_single' / "
+        "'python cmd/crawl_single.py' is deprecated as of TRACE 1.12.0. "
+        "Use 'trace crawl-single' instead; cmd/* invocations are "
+        "scheduled for removal in TRACE 2.0.\n"
+    )
     main()

@@ -24,6 +24,12 @@ dev = [
     "pip-audit>=2.7.0",
 ]
 
+# Initiative H Phase 6 (TRACE 1.12.0) — unified ``trace`` entry; legacy
+# ``python -m cmd.<name>`` invocations remain functional in 1.x with a
+# deprecation message and are scheduled for removal in TRACE 2.0.
+[project.scripts]
+trace = "trace_engine.cli:cli"
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
