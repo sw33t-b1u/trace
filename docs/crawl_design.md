@@ -267,6 +267,54 @@ os.replace`. Schema (version `1`):
 `relevance.decision` ∈ `{kept, skipped_below_threshold, extraction_failed,
 no_pir}`.
 
+Initiative G Phase 4 (TRACE 1.11.0) adds an `iocs` array per entry,
+populated by the same L2 Vertex call that produces the relevance
+verdict (no extra LLM round-trip):
+
+```json
+"iocs": [
+  {
+    "type": "ipv4" | "ipv6" | "fqdn" | "sha256" | "sha1" | "md5" | "cve_id",
+    "value": "<string>",
+    "confidence": <float 0.0-1.0>,
+    "context_snippet": "<<= 50 chars of surrounding article text>"
+  }
+]
+```
+
+The field is additive — pre-Phase-4 state files read back with
+`iocs = []` and stay version `1`.
+
+### Searching the IoC index (`cmd/search_iocs.py`)
+
+Initiative G Phase 5 adds a query CLI over the `iocs[]` index. Exact
+match, case-insensitive on both value and type:
+
+```sh
+# Find any article that mentioned an FQDN.
+uv run python -m cmd.search_iocs --ioc evil.example.com
+
+# Narrow by IoC type.
+uv run python -m cmd.search_iocs --ioc CVE-2026-12345 --type cve_id
+
+# JSON output (jq-friendly).
+uv run python -m cmd.search_iocs --ioc 192.0.2.10 --json | jq '.[].matched_url'
+
+# TLP filter — default --tlp-max=amber hides TLP:RED bundles. Pass
+# --tlp-max=red to surface them explicitly when handling sensitive
+# intel; --tlp-max=clear narrows further to fully-shareable bundles.
+uv run python -m cmd.search_iocs --ioc evil.example.com --tlp-max red
+```
+
+TLP resolution scans the STIX bundle at `entries[url].bundle_path`
+for canonical `object_marking_refs` (TLP 1.0 and 2.0). Bundles that
+carry no TLP marking — or whose file is missing — are treated as
+TLP:CLEAR (visible at all `--tlp-max` levels) so legacy bundles are
+not silently hidden.
+
+Exit codes: `0` for both match and no-match (both are successful
+outcomes); `2` when the state file cannot be loaded.
+
 ---
 
 ## 7. Dedupe strategy

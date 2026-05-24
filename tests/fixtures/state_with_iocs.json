@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "entries": {
+    "https://example.com/articles/clear-article": {
+      "first_seen": "2026-05-24T10:00:00.000Z",
+      "last_seen": "2026-05-24T10:00:00.000Z",
+      "content_sha256": "aaaaaaaa",
+      "bundle_path": "output/bundle_clear.json",
+      "relevance": {
+        "decision": "kept",
+        "score": 0.9,
+        "matched_pir_ids": ["PIR-G-001"],
+        "rationale": "active campaign",
+        "pir_set_hash": "deadbeef"
+      },
+      "iocs": [
+        {
+          "type": "fqdn",
+          "value": "evil.example.com",
+          "confidence": 0.95,
+          "context_snippet": "C2 endpoint at evil.example.com"
+        },
+        {
+          "type": "ipv4",
+          "value": "192.0.2.10",
+          "confidence": 0.9,
+          "context_snippet": "hosted on 192.0.2.10"
+        }
+      ]
+    },
+    "https://example.com/articles/green-article": {
+      "first_seen": "2026-05-24T11:00:00.000Z",
+      "last_seen": "2026-05-24T11:00:00.000Z",
+      "content_sha256": "bbbbbbbb",
+      "bundle_path": "output/bundle_green.json",
+      "relevance": {
+        "decision": "kept",
+        "score": 0.7,
+        "matched_pir_ids": ["PIR-G-001"],
+        "rationale": "related campaign",
+        "pir_set_hash": "deadbeef"
+      },
+      "iocs": [
+        {
+          "type": "sha256",
+          "value": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+          "confidence": 0.99,
+          "context_snippet": "dropper SHA-256 = abcdef..."
+        },
+        {
+          "type": "cve_id",
+          "value": "CVE-2026-12345",
+          "confidence": 0.97,
+          "context_snippet": "exploited CVE-2026-12345 to elevate"
+        }
+      ]
+    },
+    "https://example.com/articles/amber-article": {
+      "first_seen": "2026-05-24T12:00:00.000Z",
+      "last_seen": "2026-05-24T12:00:00.000Z",
+      "content_sha256": "cccccccc",
+      "bundle_path": "output/bundle_amber.json",
+      "relevance": {
+        "decision": "kept",
+        "score": 0.6,
+        "matched_pir_ids": ["PIR-G-001"],
+        "rationale": "amber tagged",
+        "pir_set_hash": "deadbeef"
+      },
+      "iocs": [
+        {
+          "type": "fqdn",
+          "value": "evil.example.com",
+          "confidence": 0.8,
+          "context_snippet": "mentioned in amber report"
+        }
+      ]
+    },
+    "https://example.com/articles/red-article": {
+      "first_seen": "2026-05-24T13:00:00.000Z",
+      "last_seen": "2026-05-24T13:00:00.000Z",
+      "content_sha256": "dddddddd",
+      "bundle_path": "output/bundle_red.json",
+      "relevance": {
+        "decision": "kept",
+        "score": 0.95,
+        "matched_pir_ids": ["PIR-G-001"],
+        "rationale": "red tagged",
+        "pir_set_hash": "deadbeef"
+      },
+      "iocs": [
+        {
+          "type": "fqdn",
+          "value": "evil.example.com",
+          "confidence": 0.99,
+          "context_snippet": "deep-confidential RED context"
+        }
+      ]
+    },
+    "https://example.com/articles/no-iocs": {
+      "first_seen": "2026-05-24T14:00:00.000Z",
+      "last_seen": "2026-05-24T14:00:00.000Z",
+      "content_sha256": "eeeeeeee",
+      "bundle_path": null,
+      "relevance": {
+        "decision": "skipped_below_threshold",
+        "score": 0.1,
+        "matched_pir_ids": [],
+        "rationale": "below threshold",
+        "pir_set_hash": "deadbeef"
+      },
+      "iocs": []
+    }
+  }
+}
