@@ -232,26 +232,28 @@ class PIRItem(BaseModel):
 
 
 class PIRDocument(RootModel[list[PIRItem]]):
-    """A PIR file is a JSON list of PIRItem (single-object form is normalized
-    to a one-element list before validation).
+    """Root model wrapping the list of :class:`PIRItem` rows the rest of
+    TRACE works with.
 
-    BEACON 1.0.0+ emits a wrapped object {"schema_version": ..., "pirs": [...]};
-    ``from_payload`` routes the wrapped form through ``PIROutputDocument`` so
-    the schema_version gate (see ``SUPPORTED_PIR_SCHEMA_VERSIONS``) fires
-    before per-item validation. Bare list / single-object payloads remain
-    accepted for the SAGE-side PIR loader and direct ``PIRItem`` tests.
+    Initiative H tightened the on-disk contract: every PIR payload must
+    arrive as a BEACON 1.0.0 wrapped envelope
+    (``{"schema_version": "1.0.0", "pirs": [...]}``). ``from_payload``
+    rejects bare lists or single objects with a migration error. Callers
+    that needed those legacy shapes have been moved onto the wrapped
+    envelope (see ``src/trace_engine/pir/loader.py``,
+    ``cmd/validate_pir.py``, ``cmd/validate_all.py``).
     """
 
     @classmethod
     def from_payload(cls, payload: object) -> PIRDocument:
-        if isinstance(payload, dict) and "pirs" in payload:
-            wrapper = PIROutputDocument.model_validate(payload)
-            return cls(root=wrapper.pirs)
-        if isinstance(payload, list):
-            items = payload
-        else:
-            items = [payload]
-        return cls.model_validate(items)
+        if not isinstance(payload, dict) or "pirs" not in payload:
+            raise ValueError(
+                "Bare-list PIR input is no longer supported as of TRACE 1.12.0; "
+                "wrap your input as "
+                '{"schema_version": "1.0.0", "pirs": [...]}'
+            )
+        wrapper = PIROutputDocument.model_validate(payload)
+        return cls(root=wrapper.pirs)
 
 
 # Initiative H (TRACE 1.12.0): tightened to ``{"1.0.0"}``. Pre-1.0 versions

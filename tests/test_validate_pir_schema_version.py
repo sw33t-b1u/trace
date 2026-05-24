@@ -1,9 +1,11 @@
-"""Tests for the BEACON 1.0.0 wrapped pir_output gate (TRACE 1.12.0 — Phase 2).
+"""Tests for the BEACON 1.0.0 wrapped pir_output gate (TRACE 1.12.0).
 
-Initiative H locks ``SUPPORTED_PIR_SCHEMA_VERSIONS`` to ``{"1.0.0"}``. The
-pre-1.0 normaliser (recency-rename, IR-factor cross-version contamination
-gate) has been removed; ``test_per_version_reject_message`` covers the
-H-12b per-version error message for the rejected pre-1.0 values.
+Initiative H locks ``SUPPORTED_PIR_SCHEMA_VERSIONS`` to ``{"1.0.0"}`` and
+tightens ``PIRDocument.from_payload`` to accept ONLY the wrapped
+``{"schema_version": "1.0.0", "pirs": [...]}`` envelope. The pre-1.0
+normaliser (recency rename, IR-factor cross-version contamination gate)
+and the bare-list dispatch are removed; ``test_per_version_reject_message``
+covers the H-12b per-version error message for rejected pre-1.0 values.
 
 Covered here:
   - ``SUPPORTED_PIR_SCHEMA_VERSIONS`` is a single-element ``set[str]`` of
@@ -15,9 +17,8 @@ Covered here:
     both ``PIROutputDocument`` and ``PIRDocument.from_payload``.
   - ``ScoreComponent`` strict mode still rejects unknown sub-factor keys
     both directly and via a wrapped fixture.
-  - Bare-list (non-wrapped) payloads continue to load through
-    ``PIRDocument.from_payload`` — the SAGE-side PIR loader and direct
-    ``PIRItem`` tests depend on that path.
+  - Bare-list / single-object payloads are rejected with the migration
+    ValueError naming TRACE 1.12.0.
 """
 
 from __future__ import annotations
@@ -188,19 +189,24 @@ class TestScoreComponentStrict:
 
 
 # ---------------------------------------------------------------------------
-# Bare-list / single-object payload — non-wrapped path still works.
+# Bare-list / single-object payload — rejected as of Initiative H Phase 3.
 # ---------------------------------------------------------------------------
 
 
-class TestBareListPayload:
-    def test_bare_list_payload_loads(self):
-        payload = _load("valid_pir.json")
-        doc = PIRDocument.from_payload(payload)
-        assert len(doc.root) == 1
-        assert doc.root[0].prioritized_actors == []
+class TestBareListPayloadRejected:
+    def test_bare_list_payload_raises_migration_value_error(self):
+        wrapped = _load("valid_pir.json")
+        bare_list = wrapped["pirs"]
+        with pytest.raises(ValueError) as exc:
+            PIRDocument.from_payload(bare_list)
+        msg = str(exc.value)
+        assert "Bare-list PIR input is no longer supported" in msg
+        assert "TRACE 1.12.0" in msg
+        assert '"schema_version": "1.0.0"' in msg
 
-    def test_bare_single_object_payload_loads(self):
-        payload = _load("valid_pir.json")[0]
-        doc = PIRDocument.from_payload(payload)
-        assert len(doc.root) == 1
-        assert doc.root[0].prioritized_actors == []
+    def test_bare_single_object_payload_raises_migration_value_error(self):
+        wrapped = _load("valid_pir.json")
+        bare_object = wrapped["pirs"][0]
+        with pytest.raises(ValueError) as exc:
+            PIRDocument.from_payload(bare_object)
+        assert "Bare-list PIR input is no longer supported" in str(exc.value)

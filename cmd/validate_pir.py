@@ -62,6 +62,16 @@ def validate_pir_file(
                 )
             )
         return None, findings
+    except ValueError as exc:
+        findings.append(
+            ValidationFinding(
+                severity="error",
+                code="SCHEMA_ENVELOPE",
+                location=str(pir_path),
+                message=str(exc),
+            )
+        )
+        return None, findings
 
     assets_doc: AssetsDocument | None = None
     if assets_path:

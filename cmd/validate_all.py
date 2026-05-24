@@ -75,6 +75,15 @@ def _validate_pir(
         doc = PIRDocument.from_payload(payload)
     except ValidationError as exc:
         return None, _schema_findings(exc, "PIR_SCHEMA")
+    except ValueError as exc:
+        return None, [
+            ValidationFinding(
+                severity="error",
+                code="PIR_SCHEMA_ENVELOPE",
+                location=str(path),
+                message=str(exc),
+            )
+        ]
     return doc, check_pir(doc, assets=assets)
 
 

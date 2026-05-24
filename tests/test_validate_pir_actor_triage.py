@@ -25,6 +25,13 @@ from trace_engine.validate.schema import ActorTriageEntry, PIRDocument
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
+
+def _wrap(pirs: list[dict]) -> dict:
+    """Wrap a list of PIRItem dicts in the 1.0.0 envelope required by
+    ``PIRDocument.from_payload`` after Initiative H."""
+    return {"schema_version": "1.0.0", "pirs": pirs}
+
+
 # ---------------------------------------------------------------------------
 # Minimal valid BEACON-shaped PIR (no prioritized_actors) — legacy baseline
 # ---------------------------------------------------------------------------
@@ -102,12 +109,12 @@ _PIR_WITH_ACTORS = {
 
 class TestPrioritizedActorsRequired:
     def test_pir_with_empty_prioritized_actors_passes(self):
-        doc = PIRDocument.from_payload([_BASE_PIR])
+        doc = PIRDocument.from_payload(_wrap([_BASE_PIR]))
         assert len(doc.root) == 1
         assert doc.root[0].pir_id == "PIR-BASE-001"
         assert doc.root[0].prioritized_actors == []
 
-    def test_bare_list_fixture_with_empty_prioritized_actors_passes(self):
+    def test_wrapped_fixture_with_empty_prioritized_actors_passes(self):
         data = json.loads((FIXTURES / "valid_pir.json").read_text())
         doc = PIRDocument.from_payload(data)
         assert doc.root[0].prioritized_actors == []
@@ -120,7 +127,7 @@ class TestPrioritizedActorsRequired:
         pir = deepcopy(_BASE_PIR)
         del pir["prioritized_actors"]
         with pytest.raises(ValidationError) as exc:
-            PIRDocument.from_payload([pir])
+            PIRDocument.from_payload(_wrap([pir]))
         msg = str(exc.value).lower()
         assert "prioritized_actors" in msg
         assert "field required" in msg or "missing" in msg
@@ -133,7 +140,7 @@ class TestPrioritizedActorsRequired:
 
 class TestValidActors:
     def test_single_valid_actor_entry_passes(self):
-        doc = PIRDocument.from_payload([_PIR_WITH_ACTORS])
+        doc = PIRDocument.from_payload(_wrap([_PIR_WITH_ACTORS]))
         actors = doc.root[0].prioritized_actors
         assert len(actors) == 1
         assert actors[0].actor_id == "threat-actor--00000000-0000-4000-8000-000000000001"
@@ -143,13 +150,13 @@ class TestValidActors:
     def test_likelihood_boundary_zero_passes(self):
         entry = copy.deepcopy(_VALID_ACTOR_ENTRY)
         entry["likelihood"] = 0.0
-        doc = PIRDocument.from_payload([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}])
+        doc = PIRDocument.from_payload(_wrap([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}]))
         assert doc.root[0].prioritized_actors[0].likelihood == 0.0
 
     def test_likelihood_boundary_one_passes(self):
         entry = copy.deepcopy(_VALID_ACTOR_ENTRY)
         entry["likelihood"] = 1.0
-        doc = PIRDocument.from_payload([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}])
+        doc = PIRDocument.from_payload(_wrap([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}]))
         assert doc.root[0].prioritized_actors[0].likelihood == 1.0
 
     def test_multiple_actors_sorted_by_likelihood(self):
@@ -158,7 +165,7 @@ class TestValidActors:
         entry2["name"] = "TestActorBeta"
         entry2["likelihood"] = 0.001
         doc = PIRDocument.from_payload(
-            [{**_PIR_WITH_ACTORS, "prioritized_actors": [_VALID_ACTOR_ENTRY, entry2]}]
+            _wrap([{**_PIR_WITH_ACTORS, "prioritized_actors": [_VALID_ACTOR_ENTRY, entry2]}])
         )
         assert len(doc.root[0].prioritized_actors) == 2
 
@@ -172,11 +179,11 @@ class TestValidActors:
         entry = copy.deepcopy(_VALID_ACTOR_ENTRY)
         entry["score_breakdown"]["intent"]["future_sub_factor"] = 0.99
         with pytest.raises(ValidationError) as exc:
-            PIRDocument.from_payload([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}])
+            PIRDocument.from_payload(_wrap([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}]))
         assert "future_sub_factor" in str(exc.value)
 
     def test_empty_prioritized_actors_list_passes(self):
-        doc = PIRDocument.from_payload([{**_PIR_WITH_ACTORS, "prioritized_actors": []}])
+        doc = PIRDocument.from_payload(_wrap([{**_PIR_WITH_ACTORS, "prioritized_actors": []}]))
         assert doc.root[0].prioritized_actors == []
 
 
@@ -186,10 +193,10 @@ class TestValidActors:
 
 
 class TestLikelihoodBounds:
-    def _make_pir(self, likelihood: float) -> list:
+    def _make_pir(self, likelihood: float) -> dict:
         entry = copy.deepcopy(_VALID_ACTOR_ENTRY)
         entry["likelihood"] = likelihood
-        return [{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}]
+        return _wrap([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}])
 
     def test_likelihood_above_one_rejected(self):
         with pytest.raises(ValidationError) as exc:
@@ -205,7 +212,7 @@ class TestLikelihoodBounds:
         entry = copy.deepcopy(_VALID_ACTOR_ENTRY)
         entry["likelihood"] = "high"
         with pytest.raises(ValidationError):
-            PIRDocument.from_payload([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}])
+            PIRDocument.from_payload(_wrap([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}]))
 
 
 # ---------------------------------------------------------------------------
@@ -214,10 +221,10 @@ class TestLikelihoodBounds:
 
 
 class TestMissingRequiredFields:
-    def _drop(self, field: str) -> list:
+    def _drop(self, field: str) -> dict:
         entry = copy.deepcopy(_VALID_ACTOR_ENTRY)
         del entry[field]
-        return [{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}]
+        return _wrap([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}])
 
     def test_missing_actor_id_rejected(self):
         with pytest.raises(ValidationError):
@@ -243,7 +250,7 @@ class TestMissingRequiredFields:
         entry = copy.deepcopy(_VALID_ACTOR_ENTRY)
         entry["actor_id"] = ""
         with pytest.raises(ValidationError):
-            PIRDocument.from_payload([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}])
+            PIRDocument.from_payload(_wrap([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}]))
 
 
 # ---------------------------------------------------------------------------
@@ -256,25 +263,25 @@ class TestWrongTypes:
         entry = copy.deepcopy(_VALID_ACTOR_ENTRY)
         entry["actor_id"] = 12345
         with pytest.raises(ValidationError):
-            PIRDocument.from_payload([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}])
+            PIRDocument.from_payload(_wrap([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}]))
 
     def test_name_non_string_rejected(self):
         entry = copy.deepcopy(_VALID_ACTOR_ENTRY)
         entry["name"] = ["list-not-string"]
         with pytest.raises(ValidationError):
-            PIRDocument.from_payload([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}])
+            PIRDocument.from_payload(_wrap([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}]))
 
     def test_score_breakdown_non_object_rejected(self):
         entry = copy.deepcopy(_VALID_ACTOR_ENTRY)
         entry["score_breakdown"] = "not-an-object"
         with pytest.raises(ValidationError):
-            PIRDocument.from_payload([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}])
+            PIRDocument.from_payload(_wrap([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}]))
 
     def test_aliases_non_list_rejected(self):
         entry = copy.deepcopy(_VALID_ACTOR_ENTRY)
         entry["aliases"] = "not-a-list"
         with pytest.raises(ValidationError):
-            PIRDocument.from_payload([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}])
+            PIRDocument.from_payload(_wrap([{**_PIR_WITH_ACTORS, "prioritized_actors": [entry]}]))
 
 
 # ---------------------------------------------------------------------------
@@ -345,7 +352,7 @@ def test_beacon_shaped_pir_passes_trace_validator():
         ],
     }
 
-    doc = PIRDocument.from_payload([beacon_pir])
+    doc = PIRDocument.from_payload(_wrap([beacon_pir]))
     pir = doc.root[0]
 
     assert pir.pir_id == "PIR-2026-001"
