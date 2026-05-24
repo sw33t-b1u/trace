@@ -6,6 +6,119 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.12.0] - 2026-05-24
+
+**Initiative H — 1.0 Stabilization release.** TRACE 1.12.0 is the
+final asymmetric minor before alignment with the strict
+SemVer-2.0.0 / 90-day-BC policy. Paired triple: BEACON 1.0.0 +
+TRACE 1.12.0 + SAGE 1.0.0.
+
+### Committed surface
+
+See `docs/api-stability.md` §3 for the authoritative inventory.
+Summary:
+
+- PIR validator: `SUPPORTED_PIR_SCHEMA_VERSIONS = {"1.0.0"}` only.
+  `PIRDocument.from_payload()` requires the wrapped envelope
+  `{"schema_version": "1.0.0", "pirs": [...]}`; bare-list rejected
+  with the migration message.
+- STIX 2.1 bundle validation API + asset bundle validators
+  (`validate-pir`, `validate-stix`, `validate-assets`,
+  `validate-identity`, `validate-accounts`, `validate-all`).
+- `schema/pir.schema.json` (BEACON mirror for drift),
+  `schema/sources.schema.json` (includes `feed_type` enum from F),
+  `schema/assets.schema.json`.
+- Crawl output: STIX 2.1 bundle + `crawl_state.json` (with
+  `iocs[]` from G Phase 4).
+- LLM IoC extraction output shape (7 types: IPv4 / IPv6 / FQDN /
+  SHA256 / SHA1 / MD5 / CVE-ID).
+- Unified `trace` console-script entry + 12 subcommands.
+- Environment variables: `ACTIVITY_WINDOW_DAYS`,
+  `TRACE_FEED_MAX_ENTRIES`, `TRACE_FEED_SINCE_DAYS`,
+  `TRACE_STATE_PATH`, `TRACE_CRAWL_CONCURRENCY`.
+
+### Migration guide (operator steps)
+
+The Initiative H triple release is a coordinated cut. Apply in
+order:
+
+1. **BEACON 1.0.0**. Re-run `beacon pir-generate` so the emitted
+   `pir_output.json` carries `schema_version: "1.0.0"` — older
+   payloads are rejected by this release with a per-version error
+   message:
+   > `schema_version "0.18.0" was supported in TRACE 1.11.0; please
+   > re-emit with BEACON 1.0.0+ output.`
+2. **TRACE 1.12.0** (this release). Strict validator restricted to
+   `schema_version: "1.0.0"`. The Initiative E/F/G `mode="before"`
+   normaliser code (rename remapping, IR-factor cross-version
+   contamination check) is removed. Wrapped envelope required;
+   bare-list inputs are rejected with the migration message.
+3. **SAGE 1.0.0**. See SAGE 1.0.0 changelog for migration steps.
+
+### Forward-looking note
+
+TRACE 1.12.0 marks the **final asymmetric minor** in TRACE's 1.x
+line. TRACE 1.0.0 (2026-05-09) onwards historically allowed
+breaking changes to the validator surface in minor releases
+(Initiative E added strict mode in 1.8.0, F added the
+`schema_version` gate in 1.10.0, G added IR-factor acceptance in
+1.11.0). 1.12.0 closes this transition by restricting the
+validator to `"1.0.0"` only.
+
+**From TRACE 1.13.0 onwards, TRACE aligns with the strict
+SemVer-2.0.0 + 90-day-BC policy applied to BEACON 1.0.0 and SAGE
+1.0.0.** Within the 90-day BC window:
+
+- **Minor releases** (`1.X.0`) ship additive changes only —
+  new optional fields, new endpoints, new CLI subcommands, new
+  env vars.
+- **Breaking changes** to any committed surface item require a new
+  major release (`2.0.0`). Deprecation path: announce in 1.X.Y
+  CHANGELOG + emit `DeprecationWarning` at runtime + remove in
+  `2.0.0` after the 90-day BC window and at least one further
+  minor.
+
+Items marked Evolving in `docs/api-stability.md` §4 (internal
+Pydantic class names, LLM prompt content, dev tools) remain free
+to change in any minor.
+
+### Changed (BREAKING) — Initiative H Phase 2 / Phase 3
+
+- **`SUPPORTED_PIR_SCHEMA_VERSIONS` restricted to `{"1.0.0"}`**
+  (Phase 2, `24b1ae7`). Drops support for `"0.16.0"`, `"0.17.0"`,
+  `"0.18.0"`. Per-version reject message points operators at the
+  TRACE release that last supported each.
+- **`mode="before"` rename normaliser removed** (Phase 2). The
+  `recency_active_campaigns_90d → recency_active_campaigns`
+  remapping for 0.16.0 / 0.17.0 payloads no longer applies; only
+  the canonical 1.0.0 name is accepted.
+- **Cross-version contamination check removed** (Phase 2). No
+  pre-1.0 versions accepted, so contamination is impossible.
+- **`PIRItem.prioritized_actors` is required** (Phase 2). BEACON
+  1.0.0 always emits this field.
+- **`PIRDocument.from_payload()` accepts wrapped envelope only**
+  (Phase 3 carry-over, `202180a`). Bare-list and single-object
+  payloads raise `ValueError` with the migration message:
+  > `Bare-list PIR input is no longer supported as of TRACE 1.12.0;
+  > wrap your input as {"schema_version": "1.0.0", "pirs": [...]}`
+
+### Added — Initiative H Phase 6: unified `trace` CLI
+
+- New `trace` console script (`trace_engine.cli:cli`) exposes 12
+  verb-noun subcommands matching `docs/api-stability.md` §3.8:
+  `crawl-batch`, `crawl-single`, `search-iocs`, `validate-pir`,
+  `validate-stix`, `validate-assets`, `validate-identity`,
+  `validate-accounts`, `validate-all`, `enrich-bundle`,
+  `submit-review`, `taxonomy-refresh`. Each subcommand delegates
+  to the existing `cmd/<name>.py` `main()` via
+  `importlib.util.spec_from_file_location` (sidestepping the
+  stdlib `cmd` module shadow).
+- `cmd/<name>.py` modules gain a deprecation steer (module
+  docstring + stderr warning at script invocation). Legacy
+  invocation form (`python -m cmd.<name>` / `python cmd/<name>.py`)
+  remains supported through TRACE 1.x for backward compatibility;
+  removal scheduled for TRACE 2.0.
+
 ## [1.11.0] - 2026-05-24
 
 Initiative G (IR Feedback Ingestion + Diamond Model Support) release —
