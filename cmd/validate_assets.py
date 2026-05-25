@@ -71,7 +71,13 @@ def validate_assets_file(path: Path) -> tuple[AssetsDocument | None, list[Valida
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate assets.json before SAGE ingestion")
-    parser.add_argument("--it-assets", "--ita", required=True, type=Path, help="Path to assets.json")
+    parser.add_argument(
+        "--it-assets",
+        "--ita",
+        required=True,
+        type=Path,
+        help="Path to assets.json",
+    )
     parser.add_argument(
         "--report",
         type=Path,

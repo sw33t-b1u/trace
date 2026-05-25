@@ -153,7 +153,11 @@ def main() -> None:
         logger.error("file_not_found", role="identity-assets", path=str(args.identity_assets))
         sys.exit(1)
 
-    findings = validate_user_accounts_files(args.user_accounts, args.it_assets, args.identity_assets)
+    findings = validate_user_accounts_files(
+        args.user_accounts,
+        args.it_assets,
+        args.identity_assets,
+    )
 
     for f in findings:
         log_method = logger.error if f.severity == "error" else logger.warning
