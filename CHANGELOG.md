@@ -6,6 +6,24 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [1.13.0] - 2026-05-25
+
+**Initiative I — Storage Abstraction.** Paired triple: BEACON 1.1.0
++ SAGE 1.1.0 + TRACE 1.13.0.
+
+### Added
+
+- **StorageBackend abstraction layer** — `LocalStorage` and
+  `GCSStorage` implementations (copied from BEACON per Decision I-12).
+  Env vars: `TRACE_STORAGE`, `TRACE_STORAGE_BASE_DIR`,
+  `TRACE_GCS_BUCKET`, `TRACE_GCS_PREFIX`.
+- `crawl-single` and `crawl-batch` write STIX bundles to
+  StorageBackend `stix/` category when `--output` / `--output-dir`
+  is not specified. Explicit flags bypass StorageBackend for backward
+  compatibility.
+
+---
+
 ## [1.12.0] - 2026-05-24
 
 **Initiative H — 1.0 Stabilization release.** TRACE 1.12.0 is the
