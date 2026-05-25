@@ -62,6 +62,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--input",
+        "-i",
         required=True,
         type=Path,
         metavar="BUNDLE_JSON",
@@ -69,6 +70,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--output",
+        "-o",
         required=True,
         type=Path,
         metavar="OUTPUT_JSON",

@@ -102,9 +102,9 @@ def _validate_bundle(path: Path, *, strict: bool) -> list[ValidationFinding]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run every TRACE validator and emit a report")
-    parser.add_argument("--assets", type=Path, default=None)
-    parser.add_argument("--pir", type=Path, default=None)
-    parser.add_argument("--bundle", type=Path, default=None)
+    parser.add_argument("--it-assets", "--ita", type=Path, default=None)
+    parser.add_argument("--pir", "-p", type=Path, default=None)
+    parser.add_argument("--bundle", "-b", type=Path, default=None)
     parser.add_argument("--strict", action="store_true", help="Promote STIX warnings to errors")
     parser.add_argument(
         "--report",
@@ -114,18 +114,18 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if not (args.assets or args.pir or args.bundle):
-        parser.error("at least one of --assets / --pir / --bundle is required")
+    if not (args.it_assets or args.pir or args.bundle):
+        parser.error("at least one of --it-assets / --pir / --bundle is required")
 
     sections: list[tuple[str, list[ValidationFinding]]] = []
     assets_doc: AssetsDocument | None = None
 
-    if args.assets:
-        if not args.assets.exists():
-            logger.error("file_not_found", path=str(args.assets))
+    if args.it_assets:
+        if not args.it_assets.exists():
+            logger.error("file_not_found", path=str(args.it_assets))
             sys.exit(1)
-        assets_doc, findings = _validate_assets(args.assets)
-        sections.append((f"Assets: {args.assets.name}", findings))
+        assets_doc, findings = _validate_assets(args.it_assets)
+        sections.append((f"Assets: {args.it_assets.name}", findings))
 
     if args.pir:
         if not args.pir.exists():

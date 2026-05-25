@@ -67,6 +67,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--pir",
+        "-p",
         type=Path,
         default=None,
         help="Path to BEACON pir_output.json. Enables the L2 relevance gate.",
@@ -102,14 +103,15 @@ def main() -> None:
         help="Print sources without fetching or extracting.",
     )
     parser.add_argument(
-        "--assets",
+        "--it-assets",
+        "--ita",
         type=Path,
         default=None,
         help=(
             "Path to BEACON assets.json. Enables identity-asset edge "
             "extraction (Initiative A): the bundle assembler resolves "
             "free-form asset references in identity_asset_edges against "
-            "this assets file. Without --assets, no identity-asset edges "
+            "this assets file. Without --it-assets, no identity-asset edges "
             "are emitted."
         ),
     )
@@ -153,19 +155,19 @@ def main() -> None:
 
     # Initiative A: load --assets so identity_asset_edges resolve.
     assets_list: list[dict] | None = None
-    if args.assets is not None:
-        if not args.assets.exists():
-            logger.error("assets_not_found", path=str(args.assets))
+    if args.it_assets is not None:
+        if not args.it_assets.exists():
+            logger.error("assets_not_found", path=str(args.it_assets))
             sys.exit(2)
         try:
-            with args.assets.open() as f:
+            with args.it_assets.open() as f:
                 assets_payload = json.load(f)
             assets_list = assets_payload.get("assets") if isinstance(assets_payload, dict) else None
             if assets_list is None:
-                logger.error("assets_missing_assets_key", path=str(args.assets))
+                logger.error("assets_missing_assets_key", path=str(args.it_assets))
                 sys.exit(2)
         except Exception as exc:
-            logger.error("assets_invalid", path=str(args.assets), error=str(exc))
+            logger.error("assets_invalid", path=str(args.it_assets), error=str(exc))
             sys.exit(2)
 
     state = CrawlState.load(args.state)

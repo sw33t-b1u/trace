@@ -71,7 +71,7 @@ def validate_assets_file(path: Path) -> tuple[AssetsDocument | None, list[Valida
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate assets.json before SAGE ingestion")
-    parser.add_argument("--assets", required=True, type=Path, help="Path to assets.json")
+    parser.add_argument("--it-assets", "--ita", required=True, type=Path, help="Path to assets.json")
     parser.add_argument(
         "--report",
         type=Path,
@@ -80,11 +80,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if not args.assets.exists():
-        logger.error("file_not_found", path=str(args.assets))
+    if not args.it_assets.exists():
+        logger.error("file_not_found", path=str(args.it_assets))
         sys.exit(1)
 
-    _, findings = validate_assets_file(args.assets)
+    _, findings = validate_assets_file(args.it_assets)
 
     for f in findings:
         log_method = logger.error if f.severity == "error" else logger.warning
@@ -92,7 +92,7 @@ def main() -> None:
 
     if args.report:
         text = render_report(
-            [(f"Assets: {args.assets.name}", findings)],
+            [(f"Assets: {args.it_assets.name}", findings)],
             timestamp=datetime.now(tz=UTC),
         )
         args.report.parent.mkdir(parents=True, exist_ok=True)

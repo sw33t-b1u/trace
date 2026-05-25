@@ -104,9 +104,10 @@ def validate_pir_file(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate pir_output.json before SAGE ingestion")
-    parser.add_argument("--pir", required=True, type=Path, help="Path to pir_output.json")
+    parser.add_argument("--pir", "-p", required=True, type=Path, help="Path to pir_output.json")
     parser.add_argument(
-        "--assets",
+        "--it-assets",
+        "--ita",
         type=Path,
         default=None,
         help="Optional assets.json — enables asset_weight_rules.tag match check",
@@ -117,11 +118,11 @@ def main() -> None:
     if not args.pir.exists():
         logger.error("file_not_found", path=str(args.pir))
         sys.exit(1)
-    if args.assets and not args.assets.exists():
-        logger.error("file_not_found", path=str(args.assets))
+    if args.it_assets and not args.it_assets.exists():
+        logger.error("file_not_found", path=str(args.it_assets))
         sys.exit(1)
 
-    _, findings = validate_pir_file(args.pir, args.assets)
+    _, findings = validate_pir_file(args.pir, args.it_assets)
 
     for f in findings:
         log_method = logger.error if f.severity == "error" else logger.warning

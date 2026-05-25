@@ -188,7 +188,7 @@ class TestCli:
     def test_exit_zero_on_clean(self, tmp_path: Path):
         ua, a = _clean_files(tmp_path)
         result = subprocess.run(
-            [sys.executable, str(CMD), "--user-accounts", str(ua), "--assets", str(a)],
+            [sys.executable, str(CMD), "--user-accounts", str(ua), "--it-assets", str(a)],
             capture_output=True,
             text=True,
             check=False,
@@ -217,7 +217,7 @@ class TestCli:
             },
         )
         result = subprocess.run(
-            [sys.executable, str(CMD), "--user-accounts", str(ua), "--assets", str(a)],
+            [sys.executable, str(CMD), "--user-accounts", str(ua), "--it-assets", str(a)],
             capture_output=True,
             text=True,
             check=False,

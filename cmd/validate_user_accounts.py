@@ -112,18 +112,21 @@ def main() -> None:
     )
     parser.add_argument(
         "--user-accounts",
+        "--ua",
         required=True,
         type=Path,
         help="Path to user_accounts.json",
     )
     parser.add_argument(
-        "--assets",
+        "--it-assets",
+        "--ita",
         required=True,
         type=Path,
         help=("Path to assets.json (REQUIRED for cross-reference of account_on_asset[*].asset_id)"),
     )
     parser.add_argument(
         "--identity-assets",
+        "--ida",
         type=Path,
         default=None,
         help=(
@@ -141,7 +144,7 @@ def main() -> None:
 
     for label, path in (
         ("user-accounts", args.user_accounts),
-        ("assets", args.assets),
+        ("it-assets", args.it_assets),
     ):
         if not path.exists():
             logger.error("file_not_found", role=label, path=str(path))
@@ -150,7 +153,7 @@ def main() -> None:
         logger.error("file_not_found", role="identity-assets", path=str(args.identity_assets))
         sys.exit(1)
 
-    findings = validate_user_accounts_files(args.user_accounts, args.assets, args.identity_assets)
+    findings = validate_user_accounts_files(args.user_accounts, args.it_assets, args.identity_assets)
 
     for f in findings:
         log_method = logger.error if f.severity == "error" else logger.warning

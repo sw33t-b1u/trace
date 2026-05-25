@@ -78,7 +78,7 @@ def validate_bundle_file(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate a STIX 2.1 bundle")
-    parser.add_argument("--bundle", required=True, type=Path, help="Path to STIX bundle JSON")
+    parser.add_argument("--bundle", "-b", required=True, type=Path, help="Path to STIX bundle JSON")
     parser.add_argument(
         "--strict",
         action="store_true",
@@ -87,6 +87,7 @@ def main() -> None:
     parser.add_argument("--report", type=Path, default=None, help="Markdown report output path")
     parser.add_argument(
         "--identity-assets",
+        "--ida",
         type=Path,
         default=None,
         dest="identity_assets",

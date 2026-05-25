@@ -166,12 +166,12 @@ _register_passthrough(
 _register_passthrough(
     "validate-identity",
     "validate_identity_assets",
-    "Validate identity_assets.json (requires --assets).",
+    "Validate identity_assets.json (requires --it-assets).",
 )
 _register_passthrough(
     "validate-accounts",
     "validate_user_accounts",
-    "Validate user_accounts.json (requires --assets).",
+    "Validate user_accounts.json (requires --it-assets).",
 )
 _register_passthrough(
     "validate-all",

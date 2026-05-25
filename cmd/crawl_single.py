@@ -74,6 +74,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--input",
+        "-i",
         required=True,
         metavar="PATH_OR_URL",
         help=(
@@ -83,6 +84,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--output",
+        "-o",
         type=Path,
         default=None,
         help=(
@@ -109,6 +111,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--pir",
+        "-p",
         type=Path,
         default=None,
         help=(
@@ -125,7 +128,8 @@ def main() -> None:
         help="Override TRACE_RELEVANCE_THRESHOLD. Ignored when --pir is not set.",
     )
     parser.add_argument(
-        "--assets",
+        "--it-assets",
+        "--ita",
         type=Path,
         default=None,
         help=(
@@ -134,13 +138,14 @@ def main() -> None:
             "emit identity_asset_edges, and the bundle assembler resolves "
             "each free-form asset reference against this assets file via "
             "the 4-tier matching ladder (name exact → substring → tag). "
-            "Unresolved edges are dropped. Without --assets, no identity-"
+            "Unresolved edges are dropped. Without --it-assets, no identity-"
             "asset edges are emitted (the LLM may extract them but they "
             "cannot be resolved to known asset_ids)."
         ),
     )
     parser.add_argument(
         "--identity-assets",
+        "--ida",
         type=Path,
         default=None,
         help=(
@@ -226,15 +231,15 @@ def main() -> None:
     # Initiative A: load --assets when supplied so identity_asset_edges
     # can be resolved to known asset_ids during bundle assembly.
     assets_list: list[dict] | None = None
-    if args.assets is not None:
-        if not args.assets.exists():
-            logger.error("assets_not_found", path=str(args.assets))
+    if args.it_assets is not None:
+        if not args.it_assets.exists():
+            logger.error("assets_not_found", path=str(args.it_assets))
             sys.exit(2)
-        with args.assets.open() as f:
+        with args.it_assets.open() as f:
             assets_payload = json.load(f)
         assets_list = assets_payload.get("assets") if isinstance(assets_payload, dict) else None
         if assets_list is None:
-            logger.error("assets_missing_assets_key", path=str(args.assets))
+            logger.error("assets_missing_assets_key", path=str(args.it_assets))
             sys.exit(2)
 
     extraction = extract_entities(text, task=args.task, config=cfg, pir_doc=pir_doc)

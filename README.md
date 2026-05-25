@@ -77,6 +77,7 @@ When `--pir` is supplied, articles are filtered through a lightweight relevance 
 | BEACON handoff | [beacon_handoff.md](docs/beacon_handoff.md) / [ja](docs/beacon_handoff.ja.md) | What moved out of BEACON and why |
 | Directory structure | [structure.md](docs/structure.md) / [ja](docs/structure.ja.md) | Top-level layout and Rule 26 adaptation notes |
 | `docs/high-level-design.md` | local-only; gitignored | Architecture, data model, algorithms |
+| Pipeline guide | [pipeline-guide.md](docs/pipeline-guide.md) / [ja](docs/pipeline-guide.ja.md) | End-to-end CTI pipeline workflow: BEACON → TRACE → SAGE |
 
 ## Quick Start
 
