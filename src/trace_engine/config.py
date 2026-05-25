@@ -144,6 +144,18 @@ class Config:
         default_factory=lambda: os.environ.get("GHE_API_BASE", "https://api.github.com")
     )
 
+    # Storage backend selection (Initiative I Phase 7).
+    # TRACE_STORAGE: "local" (default) or "gcs".
+    trace_storage: str = field(default_factory=lambda: os.environ.get("TRACE_STORAGE", "local"))
+    # TRACE_STORAGE_BASE_DIR: root directory for LocalStorage (default: "output").
+    trace_storage_base_dir: str = field(
+        default_factory=lambda: os.environ.get("TRACE_STORAGE_BASE_DIR", "output")
+    )
+    # TRACE_GCS_BUCKET: GCS bucket name (required when TRACE_STORAGE=gcs).
+    trace_gcs_bucket: str = field(default_factory=lambda: os.environ.get("TRACE_GCS_BUCKET", ""))
+    # TRACE_GCS_PREFIX: optional key prefix for all GCS objects.
+    trace_gcs_prefix: str = field(default_factory=lambda: os.environ.get("TRACE_GCS_PREFIX", ""))
+
 
 def load_config() -> Config:
     return Config()

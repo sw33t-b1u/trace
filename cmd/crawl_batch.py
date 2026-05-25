@@ -81,8 +81,11 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=_DEFAULT_OUTPUT,
-        help=f"Directory for emitted bundles (default: {_DEFAULT_OUTPUT.relative_to(_ROOT)})",
+        default=None,
+        help=(
+            f"Directory for emitted bundles (default: {_DEFAULT_OUTPUT.relative_to(_ROOT)} "
+            "when TRACE_STORAGE=local, or StorageBackend stix/ category otherwise)"
+        ),
     )
     parser.add_argument(
         "--relevance-threshold",
@@ -172,6 +175,29 @@ def main() -> None:
 
     state = CrawlState.load(args.state)
 
+    # Determine whether to use StorageBackend or direct file I/O.
+    # --output-dir bypasses StorageBackend for backward compatibility.
+    use_storage_backend = args.output_dir is None
+    write_bundle_fn = None
+    metrics_output_dir: Path
+
+    if use_storage_backend:
+        import json as _json  # noqa: E402
+
+        from trace_engine.storage import create_storage_backend  # noqa: E402
+
+        storage = create_storage_backend(cfg)
+        effective_output_dir = _DEFAULT_OUTPUT
+
+        def write_bundle_fn(path: Path, data: dict) -> None:  # type: ignore[misc]
+            filename = path.name
+            storage.save("stix", filename, _json.dumps(data, indent=2, ensure_ascii=False))
+
+        metrics_output_dir = _DEFAULT_OUTPUT
+    else:
+        effective_output_dir = args.output_dir
+        metrics_output_dir = args.output_dir
+
     failures = 0
     counts = {
         "extracted": 0,
@@ -190,7 +216,7 @@ def main() -> None:
     for outcome in crawl_batch(
         sources,
         state=state,
-        output_dir=args.output_dir,
+        output_dir=effective_output_dir,
         pir_doc=pir_doc,
         pir_set_hash=pir_set_hash,
         threshold=args.relevance_threshold,
@@ -198,6 +224,7 @@ def main() -> None:
         dry_run=args.dry_run,
         config=cfg,
         assets=assets_list,
+        write_bundle=write_bundle_fn,
     ):
         counts[outcome.kind] = counts.get(outcome.kind, 0) + 1
         log = logger.bind(url=outcome.url, label=outcome.label, kind=outcome.kind)
@@ -231,7 +258,7 @@ def main() -> None:
         for run in runs:
             print()
             print(_metrics.render_summary(run))
-        path = _metrics.write_batch_json(runs, args.output_dir)
+        path = _metrics.write_batch_json(runs, metrics_output_dir)
         print(f"\nMetrics:      {path}")
 
     sys.exit(1 if failures else 0)

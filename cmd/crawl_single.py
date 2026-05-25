@@ -62,12 +62,6 @@ logger = structlog.get_logger(__name__)
 _OUTPUT_DIR = Path(__file__).parent.parent / "output"
 
 
-def _default_output(bundle_id: str) -> Path:
-    """Return output/stix_bundle_<last-12-chars-of-bundle-id>.json."""
-    suffix = bundle_id.replace("bundle--", "")[-12:]
-    return _OUTPUT_DIR / f"stix_bundle_{suffix}.json"
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Extract STIX 2.1 bundle from a PDF or web article"
@@ -252,25 +246,36 @@ def main() -> None:
         assets=assets_list,
     )
 
-    out = args.output if args.output is not None else _default_output(bundle["id"])
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(
-        json.dumps(bundle, indent=2, ensure_ascii=False),
-        encoding="utf-8",
-    )
-
+    bundle_json = json.dumps(bundle, indent=2, ensure_ascii=False)
     object_count = len(bundle["objects"])
+
+    if args.output is not None:
+        # Explicit --output: bypass StorageBackend for backward compatibility.
+        out = args.output
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(bundle_json, encoding="utf-8")
+        out_display = str(out)
+    else:
+        # No --output: use StorageBackend (local or GCS per TRACE_STORAGE).
+        from trace_engine.storage import create_storage_backend  # noqa: E402
+
+        storage = create_storage_backend(cfg)
+        suffix = bundle["id"].replace("bundle--", "")[-12:]
+        bundle_filename = f"stix_bundle_{suffix}.json"
+        storage.save("stix", bundle_filename, bundle_json)
+        out_display = f"stix/{bundle_filename}"
+
     logger.info(
         "stix_bundle_written",
-        path=str(out),
+        path=out_display,
         entities=len(extraction.entities),
         relationships=len(extraction.relationships),
         object_count=object_count,
     )
     print(
-        f"STIX bundle written: {out} ({object_count} objects)\n"
+        f"STIX bundle written: {out_display} ({object_count} objects)\n"
         f"Validate before feeding SAGE:\n"
-        f"  uv run python cmd/validate_stix.py --bundle {out}"
+        f"  uv run python cmd/validate_stix.py --bundle {out_display}"
     )
 
     if collector is not None:
