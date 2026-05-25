@@ -64,8 +64,28 @@ Fill in:
 | `TRACE_GHE_TOKEN` | GHE only | — | PAT for `submit_review.py --open-issue` |
 | `GHE_REPO` | GHE only | — | `owner/repo` |
 | `GHE_API_BASE` | No | `https://api.github.com` | Override for self-hosted GHE |
+| `TRACE_STORAGE` | No | `local` | Storage backend: `local` or `gcs` |
+| `TRACE_STORAGE_BASE_DIR` | No | `output/` | Root directory for `LocalStorage` |
+| `TRACE_GCS_BUCKET` | GCS only | — | GCS bucket name (required when `TRACE_STORAGE=gcs`) |
+| `TRACE_GCS_PREFIX` | No | `trace/` | Key prefix within the GCS bucket |
 
 There is **no `--no-llm` mode** — both the L2 gate and L3 extraction are LLM-only.
+
+#### GCS storage (optional)
+
+To route crawl output to Google Cloud Storage instead of the local filesystem:
+
+```bash
+# Install the GCS extra
+uv sync --extra gcs
+
+export TRACE_STORAGE=gcs
+export TRACE_GCS_BUCKET=my-cti-artifacts
+export TRACE_GCS_PREFIX=trace/   # optional; default is "trace/"
+```
+
+The `google-cloud-storage` package is only required when `TRACE_STORAGE=gcs`.
+Authentication uses Application Default Credentials (same as Vertex AI).
 
 ---
 

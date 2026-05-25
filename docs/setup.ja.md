@@ -62,8 +62,28 @@ cp .env.example .env   # 存在する場合
 | `TRACE_GHE_TOKEN` | GHE 利用時のみ | — | `submit_review.py --open-issue` 用 PAT |
 | `GHE_REPO` | GHE 利用時のみ | — | `owner/repo` |
 | `GHE_API_BASE` | いいえ | `https://api.github.com` | セルフホスト GHE 用に上書き |
+| `TRACE_STORAGE` | いいえ | `local` | ストレージバックエンド: `local` または `gcs` |
+| `TRACE_STORAGE_BASE_DIR` | いいえ | `output/` | `LocalStorage` のルートディレクトリ |
+| `TRACE_GCS_BUCKET` | GCS 利用時のみ | — | GCS バケット名（`TRACE_STORAGE=gcs` 時に必須） |
+| `TRACE_GCS_PREFIX` | いいえ | `trace/` | GCS バケット内のキープレフィックス |
 
 **`--no-llm` モードは存在しません**。L2 ゲート・L3 抽出ともに LLM 必須。
+
+#### GCS ストレージ（任意）
+
+クロール出力をローカルファイルシステムではなく Google Cloud Storage に書き込む場合:
+
+```bash
+# GCS extra をインストール
+uv sync --extra gcs
+
+export TRACE_STORAGE=gcs
+export TRACE_GCS_BUCKET=my-cti-artifacts
+export TRACE_GCS_PREFIX=trace/   # 任意; デフォルトは "trace/"
+```
+
+`google-cloud-storage` パッケージは `TRACE_STORAGE=gcs` の場合のみ必要。
+認証は Vertex AI と同様に Application Default Credentials を使用する。
 
 ---
 

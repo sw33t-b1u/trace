@@ -22,7 +22,8 @@ CTI ベンダーブログ・ニュース記事・PDF レポート・任意の UR
                          │   ├── L3 PIR コンテキスト注入 (Gemini)
                          │   └── L4 バンドルメタデータ付与 (matched_pir_ids, score)
                          ▼
-              output/stix_bundle_*.json
+              StorageBackend stix/（デフォルト）または --output / --output-dir パス
+              output/stix/stix_bundle_<YYYYMMDDHHmm>.json
                          │
                          ▼
               cmd/validate_stix.py  (cti-stix-validator + 局所 refcheck)
@@ -59,6 +60,52 @@ CTI ベンダーブログ・ニュース記事・PDF レポート・任意の UR
 | `validate_*`   | JSON / STIX バンドル | なし | SAGE 取り込み前の品質ゲート |
 
 `--pir` を指定すると、STIX 抽出の前段で軽量リレバンスゲート（L2）が動作し、抽出プロンプトには PIR コンテキストが注入される（L3）。生成バンドルには `x_trace_matched_pir_ids` / `x_trace_relevance_score` メタデータが付与される（L4）。`--pir` 未指定時はゲートを無効化し、全記事を STIX 化する（試行・実験用途）。
+
+## StorageBackend（Initiative I）
+
+TRACE はクロール出力の書き先を **StorageBackend** で切り替えられる。
+抽象クラスは BEACON と同一設計（Decision I-12: コピー、共有 import なし）。
+
+| バックエンド | 用途 | 設定 |
+|------------|------|------|
+| `LocalStorage` | デフォルト | `TRACE_STORAGE=local`（デフォルト） |
+| `GCSStorage` | クラウドデプロイ | `TRACE_STORAGE=gcs` + `TRACE_GCS_BUCKET` |
+
+**出力カテゴリ:** `stix` — ファイル名形式: `stix_bundle_<YYYYMMDDHHmm>.json`
+
+**後方互換:** `--output` / `--output-dir` フラグを指定した場合は StorageBackend をバイパスし、従来通り明示パスに書き出す。
+
+### 環境変数
+
+| 変数 | デフォルト | 説明 |
+|------|-----------|------|
+| `TRACE_STORAGE` | `local` | バックエンド選択: `local` または `gcs` |
+| `TRACE_STORAGE_BASE_DIR` | `output/` | `LocalStorage` のルートディレクトリ |
+| `TRACE_GCS_BUCKET` | — | GCS バケット名（`TRACE_STORAGE=gcs` 時に必須） |
+| `TRACE_GCS_PREFIX` | `trace/` | GCS バケット内のキープレフィックス |
+
+### crawl-single の出力
+
+```bash
+# デフォルト — バンドルを StorageBackend stix/ に保存
+# （例: output/stix/stix_bundle_202601010900.json）
+uv run python cmd/crawl_single.py --input https://example.com/post
+
+# 明示パス指定 — StorageBackend をバイパス
+uv run python cmd/crawl_single.py --input https://example.com/post \
+  --output output/my_bundle.json
+```
+
+### crawl-batch の出力
+
+```bash
+# デフォルト — 各バンドルを StorageBackend stix/ に保存
+uv run python cmd/crawl_batch.py --pir ../BEACON/output/pir_output.json
+
+# 明示ディレクトリ指定 — StorageBackend をバイパス
+uv run python cmd/crawl_batch.py --pir ../BEACON/output/pir_output.json \
+  --output-dir output/stix/
+```
 
 ## 検証の 3 層
 

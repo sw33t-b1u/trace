@@ -22,7 +22,8 @@ Collects CTI from public web sources (vendor blogs, news articles, PDF reports),
                          │   ├── L3 PIR-conditioned STIX extraction (Gemini)
                          │   └── L4 bundle metadata (matched_pir_ids, score)
                          ▼
-              output/stix_bundle_*.json
+              StorageBackend stix/ (default) or --output / --output-dir path
+              output/stix/stix_bundle_<YYYYMMDDHHmm>.json
                          │
                          ▼
               cmd/validate_stix.py  (cti-stix-validator + local refcheck)
@@ -59,6 +60,52 @@ Collects CTI from public web sources (vendor blogs, news articles, PDF reports),
 | `validate_*`   | JSON / STIX bundle | None | Pre-SAGE quality gate |
 
 When `--pir` is supplied, articles are filtered through a lightweight relevance gate (L2) before STIX extraction, the extraction prompt is conditioned with PIR context (L3), and resulting bundles carry `x_trace_matched_pir_ids` / `x_trace_relevance_score` metadata (L4). Without `--pir`, the gate is bypassed and every article is fully extracted (useful for experimentation).
+
+## StorageBackend (Initiative I)
+
+TRACE uses a pluggable **StorageBackend** to route crawl output. The backend
+abstraction mirrors BEACON's (Decision I-12: copied ABC, not shared).
+
+| Backend | When used | Config |
+|---------|-----------|--------|
+| `LocalStorage` | default | `TRACE_STORAGE=local` (default) |
+| `GCSStorage` | cloud deployments | `TRACE_STORAGE=gcs` + `TRACE_GCS_BUCKET` |
+
+**Output category:** `stix` — filename format: `stix_bundle_<YYYYMMDDHHmm>.json`
+
+**Backward compatibility:** `--output` / `--output-dir` flags bypass the
+StorageBackend and write to the explicit path as before.
+
+### Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TRACE_STORAGE` | `local` | Backend selector: `local` or `gcs` |
+| `TRACE_STORAGE_BASE_DIR` | `output/` | Root directory for `LocalStorage` |
+| `TRACE_GCS_BUCKET` | — | GCS bucket name (required when `TRACE_STORAGE=gcs`) |
+| `TRACE_GCS_PREFIX` | `trace/` | Key prefix within the GCS bucket |
+
+### crawl-single output
+
+```bash
+# Default — bundle saved to StorageBackend stix/ (e.g. output/stix/stix_bundle_202601010900.json)
+uv run python cmd/crawl_single.py --input https://example.com/post
+
+# Explicit path — bypasses StorageBackend
+uv run python cmd/crawl_single.py --input https://example.com/post \
+  --output output/my_bundle.json
+```
+
+### crawl-batch output
+
+```bash
+# Default — each bundle saved to StorageBackend stix/
+uv run python cmd/crawl_batch.py --pir ../BEACON/output/pir_output.json
+
+# Explicit directory — bypasses StorageBackend
+uv run python cmd/crawl_batch.py --pir ../BEACON/output/pir_output.json \
+  --output-dir output/stix/
+```
 
 ## Validation layers
 
