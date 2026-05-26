@@ -20,6 +20,12 @@ RULES.md Rule 18 に従い、すべての runtime 依存に採用理由を記録
 | `pyyaml` | `>=6.0` | `input/sources.yaml` のパーサー（`crawler/sources.py` から）。 | MIT |
 | `python-dotenv` | `>=1.0` | CLI 起動時に `.env` を `os.environ` にロード。`GCP_PROJECT_ID`, `TRACE_GHE_TOKEN` 等を手動 export 不要に。 | BSD-3 |
 
+## オプション
+
+| パッケージ | 最小バージョン | TRACE での用途 | ライセンス |
+|-----------|--------------|--------------|-----------|
+| `google-cloud-storage` | `>=2.18.0` | StorageBackend の GCS 実装（`src/trace_engine/storage/gcs.py`）。`uv sync --extra gcs` でインストール。`TRACE_STORAGE=gcs` の場合のみ必要。 | Apache-2.0 |
+
 ## 開発
 
 | パッケージ | 最小バージョン | 用途 | ライセンス |

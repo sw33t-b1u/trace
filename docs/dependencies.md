@@ -21,6 +21,12 @@ add a new dependency, update both files in the same commit.
 | `python-dotenv` | `>=1.0` | Load `.env` into `os.environ` at CLI startup so `GCP_PROJECT_ID`, `TRACE_GHE_TOKEN`, etc. are picked up without exporting manually. | BSD-3 |
 | `feedparser` | `>=6.0` | RSS / Atom feed expansion. `crawler/feed_detector.py` classifies a fetched URL as `html`/`rss`/`atom` by `Content-Type`, and `crawler/feed_expander.py` parses RSS/Atom payloads via feedparser to yield per-entry article URLs that the batch crawler then runs through the L2 PIR gate. Added in TRACE 1.10.0 (Initiative F). | BSD-2 |
 
+## Optional
+
+| Package | Min version | Why TRACE needs it | License |
+|---------|-------------|--------------------|---------|
+| `google-cloud-storage` | `>=2.18.0` | GCS backend for StorageBackend (`src/trace_engine/storage/gcs.py`). Install with `uv sync --extra gcs`. Required only when `TRACE_STORAGE=gcs`. | Apache-2.0 |
+
 ## Development
 
 | Package | Min version | Why | License |
