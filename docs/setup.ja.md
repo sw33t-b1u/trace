@@ -65,7 +65,7 @@ cp .env.example .env   # 存在する場合
 | `TRACE_STORAGE` | いいえ | `local` | ストレージバックエンド: `local` または `gcs` |
 | `TRACE_STORAGE_BASE_DIR` | いいえ | `output/` | `LocalStorage` のルートディレクトリ |
 | `TRACE_GCS_BUCKET` | GCS 利用時のみ | — | GCS バケット名（`TRACE_STORAGE=gcs` 時に必須） |
-| `TRACE_GCS_PREFIX` | いいえ | `trace/` | GCS バケット内のキープレフィックス |
+| `TRACE_GCS_PREFIX` | いいえ | (空文字) | GCS バケット内のキープレフィックス |
 
 **`--no-llm` モードは存在しません**。L2 ゲート・L3 抽出ともに LLM 必須。
 
@@ -79,7 +79,7 @@ uv sync --extra gcs
 
 export TRACE_STORAGE=gcs
 export TRACE_GCS_BUCKET=my-cti-artifacts
-export TRACE_GCS_PREFIX=trace/   # 任意; デフォルトは "trace/"
+export TRACE_GCS_PREFIX=trace/   # 任意; デフォルトは空文字
 ```
 
 `google-cloud-storage` パッケージは `TRACE_STORAGE=gcs` の場合のみ必要。

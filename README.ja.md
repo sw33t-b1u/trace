@@ -82,7 +82,7 @@ TRACE はクロール出力の書き先を **StorageBackend** で切り替えら
 | `TRACE_STORAGE` | `local` | バックエンド選択: `local` または `gcs` |
 | `TRACE_STORAGE_BASE_DIR` | `output/` | `LocalStorage` のルートディレクトリ |
 | `TRACE_GCS_BUCKET` | — | GCS バケット名（`TRACE_STORAGE=gcs` 時に必須） |
-| `TRACE_GCS_PREFIX` | `trace/` | GCS バケット内のキープレフィックス |
+| `TRACE_GCS_PREFIX` | (空文字) | GCS バケット内のキープレフィックス |
 
 ### crawl-single の出力
 

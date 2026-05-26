@@ -83,7 +83,7 @@ StorageBackend and write to the explicit path as before.
 | `TRACE_STORAGE` | `local` | Backend selector: `local` or `gcs` |
 | `TRACE_STORAGE_BASE_DIR` | `output/` | Root directory for `LocalStorage` |
 | `TRACE_GCS_BUCKET` | — | GCS bucket name (required when `TRACE_STORAGE=gcs`) |
-| `TRACE_GCS_PREFIX` | `trace/` | Key prefix within the GCS bucket |
+| `TRACE_GCS_PREFIX` | (empty) | Key prefix within the GCS bucket |
 
 ### crawl-single output
 
