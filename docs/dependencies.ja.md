@@ -19,6 +19,8 @@ RULES.md Rule 18 に従い、すべての runtime 依存に採用理由を記録
 | `stix2-validator` | `>=3.2` | OASIS `cti-stix-validator`。STIX 2.1 バンドルが SAGE に渡る前にスキーマ + ベストプラクティスを確認。`validate/semantic/stix_refcheck.py` で局所 ID/参照/kill_chain チェックを上層に積む。 | BSD-3 |
 | `pyyaml` | `>=6.0` | `input/sources.yaml` のパーサー（`crawler/sources.py` から）。 | MIT |
 | `python-dotenv` | `>=1.0` | CLI 起動時に `.env` を `os.environ` にロード。`GCP_PROJECT_ID`, `TRACE_GHE_TOKEN` 等を手動 export 不要に。 | BSD-3 |
+| `idna` | `>=3.15` | CVE-2026-45409 修正バージョン pin。`anyio` / `httpx` 経由で transitive。 | BSD-3 |
+| `feedparser` | `>=6.0` | RSS / Atom フィード展開。`crawler/feed_detector.py` が `Content-Type` で `html`/`rss`/`atom` を分類し、`crawler/feed_expander.py` が feedparser で RSS/Atom ペイロードを解析して記事 URL を抽出、バッチクローラが L2 PIR ゲートに通す。TRACE 1.10.0（Initiative F）で追加。 | BSD-2 |
 
 ## オプション
 
@@ -39,7 +41,6 @@ RULES.md Rule 18 に従い、すべての runtime 依存に採用理由を記録
 
 | パッケージ | 理由 |
 |-----------|------|
-| `feedparser` | RSS / Atom 展開は MVP 外。`sources.yaml` はフラット URL リスト。バッチオペレータから要求が出てから再評価。 |
 | `sqlite3`（個別 dep として） | `tmp + os.replace` のアトミック JSON ファイルで MVP 規模は十分。並行バッチが要件になった時点で再評価。 |
 | `fastapi` / `uvicorn` | Web UI は TRACE Phase 2 の予定。実装するまで依存表面積を絞る。 |
 | `stix2` | TRACE は STIX 2.1 仕様キーで plain `dict` を組み立てる。フル `stix2` オブジェクトモデルは不要。仕様準拠は OASIS バリデータで担保。 |

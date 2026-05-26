@@ -68,6 +68,7 @@ uses `src/trace_engine/` instead. Reasons:
 | `pir/` | L2 PIR relevance gate. |
 | `review/` | Human-review handoff (Markdown / GHE Issue). |
 | `stix/` | L3 extraction, L4 bundle assembly, taxonomy enrichment, external-ref hashing. |
+| `storage/` | StorageBackend abstraction (local filesystem / GCS). Factory, ABC, and two implementations. |
 | `validate/` | Schema + semantic validators (PIR, assets, STIX). |
 
 ## Mapping to Rule 26's suggested directories

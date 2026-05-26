@@ -57,8 +57,15 @@ cp .env.example .env   # 存在する場合
 | `TRACE_LLM_COMPLEX` | いいえ | `gemini-2.5-pro` | L3 STIX 抽出（`--task complex` 指定時） |
 | `TRACE_RELEVANCE_MODEL_TIER` | いいえ | `simple` | `simple` / `medium` / `complex` |
 | `TRACE_RELEVANCE_THRESHOLD` | いいえ | `0.5` | L2 score `>=` 閾値で記事を残す |
-| `TRACE_CRAWL_USER_AGENT` | いいえ | `TRACE/0.1 (+...)` | `crawler/fetcher.py` が使う UA |
+| `TRACE_EXTRACTION_CHUNK_CHARS` | いいえ | `12000` | L3 抽出時の LLM チャンク最大文字数 |
+| `TRACE_EXTERNAL_REF_HASH_ENABLED` | いいえ | `true` | 外部参照の SHA-256 ハッシュ付与 |
+| `TRACE_EXTERNAL_REF_HASH_CACHE` | いいえ | `output/external_ref_hash_cache.json` | 外部参照ハッシュのキャッシュファイル |
+| `TRACE_EXTERNAL_REF_HASH_TTL_DAYS` | いいえ | `30` | キャッシュの有効期限（日数） |
+| `TRACE_CRAWL_USER_AGENT` | いいえ | Firefox UA 文字列 | `crawler/fetcher.py` が使う UA（下記注参照） |
+| `TRACE_CRAWL_CONCURRENCY` | いいえ | `4` | `crawl-batch` のスレッドプールサイズ（1 = 逐次） |
 | `TRACE_STATE_PATH` | いいえ | `output/crawl_state.json` | バッチ dedupe 状態ファイル |
+| `TRACE_FEED_MAX_ENTRIES` | いいえ | `50` | RSS/Atom フィード展開時の最大エントリ数 |
+| `TRACE_FEED_SINCE_DAYS` | いいえ | `90` | N 日より古いフィードエントリを破棄（`ACTIVITY_WINDOW_DAYS` にフォールバック） |
 | `TRACE_GHE_TOKEN` | GHE 利用時のみ | — | `submit_review.py --open-issue` 用 PAT |
 | `GHE_REPO` | GHE 利用時のみ | — | `owner/repo` |
 | `GHE_API_BASE` | いいえ | `https://api.github.com` | セルフホスト GHE 用に上書き |

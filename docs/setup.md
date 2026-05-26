@@ -59,8 +59,15 @@ Fill in:
 | `TRACE_LLM_COMPLEX` | No | `gemini-2.5-pro` | L3 STIX extraction for `--task complex` |
 | `TRACE_RELEVANCE_MODEL_TIER` | No | `simple` | `simple` / `medium` / `complex` |
 | `TRACE_RELEVANCE_THRESHOLD` | No | `0.5` | L2 score `>=` threshold keeps the article |
-| `TRACE_CRAWL_USER_AGENT` | No | `TRACE/0.1 (+...)` | UA used by `crawler/fetcher.py` |
+| `TRACE_EXTRACTION_CHUNK_CHARS` | No | `12000` | Max chars per LLM chunk in L3 extraction |
+| `TRACE_EXTERNAL_REF_HASH_ENABLED` | No | `true` | SHA-256 hash augmentation for external references |
+| `TRACE_EXTERNAL_REF_HASH_CACHE` | No | `output/external_ref_hash_cache.json` | Cache file for external-ref hashes |
+| `TRACE_EXTERNAL_REF_HASH_TTL_DAYS` | No | `30` | TTL in days for cached hashes |
+| `TRACE_CRAWL_USER_AGENT` | No | Firefox UA string | UA used by `crawler/fetcher.py` (see note below) |
+| `TRACE_CRAWL_CONCURRENCY` | No | `4` | Thread pool size for `crawl-batch` (1 = sequential) |
 | `TRACE_STATE_PATH` | No | `output/crawl_state.json` | Batch dedupe state file |
+| `TRACE_FEED_MAX_ENTRIES` | No | `50` | Max entries per RSS/Atom feed after expansion |
+| `TRACE_FEED_SINCE_DAYS` | No | `90` | Discard feed entries older than N days (falls back to `ACTIVITY_WINDOW_DAYS`) |
 | `TRACE_GHE_TOKEN` | GHE only | — | PAT for `submit_review.py --open-issue` |
 | `GHE_REPO` | GHE only | — | `owner/repo` |
 | `GHE_API_BASE` | No | `https://api.github.com` | Override for self-hosted GHE |

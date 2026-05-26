@@ -83,6 +83,7 @@ fields (`extra="allow"`) so BEACON-emitted enrichments (`risk_score`,
 | `organizational_scope` | str / null | no | |
 | `description` | str / null | no | |
 | `intelligence_level` | str / null | no | typically `strategic` / `operational` / `tactical` |
+| `prioritized_actors` | list[`ActorTriageEntry`] | yes | BEACON actor triage results; each entry has `actor_name`, `likelihood_score`, `confidence`, `intent`, `opportunity`, `capability` |
 
 ### Semantic checks (`validate/semantic/pir.py`)
 
