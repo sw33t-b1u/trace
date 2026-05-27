@@ -218,8 +218,11 @@ which entities relate to each other — keyed by short `local_id` aliases:
 `stix.extractor.build_stix_bundle_from_extraction` then assembles a STIX
 2.1 bundle entirely in Python:
 
-- Mints `id = "<type>--" + uuid.uuid4()` per entity and per relationship
-  (UUIDv4-clean by construction);
+- Assigns deterministic UUIDv5 ids for entities with stable natural keys
+  (ATT&CK technique ID, canonical name, CVE ID) so that repeated crawls
+  converge on the same STIX id; falls back to random UUIDv4 for entities
+  without a natural key (indicator, identity, campaign, etc.).
+  Relationships always receive a fresh UUIDv4;
 - Stamps a single shared `created` / `modified` timestamp in the spec's
   millisecond format;
 - Sets `spec_version = "2.1"` on every object;

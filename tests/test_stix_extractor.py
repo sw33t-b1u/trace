@@ -167,7 +167,10 @@ class TestBuildBundle:
         assert "spec_version" not in bundle
         assert "created" not in bundle
 
-    def test_entities_become_stix_objects_with_v4_ids(self):
+    def test_named_entities_get_deterministic_ids(self):
+        # intrusion-set and tool both have canonical names — they must receive
+        # deterministic UUIDv5 ids so that repeated crawls of the same entity
+        # converge on the same STIX id and SAGE can deduplicate via upsert.
         extraction = Extraction(
             entities=[_ent("a", "intrusion-set", "FIN7"), _ent("b", "tool", "Cobalt")]
         )
@@ -178,7 +181,36 @@ class TestBuildBundle:
             assert obj["created"] == obj["modified"]
             assert obj["created"].endswith(".000Z")
             tail = obj["id"].split("--")[1]
-            assert _UUIDV4.match(tail), f"{obj['id']} is not UUIDv4"
+            assert _UUID5_HEX.match(tail), f"{obj['id']} is not UUIDv5"
+
+        # Same inputs — same ids (determinism).
+        bundle2 = build_stix_bundle_from_extraction(extraction)
+        ids1 = {o["id"] for o in bundle["objects"]}
+        ids2 = {o["id"] for o in bundle2["objects"]}
+        assert ids1 == ids2
+
+    def test_entities_without_natural_key_get_uuid4_ids(self):
+        # indicator and identity have no stable natural key — they must fall
+        # back to random UUIDv4 ids so each extraction remains unique.
+        extraction = Extraction(
+            entities=[
+                ExtractedEntity(
+                    local_id="i",
+                    type="indicator",
+                    properties={
+                        "name": "Phishing indicator",
+                        "pattern": "[url:value = 'http://evil.example']",
+                        "pattern_type": "stix",
+                        "indicator_types": ["malicious-activity"],
+                        "valid_from": "2024-01-01T00:00:00Z",
+                    },
+                ),
+            ]
+        )
+        bundle = build_stix_bundle_from_extraction(extraction)
+        assert len(bundle["objects"]) == 1
+        tail = bundle["objects"][0]["id"].split("--")[1]
+        assert _UUIDV4.match(tail), f"{bundle['objects'][0]['id']} is not UUIDv4"
 
     def test_all_objects_share_one_timestamp(self):
         ext = Extraction(entities=[_ent("a", "malware", "X"), _ent("b", "tool", "Y")])
@@ -213,6 +245,8 @@ class TestBuildBundle:
 
     def test_llm_supplied_fields_do_not_override_wire_format(self):
         # If the LLM tries to sneak in `id` / `spec_version`, code wins.
+        # Malware "X" has a name so it gets a deterministic UUIDv5 id —
+        # the LLM-supplied id must be ignored regardless.
         ext = Extraction(
             entities=[
                 ExtractedEntity(
@@ -230,7 +264,10 @@ class TestBuildBundle:
         bundle = build_stix_bundle_from_extraction(ext)
         obj = bundle["objects"][0]
         tail = obj["id"].split("--")[1]
-        assert _UUIDV4.match(tail)
+        # LLM-supplied id must be ignored; malware "X" gets a deterministic
+        # UUIDv5 id (not the LLM value and not a random UUIDv4).
+        assert obj["id"] != "malware--12345678-90ab-cdef-1234-227092301234"
+        assert _UUID5_HEX.match(tail), f"{obj['id']} is not UUIDv5"
         assert obj["spec_version"] == "2.1"
         assert obj["created"].endswith(".000Z")
         assert obj["created"] != "2020-01-01T00:00:00:000Z"

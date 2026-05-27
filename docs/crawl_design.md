@@ -174,8 +174,9 @@ and behavior is identical to the pre-0.3.0 single-call path.
 `stix/extractor.build_stix_bundle_from_extraction(extraction, ...)` is
 deterministic Python. It:
 
-1. Mints a fresh `<type>--<uuid4>` per entity and records a
-   `local_id → STIX id` map.
+1. Assigns a STIX id per entity — deterministic UUIDv5 for entities with
+   a stable natural key (ATT&CK technique ID, canonical name, CVE ID),
+   random UUIDv4 otherwise — and records a `local_id → STIX id` map.
 2. Stamps every object (entities, relationships, and the
    `extension-definition` for L4 metadata) with one shared `created`
    timestamp in `YYYY-MM-DDTHH:mm:ss.000Z` form, plus

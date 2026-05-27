@@ -365,6 +365,13 @@ _IDENTITY_INTERNAL_NAMESPACE = uuid.UUID("c4f8d2e6-9b1a-5c7d-8e3f-2a4b6d8e1c5f")
 # rather than creating a duplicate.
 _USER_ACCOUNT_NAMESPACE = uuid.UUID("e51e9d8a-3b2c-5d7f-9c4e-2b6a8f3c1d50")
 
+# UUIDv5 namespace for deterministic STIX ids assigned to entities that have
+# a stable natural key (ATT&CK external_id, CVE id, or canonical name).
+# Using a pinned namespace means that the same entity extracted from two
+# different CTI reports produces the same STIX id, enabling SAGE's
+# ``INSERT OR UPDATE`` to deduplicate without manual merging.
+_DETERMINISTIC_ID_NAMESPACE = uuid.UUID("a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -1153,24 +1160,38 @@ def build_stix_bundle_from_extraction(
     indicators_dropped_invalid_pattern = 0
     vulnerabilities_dropped_no_cve = 0
     for entity in extraction.entities:
-        stix_id = f"{entity.type}--{uuid.uuid4()}"
         obj = {
             "type": entity.type,
-            "id": stix_id,
             "spec_version": "2.1",
             "created": ts,
             "modified": ts,
         }
         # Copy LLM-supplied properties (name, description, labels, …) but never
-        # let them override the wire-format fields above.
+        # let them override the wire-format fields above or sneak in an id.
         for key, value in entity.properties.items():
-            if key in obj:
+            if key in obj or key == "id":
                 continue
             obj[key] = value
         # STIX 2.1 type-specific required-property defaults. The LLM is asked
         # for domain knowledge only — it does not know which STIX wire-format
         # fields are mandatory per type, so the bundle assembler fills them in.
         _apply_required_property_defaults(obj, ts)
+        # Determine the STIX id — prefer a deterministic UUIDv5 derived from
+        # the entity's natural key (ATT&CK id, CVE id, or canonical name) so
+        # that repeated crawls of the same entity produce the same STIX id and
+        # SAGE's INSERT OR UPDATE deduplicates naturally.  Fall back to a
+        # random UUIDv4 for types that have no stable natural key.
+        det_id = _deterministic_stix_id(entity.type, obj)
+        if det_id:
+            stix_id = det_id
+            logger.debug(
+                "stix_id_deterministic",
+                entity_type=entity.type,
+                stix_id=stix_id,
+            )
+        else:
+            stix_id = f"{entity.type}--{uuid.uuid4()}"
+        obj["id"] = stix_id
         # Inject PIR taxonomy tags (apt-china, apt-russia, …) so SAGE's
         # pir_filter.is_relevant_actor can match actors against PIR vocab.
         if taxonomy_index is not None and entity.type in ("threat-actor", "intrusion-set"):
@@ -1690,6 +1711,51 @@ def _build_trace_extension_definition(ts: str) -> dict:
         "extension_types": list(_TRACE_EXTENSION_TYPES),
         "extension_properties": list(_TRACE_EXTENSION_PROPERTIES),
     }
+
+
+def _deterministic_stix_id(entity_type: str, obj: dict) -> str | None:
+    """Return a deterministic UUIDv5-based STIX id for entities that have a
+    stable natural key, or ``None`` to fall back to a random UUIDv4.
+
+    Stability rules:
+    - ``attack-pattern``: ATT&CK external_id (e.g. "T1566.001") from
+      ``external_references`` where ``source_name`` is ``"mitre-attack"`` or
+      ``"mitre-mobile-attack"``.
+    - ``threat-actor``, ``intrusion-set``, ``malware``, ``tool``: canonical
+      lower-cased name.  A ``\\0`` prefix including ``entity_type`` avoids
+      cross-type collisions (e.g. malware "Cobalt" vs tool "Cobalt").
+    - ``vulnerability``: CVE id extracted via :func:`_extract_cve_id`.
+    - All other types (``indicator``, ``identity``, ``campaign``,
+      ``user-account``, ``observed-data``, …): ``None`` — uuid4 fallback.
+
+    Using a pinned namespace (``_DETERMINISTIC_ID_NAMESPACE``) guarantees that
+    identical natural keys always produce identical STIX ids across crawl runs,
+    enabling SAGE's ``INSERT OR UPDATE`` to converge on a single row.
+    """
+    if entity_type == "attack-pattern":
+        refs = obj.get("external_references") or []
+        for ref in refs:
+            if not isinstance(ref, dict):
+                continue
+            if ref.get("source_name") in ("mitre-attack", "mitre-mobile-attack"):
+                ext_id = ref.get("external_id")
+                if ext_id and isinstance(ext_id, str):
+                    key = ext_id.strip()
+                    return f"{entity_type}--{uuid.uuid5(_DETERMINISTIC_ID_NAMESPACE, key)}"
+        return None
+    if entity_type in ("threat-actor", "intrusion-set", "malware", "tool"):
+        name = (obj.get("name") or "").strip().lower()
+        if not name:
+            return None
+        key = f"{entity_type}\0{name}"
+        return f"{entity_type}--{uuid.uuid5(_DETERMINISTIC_ID_NAMESPACE, key)}"
+    if entity_type == "vulnerability":
+        cve_id = _extract_cve_id(obj)
+        if cve_id is None:
+            return None
+        return f"{entity_type}--{uuid.uuid5(_DETERMINISTIC_ID_NAMESPACE, cve_id)}"
+    # indicator, identity, campaign, user-account, observed-data, etc.
+    return None
 
 
 def _apply_required_property_defaults(obj: dict, ts: str) -> None:
