@@ -6,6 +6,36 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [2.0.0] - 2026-05-28
+
+**Breaking: PIR schema_version 2.0.0 + deterministic STIX IDs.**
+
+### Changed (BREAKING)
+
+- `SUPPORTED_PIR_SCHEMA_VERSIONS` is now `{"2.0.0"}`. PIR documents with
+  `schema_version: "1.0.0"` are rejected. Aligns with BEACON 2.0.0's CIO
+  field rename (`tool_usage`, `ir_observed`).
+- `ScoreComponent` validation model: `tool_sophistication` → `tool_usage`;
+  `ir_observed_capability` / `ir_observed_opportunity` → `ir_observed`
+  (on Intent).
+
+### Added
+
+- Deterministic STIX IDs (UUIDv5) for entities with stable natural keys
+  (attack-pattern ATT&CK ID, threat-actor/intrusion-set/malware/tool name,
+  vulnerability CVE ID). Enables SAGE INSERT OR UPDATE deduplication.
+  Entities without a natural key keep random UUIDv4.
+
+### Removed
+
+- 90-day BC guarantee from `docs/api-stability.md` (policy simplified).
+
+### Notes
+
+- Paired with BEACON 2.0.0. SAGE unaffected (opaque score_breakdown).
+
+---
+
 ## [1.13.0] - 2026-05-25
 
 **Initiative I — Storage Abstraction.** Paired triple: BEACON 1.1.0

@@ -1,4 +1,4 @@
-"""Tests for ``prioritized_actors[]`` validation under PIR schema_version 1.0.0.
+"""Tests for ``prioritized_actors[]`` validation under PIR schema_version 2.0.0.
 
 Initiative H (TRACE 1.12.0) tightened ``prioritized_actors`` from
 optional-with-default-list to a required field — the pre-0.15.0 PIR
@@ -27,9 +27,9 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 def _wrap(pirs: list[dict]) -> dict:
-    """Wrap a list of PIRItem dicts in the 1.0.0 envelope required by
-    ``PIRDocument.from_payload`` after Initiative H."""
-    return {"schema_version": "1.0.0", "pirs": pirs}
+    """Wrap a list of PIRItem dicts in the 2.0.0 envelope required by
+    ``PIRDocument.from_payload`` after TRACE 2.0.0."""
+    return {"schema_version": "2.0.0", "pirs": pirs}
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 # TRACE API Stability Policy
 
-**Status**: Draft for Initiative H — 1.0 Stabilization (sign-off pending).
-Effective from TRACE 1.12.0 (the final asymmetric minor before alignment).
+**Status**: Effective from TRACE 2.0.0 (breaking release — PIR
+schema_version "2.0.0" contract).
 
 This document enumerates TRACE's committed public surface and the
 backward-compatibility (BC) guarantee that applies to it. Anything not
@@ -16,26 +16,21 @@ TRACE reached 1.0.0 on 2026-05-09 (STIX 2.1 identity SDO milestone,
 paired with SAGE 0.5.0) but historically allowed minor-version
 breaking changes in the validator surface (Initiative E added strict
 mode, F added schema_version gate, G added IR-factor acceptance).
-Initiative H concludes this asymmetric period.
+Initiative H concluded this asymmetric period; TRACE 2.0.0 is the
+first full breaking-change major bump.
 
 | Version | Policy |
 |---|---|
 | 1.0.0 – 1.11.0 | Historical: minor releases could break validator surface |
 | **1.12.0 (Initiative H)** | **Final asymmetric minor** — pre-1.0 normaliser removed, PIR validator restricted to `schema_version: "1.0.0"` only |
-| 1.13.0 and onwards | **Aligns with BEACON / SAGE strict policy**: SemVer 2.0.0; 90-day BC guarantee; breaking changes = `2.0.0` |
+| 1.13.0 | Last release accepting `schema_version: "1.0.0"` |
+| **2.0.0** | **Breaking**: `SUPPORTED_PIR_SCHEMA_VERSIONS` → `{"2.0.0"}`; `schema_version: "1.0.0"` now rejected. Paired with BEACON 2.0.0. |
 
-From TRACE 1.13.0 onwards (the first release after H):
+From TRACE 2.0.0 onwards:
 
 - **Major** (`X.0.0`) — breaking changes to any Committed surface item.
-- **Minor** (`1.X.0`) — additive only.
-- **Patch** (`1.0.X`) — bug fixes only.
-
-### 90-day BC guarantee (from 1.13.0)
-
-Committed surface items are guaranteed BC for at least 90 days from
-the release that introduced them. Deprecation path is identical to
-BEACON / SAGE (warn in 1.X.Y → remove in 2.0.0). See BEACON
-`docs/api-stability.md` §1 for the full policy text.
+- **Minor** (`2.X.0`) — additive only.
+- **Patch** (`2.0.X`) — bug fixes only.
 
 ---
 
@@ -43,7 +38,7 @@ BEACON / SAGE (warn in 1.X.Y → remove in 2.0.0). See BEACON
 
 | Surface | Committed? | First version | Notes |
 |---|---|---|---|
-| PIR validator: `SUPPORTED_PIR_SCHEMA_VERSIONS = {"1.0.0"}` | ✓ | 1.12.0 | Pre-1.0 versions (0.16.0 / 0.17.0 / 0.18.0) rejected with per-version error message |
+| PIR validator: `SUPPORTED_PIR_SCHEMA_VERSIONS = {"2.0.0"}` | ✓ | 2.0.0 | Versions ≤ "1.0.0" rejected with per-version error message; paired with BEACON 2.0.0 |
 | `PIRDocument.from_payload()` API | ✓ | 1.12.0 | Pydantic dispatcher for PIR validation |
 | `STIX2.1 bundle` validation API | ✓ | 1.12.0 | Wraps `stix2-validator` |
 | `Assets bundle` validation API | ✓ | 1.12.0 | `validate_assets` / `validate_identity_assets` / `validate_user_accounts` |
@@ -74,25 +69,27 @@ the wrapped envelope shape — bare-list and single-object payloads
 are rejected.
 
 **Committed**:
-- `SUPPORTED_PIR_SCHEMA_VERSIONS: set[str] = {"1.0.0"}` — TRACE
-  1.12.0 onwards accepts only `"1.0.0"`. Pre-1.0 versions (`0.16.0`,
-  `0.17.0`, `0.18.0`) are rejected with per-version error message:
-  > `schema_version "0.18.0" was supported in TRACE 1.11.0; please
-  > re-emit with BEACON 1.0.0+ output.`
-  > (Mapping: 0.16.0 → TRACE 1.9.0, 0.17.0 → 1.10.0, 0.18.0 → 1.11.0.)
+- `SUPPORTED_PIR_SCHEMA_VERSIONS: set[str] = {"2.0.0"}` — TRACE
+  2.0.0 accepts only `"2.0.0"`. The previous `"1.0.0"` and pre-1.0
+  versions (`0.16.0`, `0.17.0`, `0.18.0`) are rejected with per-version
+  error messages:
+  > `schema_version "1.0.0" was supported in TRACE 1.13.0; please
+  > re-emit with BEACON 2.0.0+ output.`
+  > (Full mapping: 0.16.0 → TRACE 1.9.0, 0.17.0 → 1.10.0, 0.18.0 →
+  > 1.11.0, 1.0.0 → 1.13.0.)
 - `PIRDocument.from_payload(payload: dict, *, ...)` — requires
-  wrapped envelope `{"schema_version": "1.0.0", "pirs": [...]}`.
+  wrapped envelope `{"schema_version": "2.0.0", "pirs": [...]}`.
   Returns validated `PIROutputDocument` or raises `ValidationError`
   (Pydantic) / `ValueError` (envelope rejection — bare-list / single-
   object inputs).
 - Bare-list rejection message:
   > `Bare-list PIR input is no longer supported as of TRACE 1.12.0;
-  > wrap your input as {"schema_version": "1.0.0", "pirs": [...]}`
+  > wrap your input as {"schema_version": "2.0.0", "pirs": [...]}`
 - `PIROutputDocument.PIRItem.prioritized_actors` — required field
-  (must be present, MAY be empty list). Initiative H Phase 2
-  tightening — BEACON 1.0.0 always emits this field.
-- Cross-version contamination check — REMOVED in Phase 2 since only
-  `"1.0.0"` is accepted (no contamination possible).
+  (must be present, MAY be empty list). BEACON 2.0.0 always emits
+  this field.
+- Cross-version contamination check — REMOVED in Initiative H Phase 2
+  since only one schema_version is accepted (no contamination possible).
 
 **Not committed**:
 - Pydantic class definitions in `validate/schema/models.py` — consumers
@@ -140,7 +137,7 @@ Regenerated from TRACE's `PIRDocument` Pydantic model. Drift check
 `make check-pir-schema-drift` compares against
 `../beacon/schema/pir_output.schema.json`.
 
-**Committed**: schema content matches BEACON 1.0.0 output exactly
+**Committed**: schema content matches BEACON 2.0.0 output exactly
 (no field difference).
 
 ### 3.6 Crawl output
@@ -276,8 +273,8 @@ them explicitly per deployment.
 
 TRACE's Committed surface depends on:
 
-- **BEACON `pir_output.json` schema** (BEACON 1.0.0+): TRACE
-  validator accepts only `schema_version: "1.0.0"` payloads. BEACON
+- **BEACON `pir_output.json` schema** (BEACON 2.0.0+): TRACE
+  validator accepts only `schema_version: "2.0.0"` payloads. BEACON
   output is the canonical input to `trace validate-pir`.
 - **MITRE ATT&CK Enterprise STIX bundle** (read at validation time
   if loaded): for threat-actor / TTP resolution.
@@ -314,5 +311,5 @@ maintenance convention.
 
 ---
 
-*Initiative H — 1.0 Stabilization. TRACE 1.12.0 is the final
-asymmetric minor; 1.13.0 onwards strict.*
+*TRACE 2.0.0 — breaking release. schema_version "2.0.0" is the
+accepted PIR contract; paired with BEACON 2.0.0.*

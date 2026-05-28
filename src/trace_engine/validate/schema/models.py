@@ -151,7 +151,7 @@ class DataQuality(BaseModel):
 
     ``extra='allow'`` is preserved so new additive quality flags can be
     added without a TRACE major bump (additive changes stay on
-    schema_version 1.0.0 per H-2 / api-stability.md).
+    schema_version 2.0.0 per api-stability.md).
     """
 
     model_config = ConfigDict(extra="allow")
@@ -234,8 +234,8 @@ class PIRDocument(RootModel[list[PIRItem]]):
     TRACE works with.
 
     Initiative H tightened the on-disk contract: every PIR payload must
-    arrive as a BEACON 1.0.0 wrapped envelope
-    (``{"schema_version": "1.0.0", "pirs": [...]}``). ``from_payload``
+    arrive as a BEACON 2.0.0 wrapped envelope
+    (``{"schema_version": "2.0.0", "pirs": [...]}``). ``from_payload``
     rejects bare lists or single objects with a migration error. Callers
     that needed those legacy shapes have been moved onto the wrapped
     envelope (see ``src/trace_engine/pir/loader.py``,
@@ -248,26 +248,26 @@ class PIRDocument(RootModel[list[PIRItem]]):
             raise ValueError(
                 "Bare-list PIR input is no longer supported as of TRACE 1.12.0; "
                 "wrap your input as "
-                '{"schema_version": "1.0.0", "pirs": [...]}'
+                '{"schema_version": "2.0.0", "pirs": [...]}'
             )
         wrapper = PIROutputDocument.model_validate(payload)
         return cls(root=wrapper.pirs)
 
 
-# Initiative H (TRACE 1.12.0): tightened to ``{"1.0.0"}``. Pre-1.0 versions
-# (0.16.0 / 0.17.0 / 0.18.0) are now rejected with a per-version message
-# (see ``_REJECTED_VERSION_HISTORY`` below) directing the operator to
-# re-emit with BEACON 1.0.0+.
-SUPPORTED_PIR_SCHEMA_VERSIONS: set[str] = {"1.0.0"}
+# TRACE 2.0.0 (breaking): tightened to ``{"2.0.0"}``. The previous ``"1.0.0"``
+# is now rejected (see ``_REJECTED_VERSION_HISTORY`` below) directing the
+# operator to re-emit with BEACON 2.0.0+.
+SUPPORTED_PIR_SCHEMA_VERSIONS: set[str] = {"2.0.0"}
 
 # Plan H-12b: per-version reject message maps each historically supported
-# pre-1.0 schema_version to the TRACE minor that last accepted it. Other
-# unrecognised values (e.g. ``"0.15.0"`` or a future ``"1.1.0"``) fall
-# through to the generic message that names the current TRACE version.
+# schema_version to the TRACE minor that last accepted it. Other
+# unrecognised values fall through to the generic message that names the
+# current TRACE version.
 _REJECTED_VERSION_HISTORY: dict[str, str] = {
     "0.16.0": "1.9.0",
     "0.17.0": "1.10.0",
     "0.18.0": "1.11.0",
+    "1.0.0": "1.13.0",
 }
 
 # Hard-coded current TRACE version name used in reject messages. Kept in
@@ -275,11 +275,11 @@ _REJECTED_VERSION_HISTORY: dict[str, str] = {
 # Phase 7). A constant rather than ``importlib.metadata.version`` lookup
 # so the validator works during ``uv sync`` first-run before the package
 # is fully installed.
-_TRACE_VERSION = "1.12.0"
+_TRACE_VERSION = "2.0.0"
 
 
 class PIROutputDocument(BaseModel):
-    """Document-level schema for pir_output.json (BEACON 1.0.0+).
+    """Document-level schema for pir_output.json (BEACON 2.0.0+).
 
     Mirrors BEACON's ``PIROutputDocument`` shape for drift-check alignment.
     ``schema_version`` is required; bundles without it or with a value
@@ -302,7 +302,7 @@ class PIROutputDocument(BaseModel):
         if legacy_trace is not None:
             raise ValueError(
                 f'schema_version "{v}" was supported in TRACE {legacy_trace}; '
-                f"please re-emit with BEACON 1.0.0+ output."
+                f"please re-emit with BEACON 2.0.0+ output."
             )
         supported = "{" + ", ".join(sorted(SUPPORTED_PIR_SCHEMA_VERSIONS)) + "}"
         raise ValueError(

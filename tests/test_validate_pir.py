@@ -17,10 +17,10 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 @pytest.fixture
 def valid_pir() -> dict:
-    """Load the canonical wrapped 1.0.0 PIR payload as a dict.
+    """Load the canonical wrapped 2.0.0 PIR payload as a dict.
 
     Initiative H (TRACE 1.12.0) tightened ``PIRDocument.from_payload``
-    to require the ``{"schema_version": "1.0.0", "pirs": [...]}``
+    to require the ``{"schema_version": "2.0.0", "pirs": [...]}``
     envelope; the bare-list and single-object forms no longer load.
     """
     with (FIXTURES / "valid_pir.json").open() as f:
