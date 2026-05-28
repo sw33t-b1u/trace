@@ -1,11 +1,12 @@
 # TRACE — Setup Guide
 
-> 動作確認済 Python: 3.12
+> Verified Python: 3.12
 
 Japanese translation: [`docs/setup.ja.md`](setup.ja.md)
 
 For data flow / responsibility split with BEACON / SAGE, see `high-level-design.md`.
 For dependency rationale, see [`docs/dependencies.md`](dependencies.md).
+For GCP deployment, see [`docs/deploy.md`](deploy.md).
 
 ## Prerequisites
 
@@ -115,193 +116,94 @@ make check      # full gate: vet → lint → test → audit
 
 ---
 
-## Running TRACE
+## Testing
 
-The full command set lives in [`docs/crawl_design.md`](crawl_design.md) (collection)
-and [`docs/data-model.md`](data-model.md) (validation gate). Quick reference:
-
-### Single URL → STIX bundle
+### Running tests
 
 ```bash
-# No PIR — extract everything the LLM finds.
-uv run python cmd/crawl_single.py \
-  --input 'https://example.com/cti-blog/post-42' \
-  --output output/test_bundle.json
+# Full quality gate (lint + test + audit)
+make check
 
-# With PIR — articles below the relevance threshold are skipped.
-uv run python cmd/crawl_single.py \
-  --input 'https://example.com/cti-blog/post-42' \
-  --pir ../BEACON/output/pir_output.json
+# Tests only
+make test
+
+# Tests only via uv
+uv run pytest
+
+# Run a specific test file
+uv run pytest tests/test_stix_extractor.py -v
+
+# Run tests matching a name pattern
+uv run pytest -k "test_relevance" -v
 ```
 
-### Batch crawl
+No external services are required — all LLM calls are mocked in the test suite.
+
+### Test fixtures
+
+Fixtures live in `tests/fixtures/`. Each fixture is a static file used as
+test input or expected output:
+
+| Fixture type | Description |
+|-------------|-------------|
+| STIX bundle JSON | Sample bundles for extractor and validator tests |
+| PIR JSON | Sample `pir_output.json` documents for validator tests |
+| Assets JSON | Sample `assets.json` for asset validator tests |
+| Taxonomy JSON | Cached taxonomy snapshot; used instead of BEACON live data |
+
+The taxonomy fixture (`schema/threat_taxonomy.cached.json` or a copy in
+`tests/fixtures/`) means tests do not depend on BEACON being present or
+reachable.
+
+### No external service dependency
+
+- **LLM calls**: All Vertex AI / Gemini calls are patched with `unittest.mock`
+  or `pytest-mock`. Tests do not require a GCP project, `GOOGLE_APPLICATION_CREDENTIALS`,
+  or network access.
+- **BEACON**: Taxonomy auto-sync is bypassed in tests. The test suite uses
+  the committed taxonomy snapshot.
+- **GCS**: `GCSStorage` is not exercised in unit tests. `LocalStorage` with a
+  temporary directory is used instead.
+
+### Common test patterns
+
+#### Fixture-based STIX bundle tests
+
+Most tests in `tests/test_stix_extractor.py` load a JSON fixture, call the
+extractor or validator function, and assert on the result structure:
+
+```python
+def test_bundle_validates(tmp_path, stix_fixture):
+    bundle = json.loads(stix_fixture.read_text())
+    result = validate_stix_bundle(bundle)
+    assert result.is_valid
+```
+
+#### Relevance gate tests
+
+L2 gate tests patch the Vertex AI client and assert that articles below the
+threshold are recorded as skipped in `crawl_state.json`:
+
+```python
+def test_low_relevance_skipped(mock_llm, crawl_state):
+    mock_llm.return_value = RelevanceResponse(score=0.1)
+    ...
+    assert crawl_state[url]["skipped"] is True
+```
+
+### Taxonomy cache in tests
+
+Tests that exercise taxonomy enrichment use the committed
+`schema/threat_taxonomy.cached.json` snapshot (or a fixture copy). The
+auto-sync path (`ensure_taxonomy_fresh`) is mocked to be a no-op, so no
+BEACON dependency is needed.
+
+To regenerate the test taxonomy snapshot from a live BEACON installation:
 
 ```bash
-# input/sources.yaml schema is documented in docs/crawl_design.md.
-uv run python cmd/crawl_batch.py --pir ../BEACON/output/pir_output.json
-uv run python cmd/crawl_batch.py --pir ../BEACON/output/pir_output.json --recheck-on-pir-change
-uv run python cmd/crawl_batch.py --dry-run
+trace taxonomy-refresh
+cp schema/threat_taxonomy.cached.json tests/fixtures/threat_taxonomy.json
 ```
-
-### Validation gate
-
-```bash
-uv run python cmd/validate_assets.py --assets ../BEACON/output/assets.json
-uv run python cmd/validate_pir.py    --pir    ../BEACON/output/pir_output.json \
-                                     --assets ../BEACON/output/assets.json
-uv run python cmd/validate_stix.py   --bundle output/stix_bundle.json [--strict]
-
-# Initiative A / Initiative C Phase 2 — Identity SDO + has_access edges.
-# Cross-checks each has_access[].asset_id against assets.json and validates
-# is_high_value_impersonation_target / impersonation_risk_factors (Phase 2).
-uv run python cmd/validate_identity_assets.py \
-  --identity-assets ../BEACON/output/identity_assets.json \
-  --assets          ../BEACON/output/assets.json
-
-# Initiative B — UserAccount SCO + account_on_asset edges.
-uv run python cmd/validate_user_accounts.py \
-  --user-accounts ../BEACON/output/user_accounts.json \
-  --assets        ../BEACON/output/assets.json
-
-uv run python cmd/validate_all.py \
-  --assets ../BEACON/output/assets.json \
-  --pir    ../BEACON/output/pir_output.json \
-  --bundle output/stix_bundle.json \
-  --report output/validation_report.md
-```
-
-### Taxonomy enrichment
-
-TRACE bundles carry PIR vocabulary tags (`apt-china`, `apt-russia`, `ransomware`, …) on `threat-actor` and `intrusion-set` objects so that SAGE's `pir_filter.is_relevant_actor` retains actors for downstream graph ingestion.
-
-**Auto-sync at crawl startup** (TRACE 1.7.0): `crawl_single` and `crawl_batch` call `ensure_taxonomy_fresh` at startup, which copies `../BEACON/schema/threat_taxonomy.json` to `schema/threat_taxonomy.cached.json` when BEACON is available. The sync is best-effort — if BEACON is absent, the existing cached snapshot is used and a `taxonomy_sync_skipped` warning is logged.
-
-```bash
-# Opt out of auto-sync (CI / air-gapped):
-uv run python cmd/crawl_single.py --input report.pdf --no-sync-taxonomy
-
-# Explicit cache refresh:
-uv run python cmd/update_taxonomy_cache.py
-```
-
-**External-bundle rescue** — OpenCTI feeds, hand-authored STIX, or old TRACE bundles often lack these tags. Enrich them before feeding SAGE:
-
-```bash
-uv run python cmd/enrich_bundle.py \
-    --input  external.json \
-    --output enriched.json
-
-# Then feed to SAGE:
-cd ../SAGE
-uv run python cmd/run_etl.py --manual-bundle ../TRACE/enriched.json
-```
-
-Override the taxonomy snapshot with `--taxonomy <path>` if needed (default: `schema/threat_taxonomy.cached.json`).
-
-| Env var | Default | Description |
-|---------|---------|-------------|
-| `TRACE_TAXONOMY_CACHE_PATH` | `schema/threat_taxonomy.cached.json` | TRACE-side cache |
-| `TRACE_BEACON_TAXONOMY_SOURCE` | `../BEACON/schema/threat_taxonomy.json` | BEACON master file for auto-sync |
-
-### Reviewer handoff
-
-```bash
-# Echo Markdown to stdout.
-uv run python cmd/submit_review.py --report output/validation_report.md
-
-# Or post as a single GHE Issue.
-uv run python cmd/submit_review.py \
-  --report output/validation_report.md --open-issue \
-  --title "TRACE validation 2026-05-08"
-```
-
-Exit codes everywhere: `0` success / `1` validation failures / `2` input or
-auth-config error.
-
----
-
-## Step 6 — Deploy TRACE to Cloud Run (Job)
-
-Build the container image and deploy TRACE as a Cloud Run Job for batch execution.
-
-```sh
-# Load .env if not already sourced
-source .env
-export IMAGE=gcr.io/${GCP_PROJECT_ID}/trace-crawl
-
-# Build and push container image via Cloud Build
-gcloud builds submit --tag ${IMAGE} --project=${GCP_PROJECT_ID}
-
-# Create the Cloud Run Job
-gcloud run jobs create trace-crawl \
-  --image=${IMAGE} \
-  --region=${VERTEX_LOCATION:-us-central1} \
-  --set-env-vars="GCP_PROJECT_ID=${GCP_PROJECT_ID},VERTEX_LOCATION=${VERTEX_LOCATION:-us-central1},TRACE_STORAGE=${TRACE_STORAGE:-gcs},TRACE_GCS_BUCKET=${TRACE_GCS_BUCKET}" \
-  --set-secrets="TRACE_GCS_PREFIX=trace-gcs-prefix:latest" \
-  --project=${GCP_PROJECT_ID}
-```
-
-> **Secret Manager:** Store sensitive values with
-> `gcloud secrets create trace-gcs-prefix --data-file=- <<< "trace/"` and
-> reference with `--set-secrets` instead of `--set-env-vars`.
-
-> **Service account:** Create a dedicated service account and grant
-> `roles/aiplatform.user` (Vertex AI Gemini), `roles/storage.objectAdmin`
-> (GCS output), and `roles/run.invoker` before deploying.
->
-> ```sh
-> gcloud iam service-accounts create trace-crawl \
->   --display-name="TRACE Crawl Job" \
->   --project=${GCP_PROJECT_ID}
->
-> for ROLE in roles/aiplatform.user roles/storage.objectAdmin roles/run.invoker; do
->   gcloud projects add-iam-policy-binding ${GCP_PROJECT_ID} \
->     --member="serviceAccount:trace-crawl@${GCP_PROJECT_ID}.iam.gserviceaccount.com" \
->     --role="${ROLE}"
-> done
->
-> gcloud run jobs update trace-crawl \
->   --service-account="trace-crawl@${GCP_PROJECT_ID}.iam.gserviceaccount.com" \
->   --region=${VERTEX_LOCATION:-us-central1} \
->   --project=${GCP_PROJECT_ID}
-> ```
-
-> **Overriding the subcommand:** The default `CMD ["crawl-batch"]` runs batch
-> crawl. Pass `--args` to override, e.g.
-> `gcloud run jobs update trace-crawl --args="validate-all,--assets,gs://..."`.
-
-> **`sources.yaml`:** The container image does not include `input/sources.yaml`
-> (it is gitignored and contains deployment-specific URLs). Mount it at runtime
-> via GCS or a Secret Manager volume:
-> ```sh
-> gcloud run jobs update trace-crawl \
->   --add-volume=name=sources,type=cloud-storage,bucket=${TRACE_GCS_BUCKET} \
->   --add-volume-mount=volume=sources,mount-path=/app/input \
->   --region=${VERTEX_LOCATION:-us-central1} \
->   --project=${GCP_PROJECT_ID}
-> ```
-
----
-
-## Step 7 — Set up Cloud Scheduler (periodic crawl)
-
-Trigger the TRACE crawl job automatically on a schedule.
-
-```sh
-gcloud services enable cloudscheduler.googleapis.com --project=${GCP_PROJECT_ID}
-
-# Every 6 hours
-gcloud scheduler jobs create http trace-periodic-crawl \
-  --location=${VERTEX_LOCATION:-us-central1} \
-  --schedule="0 */6 * * *" \
-  --uri="https://${VERTEX_LOCATION:-us-central1}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${GCP_PROJECT_ID}/jobs/trace-crawl:run" \
-  --message-body="{}" \
-  --oauth-service-account-email="trace-crawl@${GCP_PROJECT_ID}.iam.gserviceaccount.com" \
-  --time-zone="UTC" \
-  --project=${GCP_PROJECT_ID}
-```
-
-> **Manual trigger:** `gcloud run jobs execute trace-crawl --region=${VERTEX_LOCATION:-us-central1} --project=${GCP_PROJECT_ID}`
 
 ---
 

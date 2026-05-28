@@ -61,69 +61,23 @@ CTI ベンダーブログ・ニュース記事・PDF レポート・任意の UR
 
 `--pir` を指定すると、STIX 抽出の前段で軽量リレバンスゲート（L2）が動作し、抽出プロンプトには PIR コンテキストが注入される（L3）。生成バンドルには `x_trace_matched_pir_ids` / `x_trace_relevance_score` メタデータが付与される（L4）。`--pir` 未指定時はゲートを無効化し、全記事を STIX 化する（試行・実験用途）。
 
-## StorageBackend（Initiative I）
-
-TRACE はクロール出力の書き先を **StorageBackend** で切り替えられる。
-抽象クラスは BEACON と同一設計（Decision I-12: コピー、共有 import なし）。
-
-| バックエンド | 用途 | 設定 |
-|------------|------|------|
-| `LocalStorage` | デフォルト | `TRACE_STORAGE=local`（デフォルト） |
-| `GCSStorage` | クラウドデプロイ | `TRACE_STORAGE=gcs` + `TRACE_GCS_BUCKET` |
-
-**出力カテゴリ:** `stix` — ファイル名形式: `stix_bundle_<YYYYMMDDHHmm>.json`
-
-**後方互換:** `--output` / `--output-dir` フラグを指定した場合は StorageBackend をバイパスし、従来通り明示パスに書き出す。
-
-### 環境変数
-
-| 変数 | デフォルト | 説明 |
-|------|-----------|------|
-| `TRACE_STORAGE` | `local` | バックエンド選択: `local` または `gcs` |
-| `TRACE_STORAGE_BASE_DIR` | `output/` | `LocalStorage` のルートディレクトリ |
-| `TRACE_GCS_BUCKET` | — | GCS バケット名（`TRACE_STORAGE=gcs` 時に必須） |
-| `TRACE_GCS_PREFIX` | (空文字) | GCS バケット内のキープレフィックス |
-
-### crawl-single の出力
-
-```bash
-# デフォルト — バンドルを StorageBackend stix/ に保存
-# （例: output/stix/stix_bundle_202601010900.json）
-uv run python cmd/crawl_single.py --input https://example.com/post
-
-# 明示パス指定 — StorageBackend をバイパス
-uv run python cmd/crawl_single.py --input https://example.com/post \
-  --output output/my_bundle.json
-```
-
-### crawl-batch の出力
-
-```bash
-# デフォルト — 各バンドルを StorageBackend stix/ に保存
-uv run python cmd/crawl_batch.py --pir ../BEACON/output/pir_output.json
-
-# 明示ディレクトリ指定 — StorageBackend をバイパス
-uv run python cmd/crawl_batch.py --pir ../BEACON/output/pir_output.json \
-  --output-dir output/stix/
-```
-
-## 検証の 3 層
-
-1. **スキーマ層** — Pydantic v2 モデルが SAGE の入力契約（`SAGE/cmd/load_assets.py`, `SAGE/src/sage/pir/filter.py`）に準拠。STIX バンドルは OASIS [`stix2-validator`](https://github.com/oasis-open/cti-stix-validator) で検証する。
-2. **セマンティクス層** — ID 一意性、参照整合性（`asset.network_segment_id` の解決可否など）、`threat_actor_tags` がキャッシュ済み脅威タクソノミに存在するか、PIR の `asset_weight_rules.tag` が少なくとも 1 つの asset タグと一致するか。
-3. **人手レビュー支援** — 検証実行ごとに決定論的な `output/validation_report_*.md` を生成。`cmd/submit_review.py --open-issue` で GitHub Enterprise に Issue として登録できる（任意）。
-
 ## ドキュメント
 
-| ドキュメント | JA / EN | 説明 |
-|-------------|---------|------|
-| Setup | [ja](docs/setup.ja.md) / [en](docs/setup.md) | 前提条件・インストール・環境変数・GCP 認証・CLI クイックリファレンス |
-| Data model | [ja](docs/data-model.ja.md) / [en](docs/data-model.md) | 検証契約: `assets.json`, `pir_output.json`, STIX バンドル, `ValidationFinding` |
-| Crawl 設計 | [ja](docs/crawl_design.ja.md) / [en](docs/crawl_design.md) | `sources.yaml` スキーマ（注釈付き例）・`crawl_state.json` 意味論・L2/L3/L4 フロー・dedupe 戦略 |
-| Dependencies | [ja](docs/dependencies.ja.md) / [en](docs/dependencies.md) | 依存ライブラリの採用理由とライセンス |
-| BEACON 移管 | [ja](docs/beacon_handoff.ja.md) / [en](docs/beacon_handoff.md) | BEACON から移管した範囲とその理由 |
-| ディレクトリ構成 | [ja](docs/structure.ja.md) / [en](docs/structure.md) | トップレベル構成と Rule 26 からの逸脱記録 |
-| `docs/high-level-design.md` | local-only / gitignored | アーキテクチャ・データモデル・主要アルゴリズム |
+| ドキュメント | 説明 |
+|-------------|------|
+| [docs/setup.md](docs/setup.md) / [ja](docs/setup.ja.md) | クローン・インストール・設定・テスト・初回実行 |
+| [docs/deploy.md](docs/deploy.md) / [ja](docs/deploy.ja.md) | Cloud Run Job デプロイと Cloud Scheduler |
+| [docs/usage.md](docs/usage.md) / [ja](docs/usage.ja.md) | CLI コマンド・クロールワークフロー・運用・トラブルシューティング |
+| [docs/data-model.md](docs/data-model.md) / [ja](docs/data-model.ja.md) | 検証スキーマ・STIX バンドル形式 |
+| [docs/crawl_design.md](docs/crawl_design.md) / [ja](docs/crawl_design.ja.md) | クローラーアーキテクチャ・L2-L4 パイプライン |
+| [docs/structure.md](docs/structure.md) / [ja](docs/structure.ja.md) | プロジェクトディレクトリ構成 |
+| [docs/dependencies.md](docs/dependencies.md) / [ja](docs/dependencies.ja.md) | 依存ライブラリの採用理由とライセンス |
+| [docs/api-stability.md](docs/api-stability.md) / [ja](docs/api-stability.ja.md) | API 安定性ポリシーと後方互換保証 |
+
+クロスプロジェクトドキュメント:
+- [BEACON pipeline-guide.md](https://github.com/sw33t-b1u/beacon/blob/main/docs/pipeline-guide.md) — エンドツーエンド CTI パイプライン
+- [BEACON citations.md](https://github.com/sw33t-b1u/beacon/blob/main/docs/citations.md) — 外部引用とライセンス一覧
+- [SAGE ir-feedback-flow.md](https://github.com/sw33t-b1u/sage/blob/main/docs/ir-feedback-flow.md) — IR フィードバックループとスコアリング計算式
 
 ## クイックスタート
 

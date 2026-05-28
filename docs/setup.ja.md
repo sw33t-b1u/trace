@@ -4,6 +4,7 @@
 
 データフローと BEACON / SAGE との責務分担は `high-level-design.md` を参照。
 依存関係の根拠は [`docs/dependencies.ja.md`](dependencies.ja.md) を参照。
+GCP デプロイについては [`docs/deploy.ja.md`](deploy.ja.md) を参照。
 
 ## 前提条件
 
@@ -113,108 +114,91 @@ make check      # フル品質ゲート: vet → lint → test → audit
 
 ---
 
-## TRACE の実行
+## テスト
 
-詳細コマンドは [`docs/crawl_design.ja.md`](crawl_design.ja.md)（収集系）と
-[`docs/data-model.ja.md`](data-model.ja.md)（検証ゲート）を参照。
-クイックリファレンス:
-
-### 単発 URL → STIX バンドル
+### テストの実行
 
 ```bash
-# PIR 無し — LLM が見つけたものすべてを抽出。
-uv run python cmd/crawl_single.py \
-  --input 'https://example.com/cti-blog/post-42' \
-  --output output/test_bundle.json
+# フル品質ゲート (lint + test + audit)
+make check
 
-# PIR 有り — リレバンス閾値未満の記事はスキップ。
-uv run python cmd/crawl_single.py \
-  --input 'https://example.com/cti-blog/post-42' \
-  --pir ../BEACON/output/pir_output.json
+# テストのみ
+make test
+
+# uv 経由でテストのみ実行
+uv run pytest
+
+# 特定のテストファイルを実行
+uv run pytest tests/test_stix_extractor.py -v
+
+# 名前パターンでテストを絞り込む
+uv run pytest -k "test_relevance" -v
 ```
 
-### バッチ収集
+外部サービスは不要 — テストスイート内のすべての LLM 呼び出しはモックされている。
+
+### テストフィクスチャ
+
+フィクスチャは `tests/fixtures/` に置かれ、テスト入力または期待出力として使用される:
+
+| フィクスチャの種類 | 説明 |
+|-----------------|------|
+| STIX バンドル JSON | 抽出器・バリデータテスト用のサンプルバンドル |
+| PIR JSON | バリデータテスト用のサンプル `pir_output.json` |
+| Assets JSON | アセットバリデータテスト用のサンプル `assets.json` |
+| タクソノミ JSON | キャッシュ済みタクソノミスナップショット。BEACON ライブデータの代替 |
+
+タクソノミフィクスチャ（`schema/threat_taxonomy.cached.json` またはその
+`tests/fixtures/` へのコピー）により、テストは BEACON の存在や疎通を必要としない。
+
+### 外部サービス不要
+
+- **LLM 呼び出し**: Vertex AI / Gemini の呼び出しはすべて `unittest.mock` または
+  `pytest-mock` でパッチされている。テストに GCP プロジェクト、
+  `GOOGLE_APPLICATION_CREDENTIALS`、またはネットワークアクセスは不要。
+- **BEACON**: タクソノミ自動同期はテストでバイパスされる。テストスイートは
+  コミット済みタクソノミスナップショットを使用する。
+- **GCS**: `GCSStorage` はユニットテストでは使用されない。一時ディレクトリを
+  使った `LocalStorage` が代わりに使われる。
+
+### 主要なテストパターン
+
+#### フィクスチャベースの STIX バンドルテスト
+
+`tests/test_stix_extractor.py` の多くのテストは JSON フィクスチャを読み込み、
+抽出器またはバリデータ関数を呼び出して結果の構造をアサートする:
+
+```python
+def test_bundle_validates(tmp_path, stix_fixture):
+    bundle = json.loads(stix_fixture.read_text())
+    result = validate_stix_bundle(bundle)
+    assert result.is_valid
+```
+
+#### リレバンスゲートテスト
+
+L2 ゲートテストは Vertex AI クライアントをパッチし、閾値未満の記事が
+`crawl_state.json` にスキップ済みとして記録されることをアサートする:
+
+```python
+def test_low_relevance_skipped(mock_llm, crawl_state):
+    mock_llm.return_value = RelevanceResponse(score=0.1)
+    ...
+    assert crawl_state[url]["skipped"] is True
+```
+
+### テストにおけるタクソノミキャッシュ
+
+タクソノミエンリッチメントをテストする際は、コミット済みの
+`schema/threat_taxonomy.cached.json` スナップショット（またはフィクスチャのコピー）を使用する。
+自動同期パス（`ensure_taxonomy_fresh`）はモックで no-op とし、BEACON 依存をなくしている。
+
+ライブ BEACON からテスト用タクソノミスナップショットを再生成する場合:
 
 ```bash
-# input/sources.yaml のスキーマは docs/crawl_design.ja.md を参照。
-uv run python cmd/crawl_batch.py --pir ../BEACON/output/pir_output.json
-uv run python cmd/crawl_batch.py --pir ../BEACON/output/pir_output.json --recheck-on-pir-change
-uv run python cmd/crawl_batch.py --dry-run
+trace taxonomy-refresh
+cp schema/threat_taxonomy.cached.json tests/fixtures/threat_taxonomy.json
 ```
-
-### 検証ゲート
-
-```bash
-uv run python cmd/validate_assets.py --assets ../BEACON/output/assets.json
-uv run python cmd/validate_pir.py    --pir    ../BEACON/output/pir_output.json \
-                                     --assets ../BEACON/output/assets.json
-uv run python cmd/validate_stix.py   --bundle output/stix_bundle.json [--strict]
-
-# Initiative A / Initiative C Phase 2 — Identity SDO + has_access エッジ。
-# 各 has_access[].asset_id を assets.json とクロス参照し、Phase 2 の
-# is_high_value_impersonation_target / impersonation_risk_factors も検証。
-uv run python cmd/validate_identity_assets.py \
-  --identity-assets ../BEACON/output/identity_assets.json \
-  --assets          ../BEACON/output/assets.json
-
-# Initiative B — UserAccount SCO + account_on_asset エッジ。
-uv run python cmd/validate_user_accounts.py \
-  --user-accounts ../BEACON/output/user_accounts.json \
-  --assets        ../BEACON/output/assets.json
-
-uv run python cmd/validate_all.py \
-  --assets ../BEACON/output/assets.json \
-  --pir    ../BEACON/output/pir_output.json \
-  --bundle output/stix_bundle.json \
-  --report output/validation_report.md
-```
-
-### タクソノミーエンリッチメント
-
-TRACE バンドルは `threat-actor` / `intrusion-set` オブジェクトに PIR 語彙タグ（`apt-china`、`apt-russia`、`ransomware` など）を付与します。これにより SAGE の `pir_filter.is_relevant_actor` がアクターを保持し、Spanner Graph へのグラフ取り込みが正常に行われます。
-
-**巡回起動時の自動同期**（TRACE 1.7.0）: `crawl_single` / `crawl_batch` は起動時に `ensure_taxonomy_fresh` を呼び出し、BEACON が利用可能な場合は `../BEACON/schema/threat_taxonomy.json` を `schema/threat_taxonomy.cached.json` にコピーします。同期はベストエフォートで、BEACON が不在の場合は既存のキャッシュスナップショットを使用し、`taxonomy_sync_skipped` 警告をログに記録します。
-
-```bash
-# 自動同期をスキップ（CI / エアギャップ環境）:
-uv run python cmd/crawl_single.py --input report.pdf --no-sync-taxonomy
-
-# 明示的なキャッシュ更新:
-uv run python cmd/update_taxonomy_cache.py
-```
-
-**外部バンドルのレスキュー** — OpenCTI フィード、手動作成 STIX、または古い TRACE バンドルにはタグが不足している場合があります。SAGE へ渡す前にエンリッチしてください:
-
-```bash
-uv run python cmd/enrich_bundle.py \
-    --input  external.json \
-    --output enriched.json
-
-# その後 SAGE へ投入:
-cd ../SAGE
-uv run python cmd/run_etl.py --manual-bundle ../TRACE/enriched.json
-```
-
-必要に応じて `--taxonomy <path>` でスナップショットを上書き可能（デフォルト: `schema/threat_taxonomy.cached.json`）。
-
-| 環境変数 | デフォルト | 説明 |
-|---------|-----------|------|
-| `TRACE_TAXONOMY_CACHE_PATH` | `schema/threat_taxonomy.cached.json` | TRACE 側キャッシュパス |
-| `TRACE_BEACON_TAXONOMY_SOURCE` | `../BEACON/schema/threat_taxonomy.json` | 自動同期元 BEACON マスターファイル |
-
-### レビュー依頼
-
-```bash
-# Markdown を標準出力。
-uv run python cmd/submit_review.py --report output/validation_report.md
-
-# あるいは GHE Issue として 1 件投稿。
-uv run python cmd/submit_review.py \
-  --report output/validation_report.md --open-issue \
-  --title "TRACE validation 2026-05-08"
-```
-
-終了コード規約: `0` 成功 / `1` 検証エラーあり / `2` 入力エラー or 認証設定エラー。
 
 ---
 

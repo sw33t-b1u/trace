@@ -15,7 +15,10 @@ TRACE/
 │                       #   validate_stix, enrich_bundle, …). One file per
 │                       #   command; each calls into src/trace_engine.
 ├── docs/               # English documentation + .ja.md translations
-│                       #   (Rule 11). Includes high-level-design.md
+│                       #   (Rule 11). Key docs: setup.md, deploy.md,
+│                       #   usage.md, data-model.md, crawl_design.md,
+│                       #   structure.md, dependencies.md,
+│                       #   api-stability.md. Includes high-level-design.md
 │                       #   (gitignored per maintainer policy; see
 │                       #   `.gitignore` entry `docs/high-level-design.md`).
 ├── input/              # Operator-managed inputs (sources.yaml, sample
@@ -64,7 +67,7 @@ uses `src/trace_engine/` instead. Reasons:
 | `config.py` | `Config.from_env()` — environment-driven settings (Rule 24). |
 | `crawler/` | Batch fetch, state, taxonomy auto-sync. |
 | `ingest/` | Report → Markdown adapters (`report_reader.py`). |
-| `llm/` | Vertex AI Gemini client + prompt assets. Duplicated from BEACON; see [`beacon_handoff.md`](beacon_handoff.md). |
+| `llm/` | Vertex AI Gemini client + prompt assets. Duplicated from BEACON per Decision I-12 (see CHANGELOG 0.1.0). |
 | `pir/` | L2 PIR relevance gate. |
 | `review/` | Human-review handoff (Markdown / GHE Issue). |
 | `stix/` | L3 extraction, L4 bundle assembly, taxonomy enrichment, external-ref hashing. |

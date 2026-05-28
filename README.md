@@ -61,70 +61,23 @@ Collects CTI from public web sources (vendor blogs, news articles, PDF reports),
 
 When `--pir` is supplied, articles are filtered through a lightweight relevance gate (L2) before STIX extraction, the extraction prompt is conditioned with PIR context (L3), and resulting bundles carry `x_trace_matched_pir_ids` / `x_trace_relevance_score` metadata (L4). Without `--pir`, the gate is bypassed and every article is fully extracted (useful for experimentation).
 
-## StorageBackend (Initiative I)
-
-TRACE uses a pluggable **StorageBackend** to route crawl output. The backend
-abstraction mirrors BEACON's (Decision I-12: copied ABC, not shared).
-
-| Backend | When used | Config |
-|---------|-----------|--------|
-| `LocalStorage` | default | `TRACE_STORAGE=local` (default) |
-| `GCSStorage` | cloud deployments | `TRACE_STORAGE=gcs` + `TRACE_GCS_BUCKET` |
-
-**Output category:** `stix` — filename format: `stix_bundle_<YYYYMMDDHHmm>.json`
-
-**Backward compatibility:** `--output` / `--output-dir` flags bypass the
-StorageBackend and write to the explicit path as before.
-
-### Environment variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TRACE_STORAGE` | `local` | Backend selector: `local` or `gcs` |
-| `TRACE_STORAGE_BASE_DIR` | `output/` | Root directory for `LocalStorage` |
-| `TRACE_GCS_BUCKET` | — | GCS bucket name (required when `TRACE_STORAGE=gcs`) |
-| `TRACE_GCS_PREFIX` | (empty) | Key prefix within the GCS bucket |
-
-### crawl-single output
-
-```bash
-# Default — bundle saved to StorageBackend stix/ (e.g. output/stix/stix_bundle_202601010900.json)
-uv run python cmd/crawl_single.py --input https://example.com/post
-
-# Explicit path — bypasses StorageBackend
-uv run python cmd/crawl_single.py --input https://example.com/post \
-  --output output/my_bundle.json
-```
-
-### crawl-batch output
-
-```bash
-# Default — each bundle saved to StorageBackend stix/
-uv run python cmd/crawl_batch.py --pir ../BEACON/output/pir_output.json
-
-# Explicit directory — bypasses StorageBackend
-uv run python cmd/crawl_batch.py --pir ../BEACON/output/pir_output.json \
-  --output-dir output/stix/
-```
-
-## Validation layers
-
-1. **Schema** — Pydantic v2 models matching SAGE's input contract (`SAGE/cmd/load_assets.py`, `SAGE/src/sage/pir/filter.py`). STIX bundles go through OASIS [`stix2-validator`](https://github.com/oasis-open/cti-stix-validator).
-2. **Semantic** — id uniqueness, reference integrity (e.g. `asset.network_segment_id` resolves), `threat_actor_tags` exist in the cached threat taxonomy, PIR `asset_weight_rules.tag` matches at least one asset tag.
-3. **Human review** — every validation run produces a deterministic `output/validation_report_*.md`. `cmd/submit_review.py --open-issue` optionally posts the report to GitHub Enterprise.
-
 ## Documentation
 
-| Document | EN / JA | Description |
-|----------|---------|-------------|
-| Setup | [setup.md](docs/setup.md) / [ja](docs/setup.ja.md) | Prerequisites, installation, environment variables, GCP authentication, CLI quick reference |
-| Data model | [data-model.md](docs/data-model.md) / [ja](docs/data-model.ja.md) | Validation contracts: `assets.json`, `pir_output.json`, STIX bundle, `ValidationFinding` |
-| Crawl design | [crawl_design.md](docs/crawl_design.md) / [ja](docs/crawl_design.ja.md) | `sources.yaml` schema (with annotated example), `crawl_state.json` semantics, L2/L3/L4 flow, dedupe strategy |
-| Dependencies | [dependencies.md](docs/dependencies.md) / [ja](docs/dependencies.ja.md) | Dependency rationale and license information |
-| BEACON handoff | [beacon_handoff.md](docs/beacon_handoff.md) / [ja](docs/beacon_handoff.ja.md) | What moved out of BEACON and why |
-| Directory structure | [structure.md](docs/structure.md) / [ja](docs/structure.ja.md) | Top-level layout and Rule 26 adaptation notes |
-| `docs/high-level-design.md` | local-only; gitignored | Architecture, data model, algorithms |
-| Pipeline guide | [pipeline-guide.md](docs/pipeline-guide.md) / [ja](docs/pipeline-guide.ja.md) | End-to-end CTI pipeline workflow: BEACON → TRACE → SAGE |
+| Document | Description |
+|----------|-------------|
+| [docs/setup.md](docs/setup.md) | Clone, install, configure, test, first run |
+| [docs/deploy.md](docs/deploy.md) | Cloud Run Job deployment and Cloud Scheduler |
+| [docs/usage.md](docs/usage.md) | CLI commands, crawl workflows, operations, troubleshooting |
+| [docs/data-model.md](docs/data-model.md) | Validation schemas, STIX bundle format |
+| [docs/crawl_design.md](docs/crawl_design.md) | Crawler architecture, L2-L4 pipeline |
+| [docs/structure.md](docs/structure.md) | Project directory layout |
+| [docs/dependencies.md](docs/dependencies.md) | Dependency rationale and licenses |
+| [docs/api-stability.md](docs/api-stability.md) | API stability policy and BC guarantees |
+
+Cross-project:
+- [BEACON pipeline-guide.md](https://github.com/sw33t-b1u/beacon/blob/main/docs/pipeline-guide.md) — End-to-end CTI pipeline
+- [BEACON citations.md](https://github.com/sw33t-b1u/beacon/blob/main/docs/citations.md) — External citations and license inventory
+- [SAGE ir-feedback-flow.md](https://github.com/sw33t-b1u/sage/blob/main/docs/ir-feedback-flow.md) — IR feedback loop and scoring formulas
 
 ## Quick Start
 
