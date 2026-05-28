@@ -337,13 +337,3 @@ def main(
         click.echo(f"\n{len(matches)} match(es).")
     # Exit 0 in both match and no-match cases per plan §2.6 + Phase 5.
     sys.exit(0)
-
-
-if __name__ == "__main__":
-    sys.stderr.write(
-        "DeprecationWarning: 'python -m cmd.search_iocs' / "
-        "'python cmd/search_iocs.py' is deprecated as of TRACE 1.12.0. "
-        "Use 'trace search-iocs' instead; cmd/* invocations are "
-        "scheduled for removal in TRACE 2.0.\n"
-    )
-    main()

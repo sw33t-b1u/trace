@@ -133,13 +133,3 @@ def main() -> None:
         total_objects=len(objects),
     )
     print(f"Enriched {enriched_count}/{len(objects)} objects → {args.output}")
-
-
-if __name__ == "__main__":
-    sys.stderr.write(
-        "DeprecationWarning: 'python -m cmd.enrich_bundle' / "
-        "'python cmd/enrich_bundle.py' is deprecated as of TRACE 1.12.0. "
-        "Use 'trace enrich-bundle' instead; cmd/* invocations are "
-        "scheduled for removal in TRACE 2.0.\n"
-    )
-    main()

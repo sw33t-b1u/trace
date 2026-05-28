@@ -193,6 +193,11 @@ _register_passthrough(
     "update_taxonomy_cache",
     "Refresh schema/threat_taxonomy.cached.json from BEACON.",
 )
+_register_passthrough(
+    "schema-regenerate",
+    "generate_schemas",
+    "Regenerate schema/*.schema.json from Pydantic contract models.",
+)
 
 
 __all__ = ["cli"]

@@ -287,12 +287,12 @@ no_pir}`。
 
 ## 8. 単発モードの追加事項
 
-`cmd/crawl_single.py` はオンデマンド版。`crawl_state.json` には **永続化しない**。
+`trace crawl-single` はオンデマンド版。`crawl_state.json` には **永続化しない**。
 主用途は「アナリストが URL を渡したのでバンドルが欲しい」という意図的な
 ステートレス操作のため。L2 + L3 + L4 の挙動は同一。
 
 ```bash
-uv run python cmd/crawl_single.py --input '<url-or-pdf-path>' \
+uv run trace crawl-single --input '<url-or-pdf-path>' \
   --pir ../BEACON/output/pir_output.json \
   [--task complex] [--relevance-threshold 0.6]
 ```

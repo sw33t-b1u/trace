@@ -109,13 +109,3 @@ def main() -> None:
     warnings = sum(1 for f in findings if f.severity == "warning")
     print(f"assets validation: errors={errors} warnings={warnings}")
     sys.exit(1 if has_errors(findings) else 0)
-
-
-if __name__ == "__main__":
-    sys.stderr.write(
-        "DeprecationWarning: 'python -m cmd.validate_assets' / "
-        "'python cmd/validate_assets.py' is deprecated as of TRACE 1.12.0. "
-        "Use 'trace validate-assets' instead; cmd/* invocations are "
-        "scheduled for removal in TRACE 2.0.\n"
-    )
-    main()

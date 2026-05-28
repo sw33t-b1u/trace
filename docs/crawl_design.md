@@ -286,25 +286,25 @@ verdict (no extra LLM round-trip):
 The field is additive — pre-Phase-4 state files read back with
 `iocs = []` and stay version `1`.
 
-### Searching the IoC index (`cmd/search_iocs.py`)
+### Searching the IoC index (`trace search-iocs`)
 
 Initiative G Phase 5 adds a query CLI over the `iocs[]` index. Exact
 match, case-insensitive on both value and type:
 
 ```sh
 # Find any article that mentioned an FQDN.
-uv run python -m cmd.search_iocs --ioc evil.example.com
+uv run trace search-iocs --ioc evil.example.com
 
 # Narrow by IoC type.
-uv run python -m cmd.search_iocs --ioc CVE-2026-12345 --type cve_id
+uv run trace search-iocs --ioc CVE-2026-12345 --type cve_id
 
 # JSON output (jq-friendly).
-uv run python -m cmd.search_iocs --ioc 192.0.2.10 --json | jq '.[].matched_url'
+uv run trace search-iocs --ioc 192.0.2.10 --json | jq '.[].matched_url'
 
 # TLP filter — default --tlp-max=amber hides TLP:RED bundles. Pass
 # --tlp-max=red to surface them explicitly when handling sensitive
 # intel; --tlp-max=clear narrows further to fully-shareable bundles.
-uv run python -m cmd.search_iocs --ioc evil.example.com --tlp-max red
+uv run trace search-iocs --ioc evil.example.com --tlp-max red
 ```
 
 TLP resolution scans the STIX bundle at `entries[url].bundle_path`
@@ -342,13 +342,13 @@ later.
 
 ## 8. Single-URL extras
 
-`cmd/crawl_single.py` is the on-demand counterpart. It does **not** persist
+`trace crawl-single` is the on-demand counterpart. It does **not** persist
 to `crawl_state.json` — it's intentionally stateless, since the main use case
 is "an analyst handed me a URL, give me a bundle." All of L2 + L3 + L4
 behaves identically.
 
 ```bash
-uv run python cmd/crawl_single.py --input '<url-or-pdf-path>' \
+uv run trace crawl-single --input '<url-or-pdf-path>' \
   --pir ../BEACON/output/pir_output.json \
   [--task complex] [--relevance-threshold 0.6]
 ```

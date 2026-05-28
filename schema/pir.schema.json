@@ -128,7 +128,7 @@
     },
     "DataQuality": {
       "additionalProperties": true,
-      "description": "Data quality metadata for actor triage entries.\n\n``extra='allow'`` is preserved so new additive quality flags can be\nadded without a TRACE major bump (additive changes stay on\nschema_version 1.0.0 per H-2 / api-stability.md).",
+      "description": "Data quality metadata for actor triage entries.\n\n``extra='allow'`` is preserved so new additive quality flags can be\nadded without a TRACE major bump (additive changes stay on\nschema_version 2.0.0 per api-stability.md).",
       "properties": {
         "degraded": {
           "default": false,
@@ -239,7 +239,7 @@
     },
     "ScoreComponent": {
       "additionalProperties": false,
-      "description": "Generic I×C×O score component — strict mode.\n\nUsed for intent / capability / opportunity sub-breakdowns in\nActorTriageEntry. ``extra='forbid'`` rejects unknown fields,\ncatching typos and silent producer drift. Adding a new sub-factor\nrequires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and extending\nthis model.\n\nCanonical sub-factor names (committed surface as of schema_version\n1.0.0; see ``docs/api-stability.md``):\n  Intent:       motivation_alignment, industry_match\n  Capability:   ttp_count_norm, sophistication_score,\n                recency_active_campaigns, tool_sophistication,\n                targeting_persistence, evasion_capability, depth,\n                breadth, ir_observed_capability\n  Opportunity:  victimology_match, geographic_match,\n                surface_ttp_coverage, ir_observed_opportunity",
+      "description": "Generic I×C×O score component — strict mode.\n\nUsed for intent / capability / opportunity sub-breakdowns in\nActorTriageEntry. ``extra='forbid'`` rejects unknown fields,\ncatching typos and silent producer drift. Adding a new sub-factor\nrequires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and extending\nthis model.\n\nCanonical sub-factor names (committed surface; see ``docs/api-stability.md``):\n  Intent:       motivation_alignment, industry_match, ir_observed\n  Capability:   ttp_count_norm, sophistication_score,\n                recency_active_campaigns, tool_usage,\n                targeting_persistence, evasion_capability, depth,\n                breadth\n  Opportunity:  victimology_match, geographic_match,\n                surface_ttp_coverage",
       "properties": {
         "breadth": {
           "anyOf": [
@@ -311,7 +311,7 @@
           "default": null,
           "title": "Industry Match"
         },
-        "ir_observed_capability": {
+        "ir_observed": {
           "anyOf": [
             {
               "maximum": 1.0,
@@ -323,21 +323,7 @@
             }
           ],
           "default": null,
-          "title": "Ir Observed Capability"
-        },
-        "ir_observed_opportunity": {
-          "anyOf": [
-            {
-              "maximum": 1.0,
-              "minimum": 0.0,
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Ir Observed Opportunity"
+          "title": "Ir Observed"
         },
         "motivation_alignment": {
           "anyOf": [
@@ -415,7 +401,7 @@
           "default": null,
           "title": "Targeting Persistence"
         },
-        "tool_sophistication": {
+        "tool_usage": {
           "anyOf": [
             {
               "maximum": 1.0,
@@ -427,7 +413,7 @@
             }
           ],
           "default": null,
-          "title": "Tool Sophistication"
+          "title": "Tool Usage"
         },
         "ttp_count_norm": {
           "anyOf": [
@@ -466,7 +452,7 @@
     }
   },
   "additionalProperties": true,
-  "description": "Document-level schema for pir_output.json (BEACON 1.0.0+).\n\nMirrors BEACON's ``PIROutputDocument`` shape for drift-check alignment.\n``schema_version`` is required; bundles without it or with a value\noutside ``SUPPORTED_PIR_SCHEMA_VERSIONS`` are rejected so unannounced\nproducer schema changes cannot slip through to SAGE ingestion.",
+  "description": "Document-level schema for pir_output.json (BEACON 2.0.0+).\n\nMirrors BEACON's ``PIROutputDocument`` shape for drift-check alignment.\n``schema_version`` is required; bundles without it or with a value\noutside ``SUPPORTED_PIR_SCHEMA_VERSIONS`` are rejected so unannounced\nproducer schema changes cannot slip through to SAGE ingestion.",
   "properties": {
     "pirs": {
       "items": {

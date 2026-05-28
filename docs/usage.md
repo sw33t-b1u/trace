@@ -10,7 +10,7 @@ pipeline internals, see [`docs/crawl_design.md`](crawl_design.md).
 
 ## CLI commands (`trace` entry point)
 
-TRACE exposes a unified `trace` console script with 12 subcommands:
+TRACE exposes a unified `trace` console script with 13 subcommands:
 
 | Subcommand | Description |
 |------------|-------------|
@@ -26,9 +26,10 @@ TRACE exposes a unified `trace` console script with 12 subcommands:
 | `trace search-iocs` | Query the IoC index stored in `crawl_state.json` |
 | `trace submit-review` | Post a validation report to GitHub (optional `--open-issue`) |
 | `trace taxonomy-refresh` | Sync the local taxonomy cache from the BEACON source |
+| `trace schema-regenerate` | Regenerate `schema/*.schema.json` from Pydantic contract models |
 
-> **Legacy form:** `python -m cmd.<name>` and `python cmd/<name>.py` remain
-> supported through TRACE 1.x but will be removed in 2.0.
+> **Removed in 2.1.0:** `python -m cmd.<name>` and `python cmd/<name>.py`
+> are no longer supported. Use `uv run trace <subcommand>` instead.
 
 ---
 

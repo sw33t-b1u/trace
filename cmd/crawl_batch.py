@@ -262,13 +262,3 @@ def main() -> None:
         print(f"\nMetrics:      {path}")
 
     sys.exit(1 if failures else 0)
-
-
-if __name__ == "__main__":
-    sys.stderr.write(
-        "DeprecationWarning: 'python -m cmd.crawl_batch' / "
-        "'python cmd/crawl_batch.py' is deprecated as of TRACE 1.12.0. "
-        "Use 'trace crawl-batch' instead; cmd/* invocations are "
-        "scheduled for removal in TRACE 2.0.\n"
-    )
-    main()

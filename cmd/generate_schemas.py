@@ -1,7 +1,7 @@
 """Generate JSON Schema files from TRACE Pydantic contract models.
 
 Run once to produce schema/*.schema.json:
-  uv run python cmd/generate_schemas.py
+  uv run trace schema-regenerate
 
 These schemas are the consumer-canonical contract TRACE enforces on SAGE
 input artifacts. They are committed to git (intentionally NOT gitignored)
@@ -21,6 +21,13 @@ SCHEMA_DIR = Path(__file__).parent.parent / "schema"
 
 
 def main() -> int:
+    import argparse  # noqa: PLC0415
+
+    argparse.ArgumentParser(
+        prog="trace schema-regenerate",
+        description="Regenerate schema/*.schema.json from Pydantic contract models.",
+    ).parse_args()
+
     SCHEMA_DIR.mkdir(exist_ok=True)
 
     from trace_engine.validate.schema.models import (
@@ -41,7 +48,3 @@ def _write(path: Path, schema: dict) -> None:
     content = json.dumps(schema, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     path.write_text(content, encoding="utf-8")
     print(f"Written: {path}")
-
-
-if __name__ == "__main__":
-    sys.exit(main())

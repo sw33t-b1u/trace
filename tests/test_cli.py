@@ -20,9 +20,6 @@ module instead of running it as a script.
 
 from __future__ import annotations
 
-import os
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -47,6 +44,7 @@ SUBCOMMANDS: list[tuple[str, str, str]] = [
     ("enrich-bundle", "enrich_bundle", "trace enrich-bundle"),
     ("submit-review", "submit_review", "trace submit-review"),
     ("taxonomy-refresh", "update_taxonomy_cache", "trace taxonomy-refresh"),
+    ("schema-regenerate", "generate_schemas", "trace schema-regenerate"),
 ]
 
 
@@ -70,7 +68,7 @@ class TestTraceGroupHelp:
         result = runner.invoke(cli, ["--help"])
         assert "trace <subcommand> --help" in result.output
 
-    def test_all_12_subcommands_registered(self):
+    def test_all_13_subcommands_registered(self):
         registered = set(cli.commands.keys())
         expected = {cmd_name for cmd_name, _, _ in SUBCOMMANDS}
         assert registered == expected, (
@@ -132,66 +130,4 @@ class TestTraceValidatePirEndToEnd:
         assert result.exit_code == 0, (
             f"trace validate-pir failed: out={result.output}, "
             f"stderr={getattr(result, 'stderr', '')!r}, exc={result.exception!r}"
-        )
-
-
-# ---------------------------------------------------------------------------
-# Deprecation warning when invoked via ``python cmd/<name>.py``
-# ---------------------------------------------------------------------------
-
-
-class TestCmdLegacyDeprecation:
-    @pytest.mark.parametrize(
-        ("subcommand", "cmd_module"),
-        [(name, module) for name, module, _ in SUBCOMMANDS],
-    )
-    def test_cmd_help_emits_deprecation_to_stderr(
-        self, subcommand: str, cmd_module: str, tmp_path: Path
-    ):
-        """``python cmd/<name>.py --help`` should print the deprecation
-        line on stderr (in addition to its usage text on stdout).
-
-        Subprocess invocation is required: the deprecation print lives
-        in the ``if __name__ == "__main__":`` block which only fires
-        when the module runs as a script.
-        """
-        env = os.environ.copy()
-        # Mirror the runtime sandbox profile: drop proxies that interfere
-        # with the no-network test run.
-        for key in (
-            "ALL_PROXY",
-            "HTTP_PROXY",
-            "HTTPS_PROXY",
-            "http_proxy",
-            "https_proxy",
-            "all_proxy",
-        ):
-            env.pop(key, None)
-        env.setdefault("UV_CACHE_DIR", str(tmp_path / "uv-cache"))
-
-        proc = subprocess.run(
-            [sys.executable, f"cmd/{cmd_module}.py", "--help"],
-            cwd=str(PROJECT_ROOT),
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-
-        combined = proc.stdout + proc.stderr
-        assert "DeprecationWarning" in proc.stderr, (
-            f"cmd/{cmd_module}.py --help did not emit DeprecationWarning to "
-            f"stderr.\nstdout={proc.stdout}\nstderr={proc.stderr}"
-        )
-        assert f"trace {subcommand}" in proc.stderr, (
-            f"deprecation message missing 'trace {subcommand}' steer:\nstderr={proc.stderr}"
-        )
-        # --help should still succeed (argparse / click exit 0).
-        assert proc.returncode == 0, (
-            f"cmd/{cmd_module}.py --help returned {proc.returncode}:\n"
-            f"stdout={proc.stdout}\nstderr={proc.stderr}"
-        )
-        # And the usage text must still appear (we did not break --help).
-        assert "usage:" in combined.lower() or "options:" in combined.lower(), (
-            f"no usage text from cmd/{cmd_module}.py --help:\n{combined}"
         )

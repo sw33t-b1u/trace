@@ -58,9 +58,7 @@ def _inline_payload(schema_version: str) -> dict:
                 "pir_id": "PIR-LEGACY-001",
                 "intelligence_level": "operational",
                 "threat_actor_tags": ["apt-china"],
-                "asset_weight_rules": [
-                    {"tag": "external-facing", "criticality_multiplier": 2.0}
-                ],
+                "asset_weight_rules": [{"tag": "external-facing", "criticality_multiplier": 2.0}],
                 "valid_from": "2026-05-24",
                 "valid_until": "2027-05-24",
                 "prioritized_actors": [],

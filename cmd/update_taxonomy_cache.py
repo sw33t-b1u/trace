@@ -153,13 +153,3 @@ def main() -> None:
         f"  actor_categories={actor_count}, geographies={geo_count}, "
         f"upstream_sync={upstream_meta.get('last_auto_sync')}"
     )
-
-
-if __name__ == "__main__":
-    sys.stderr.write(
-        "DeprecationWarning: 'python -m cmd.update_taxonomy_cache' / "
-        "'python cmd/update_taxonomy_cache.py' is deprecated as of TRACE 1.12.0. "
-        "Use 'trace taxonomy-refresh' instead; cmd/* invocations are "
-        "scheduled for removal in TRACE 2.0.\n"
-    )
-    main()

@@ -107,13 +107,3 @@ def main() -> None:
         labels=args.labels,
     )
     print(f"Issue created: #{result.issue_number} {result.html_url}")
-
-
-if __name__ == "__main__":
-    sys.stderr.write(
-        "DeprecationWarning: 'python -m cmd.submit_review' / "
-        "'python cmd/submit_review.py' is deprecated as of TRACE 1.12.0. "
-        "Use 'trace submit-review' instead; cmd/* invocations are "
-        "scheduled for removal in TRACE 2.0.\n"
-    )
-    main()

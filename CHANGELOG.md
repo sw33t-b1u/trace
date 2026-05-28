@@ -6,6 +6,33 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [2.1.0] - 2026-05-28
+
+**Standalone `cmd` invocation retired; unified `trace` CLI only.**
+
+### Removed
+
+- Standalone `python -m cmd.<name>` / `python cmd/<name>.py` invocation.
+  The `if __name__ == "__main__"` blocks and DeprecationWarning machinery
+  are gone. Use `trace <subcommand>` (or `python -m trace_engine.cli
+  <subcommand>`). Deprecated since 1.12.0; removal was scheduled for 2.0.0.
+
+### Added
+
+- `trace schema-regenerate` subcommand (wraps `cmd/generate_schemas.py`),
+  completing unified-CLI coverage of every `cmd/` module.
+- `python -m trace_engine.cli` entry (`cli/__main__.py`) as an alias for
+  the `trace` console script.
+
+### Changed
+
+- All docs migrated from `python -m cmd.<name>` to `trace <subcommand>`.
+- Regenerated `schema/pir.schema.json` to match the 2.0.0 `ScoreComponent`
+  model rename (`ir_observed_capability`/`ir_observed_opportunity` →
+  `ir_observed` on Intent; `tool_sophistication` → `tool_usage`). The
+  generated schema file was stale since 2.0.0; this is a catch-up to the
+  already-shipped Pydantic models, not a new contract change.
+
 ## [2.0.0] - 2026-05-28
 
 **Breaking: PIR schema_version 2.0.0 + deterministic STIX IDs.**

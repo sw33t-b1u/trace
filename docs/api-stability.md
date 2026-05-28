@@ -50,7 +50,7 @@ From TRACE 2.0.0 onwards:
 | Crawl output: `crawl_state.json` schema | ✓ | 1.11.0 (G) | Per-entry `iocs[]` since G Phase 4 |
 | LLM IoC extraction (`iocs[]` shape) | ✓ | 1.11.0 (G) | 7 IoC types, confidence, context_snippet |
 | `trace` CLI entry + subcommands (Phase 6 of H) | ✓ | 1.12.0 | Subcommand names + main flags frozen |
-| Legacy `python -m cmd.<name>` | (deprecated) | n/a | Deprecated in 1.12.0 → removed in 2.0.0 |
+| Legacy `python -m cmd.<name>` | (removed) | n/a | Removed in 2.1.0; use `trace <subcommand>` |
 | Env vars (§5) | ✓ | 1.12.0 | Name + meaning + default frozen |
 | Internal Python modules (`src/trace_engine/*` non-public symbols) | ✗ | n/a | Underscore-prefixed and undocumented helpers may change |
 | `validate/schema/models.py` Pydantic class names | ✗ | n/a | Consumers go through `PIRDocument.from_payload()`, not direct Pydantic import |
@@ -218,6 +218,7 @@ visible surface from 1.12.0:
 | `trace enrich-bundle` | `cmd/enrich_bundle.py` | Post-process STIX bundle |
 | `trace submit-review` | `cmd/submit_review.py` | Submit output to review system |
 | `trace taxonomy-refresh` | `cmd/update_taxonomy_cache.py` | Refresh threat taxonomy cache |
+| `trace schema-regenerate` | `cmd/generate_schemas.py` | Regenerate schema/*.schema.json from Pydantic models |
 
 **Committed**: subcommand names + each subcommand's main flags
 (e.g., `crawl-batch --sources`, `search-iocs --ioc`, `search-iocs
@@ -226,10 +227,9 @@ visible surface from 1.12.0:
 **Evolving**: optional flag defaults, help text wording, output
 formatting.
 
-**Deprecated (removal in 2.0.0)**: `python -m cmd.<name>` invocation
-syntax. The cmd modules remain in 1.x for backward compat but emit
-`DeprecationWarning` directing operators to the unified `trace`
-entry.
+**Removed in 2.1.0**: `python -m cmd.<name>` invocation syntax. The
+unified `trace` CLI is the only supported entry point. All `cmd/*.py`
+modules remain callable via `main()` from the CLI wrappers.
 
 ### 3.9 Environment variables (Committed)
 
@@ -262,8 +262,8 @@ them explicitly per deployment.
 - **LLM prompt content** in `src/trace_engine/llm/prompts/` — tuned
   per LLM model upgrade. LLM **output JSON shape** is Committed
   (§3.7).
-- **`generate_schemas.py`** dev tool — operators do not invoke this
-  directly.
+- **`trace schema-regenerate`** (`cmd/generate_schemas.py`) — dev tool
+  for regenerating `schema/*.schema.json`; output format may change.
 - **`schema/threat_taxonomy.cached.json`** — auto-generated taxonomy
   cache, refreshed via `trace taxonomy-refresh`.
 

@@ -285,13 +285,3 @@ def main() -> None:
             print(_metrics.render_summary(run))
             metrics_path = _metrics.write_run_json(run, _OUTPUT_DIR)
             print(f"Metrics:      {metrics_path}")
-
-
-if __name__ == "__main__":
-    sys.stderr.write(
-        "DeprecationWarning: 'python -m cmd.crawl_single' / "
-        "'python cmd/crawl_single.py' is deprecated as of TRACE 1.12.0. "
-        "Use 'trace crawl-single' instead; cmd/* invocations are "
-        "scheduled for removal in TRACE 2.0.\n"
-    )
-    main()
