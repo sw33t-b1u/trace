@@ -112,15 +112,14 @@ class ScoreComponent(BaseModel):
     requires bumping ``SUPPORTED_PIR_SCHEMA_VERSIONS`` and extending
     this model.
 
-    Canonical sub-factor names (committed surface as of schema_version
-    1.0.0; see ``docs/api-stability.md``):
-      Intent:       motivation_alignment, industry_match
+    Canonical sub-factor names (committed surface; see ``docs/api-stability.md``):
+      Intent:       motivation_alignment, industry_match, ir_observed
       Capability:   ttp_count_norm, sophistication_score,
-                    recency_active_campaigns, tool_sophistication,
+                    recency_active_campaigns, tool_usage,
                     targeting_persistence, evasion_capability, depth,
-                    breadth, ir_observed_capability
+                    breadth
       Opportunity:  victimology_match, geographic_match,
-                    surface_ttp_coverage, ir_observed_opportunity
+                    surface_ttp_coverage
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -129,23 +128,22 @@ class ScoreComponent(BaseModel):
     # Intent sub-factors (BEACON IntentComponent).
     motivation_alignment: float | None = Field(default=None, ge=0.0, le=1.0)
     industry_match: float | None = Field(default=None, ge=0.0, le=1.0)
+    ir_observed: float | None = Field(default=None, ge=0.0, le=1.0)
 
     # Capability sub-factors (BEACON CapabilityComponent).
     ttp_count_norm: float | None = Field(default=None, ge=0.0, le=1.0)
     sophistication_score: float | None = Field(default=None, ge=0.0, le=1.0)
     recency_active_campaigns: float | None = Field(default=None, ge=0.0, le=1.0)
-    tool_sophistication: float | None = Field(default=None, ge=0.0, le=1.0)
+    tool_usage: float | None = Field(default=None, ge=0.0, le=1.0)
     targeting_persistence: float | None = Field(default=None, ge=0.0, le=1.0)
     evasion_capability: float | None = Field(default=None, ge=0.0, le=1.0)
     depth: float | None = Field(default=None, ge=0.0, le=1.0)
     breadth: float | None = Field(default=None, ge=0.0, le=1.0)
-    ir_observed_capability: float | None = Field(default=None, ge=0.0, le=1.0)
 
     # Opportunity sub-factors (BEACON OpportunityComponent).
     victimology_match: float | None = Field(default=None, ge=0.0, le=1.0)
     geographic_match: float | None = Field(default=None, ge=0.0, le=1.0)
     surface_ttp_coverage: float | None = Field(default=None, ge=0.0, le=1.0)
-    ir_observed_opportunity: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class DataQuality(BaseModel):

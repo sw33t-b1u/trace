@@ -80,15 +80,13 @@ class TestValid100Payload:
         assert len(doc.root) == 1
         assert doc.root[0].pir_id == "PIR-H-001"
 
-    def test_ir_boost_factors_round_trip(self):
-        """The IR-boost factors are now committed surface on 1.0.0."""
+    def test_ir_observed_round_trip(self):
+        """ir_observed is on Intent (binary: 1.0 or 0.5)."""
         payload = _load("valid_pir_100_canonical.json")
         doc = PIRDocument.from_payload(payload)
         actor = doc.root[0].prioritized_actors[0]
-        cap = actor.score_breakdown.capability
-        opp = actor.score_breakdown.opportunity
-        assert cap.ir_observed_capability == pytest.approx(1.0)
-        assert opp.ir_observed_opportunity == pytest.approx(0.7)
+        intent = actor.score_breakdown.intent
+        assert intent.ir_observed == pytest.approx(1.0)
         assert actor.score_breakdown.data_quality.ir_boost_skipped is False
 
     def test_capability_sub_factors_round_trip(self):
@@ -100,7 +98,7 @@ class TestValid100Payload:
             .score_breakdown.capability
         )
         assert cap.recency_active_campaigns == pytest.approx(0.25)
-        assert cap.tool_sophistication == pytest.approx(0.4)
+        assert cap.tool_usage == pytest.approx(0.4)
         assert cap.evasion_capability == pytest.approx(0.6)
         assert cap.depth == pytest.approx(0.62)
         assert cap.breadth == pytest.approx(0.48)
