@@ -22,3 +22,9 @@ tmp/
 temp/
 Thumbs.db
 TODO.md
+
+# Local Claude Code agent state
+.claude/
+
+# macOS
+.DS_Store
