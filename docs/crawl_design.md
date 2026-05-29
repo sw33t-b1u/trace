@@ -167,7 +167,7 @@ The per-chunk results are merged by `_merge_extractions`:
 | Hallucinated endpoints | Dropped (alias map miss); counted in the `extractions_merged` log line. |
 
 For short articles (`len(text) <= chunk_chars`) the chunk loop is bypassed
-and behavior is identical to the pre-0.3.0 single-call path.
+and behavior is identical to the single-call path.
 
 ## 4a. L4 bundle assembly (code builds STIX)
 
@@ -268,9 +268,8 @@ os.replace`. Schema (version `1`):
 `relevance.decision` ∈ `{kept, skipped_below_threshold, extraction_failed,
 no_pir}`.
 
-Initiative G Phase 4 (TRACE 1.11.0) adds an `iocs` array per entry,
-populated by the same L2 Vertex call that produces the relevance
-verdict (no extra LLM round-trip):
+Each entry carries an `iocs` array, populated by the same L2 Vertex call
+that produces the relevance verdict (no extra LLM round-trip):
 
 ```json
 "iocs": [
@@ -283,13 +282,13 @@ verdict (no extra LLM round-trip):
 ]
 ```
 
-The field is additive — pre-Phase-4 state files read back with
+The field is additive — state files without the field read back with
 `iocs = []` and stay version `1`.
 
 ### Searching the IoC index (`trace search-iocs`)
 
-Initiative G Phase 5 adds a query CLI over the `iocs[]` index. Exact
-match, case-insensitive on both value and type:
+A query CLI is available over the `iocs[]` index. Exact match,
+case-insensitive on both value and type:
 
 ```sh
 # Find any article that mentioned an FQDN.
@@ -310,8 +309,7 @@ uv run trace search-iocs --ioc evil.example.com --tlp-max red
 TLP resolution scans the STIX bundle at `entries[url].bundle_path`
 for canonical `object_marking_refs` (TLP 1.0 and 2.0). Bundles that
 carry no TLP marking — or whose file is missing — are treated as
-TLP:CLEAR (visible at all `--tlp-max` levels) so legacy bundles are
-not silently hidden.
+TLP:CLEAR (visible at all `--tlp-max` levels).
 
 Exit codes: `0` for both match and no-match (both are successful
 outcomes); `2` when the state file cannot be loaded.

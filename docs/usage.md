@@ -28,8 +28,7 @@ TRACE exposes a unified `trace` console script with 13 subcommands:
 | `trace taxonomy-refresh` | Sync the local taxonomy cache from the BEACON source |
 | `trace schema-regenerate` | Regenerate `schema/*.schema.json` from Pydantic contract models |
 
-> **Removed in 2.1.0:** `python -m cmd.<name>` and `python cmd/<name>.py`
-> are no longer supported. Use `uv run trace <subcommand>` instead.
+> Invoke TRACE via `uv run trace <subcommand>`.
 
 ---
 
@@ -216,7 +215,7 @@ Output category `stix` produces filenames in the format
 `stix_bundle_<YYYYMMDDHHmm>.json`.
 
 Passing `--output` / `--output-dir` bypasses the StorageBackend and writes
-to the explicit path as before.
+to the explicit path.
 
 ---
 

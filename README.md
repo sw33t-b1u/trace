@@ -40,10 +40,9 @@ Collects CTI from public web sources (vendor blogs, news articles, PDF reports),
          └───► cmd/validate_pir.py               (Pydantic + taxonomy + asset-tag match)
          │
          └───► cmd/validate_identity_assets.py   (Identity + has_access cross-ref vs assets.json;
-         │                                        Initiative A / Initiative C Phase 2 flags)
+         │                                        impersonation flags)
          │
-         └───► cmd/validate_user_accounts.py     (UserAccount + account_on_asset cross-ref;
-         │                                        Initiative B)
+         └───► cmd/validate_user_accounts.py     (UserAccount + account_on_asset cross-ref)
          │
          └───► cmd/validate_all.py               (one combined Markdown report)
                          │

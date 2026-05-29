@@ -40,10 +40,9 @@ CTI ベンダーブログ・ニュース記事・PDF レポート・任意の UR
          └───► cmd/validate_pir.py               (Pydantic + タクソノミ + asset タグ照合)
          │
          └───► cmd/validate_identity_assets.py   (Identity + has_access の assets.json クロス参照、
-         │                                        Initiative A / Initiative C Phase 2 フラグ検証)
+         │                                        なりすましフラグ検証)
          │
-         └───► cmd/validate_user_accounts.py     (UserAccount + account_on_asset クロス参照、
-         │                                        Initiative B)
+         └───► cmd/validate_user_accounts.py     (UserAccount + account_on_asset クロス参照)
          │
          └───► cmd/validate_all.py               (集約 Markdown レポート)
                          │

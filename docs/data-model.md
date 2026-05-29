@@ -117,7 +117,6 @@ local checks that the OASIS validator does not cover.
 | Code | Severity | Trigger |
 |------|----------|---------|
 | `BUNDLE_TYPE` | error | top-level `type != "bundle"` |
-| ~~`BUNDLE_SPEC_VERSION`~~ | — | Removed in 0.4.0. The bundle envelope no longer carries `spec_version` (STIX 2.1 deprecated it at envelope level — per-object only). SAGE's parser reads per-object `spec_version` from `bundle.objects[]`. |
 | `STIX_ID_NOT_UNIQUE` | error | duplicate `id` within `objects[]` |
 | `REL_REF_MISSING` | error | `relationship` lacks `source_ref` or `target_ref` |
 | `REL_REF_UNRESOLVED` | error | `relationship.{source_ref,target_ref}` does not match any `objects[*].id` |
@@ -133,7 +132,7 @@ threat-intel semantics. Users who want to gate on them can run
 | Code | Pattern | Why accepted |
 |------|---------|--------------|
 | `{202}` | `tool` source with `uses` relationship targeting `malware` or `tool` | STIX 2.1 §4.13 defines suggested target sets for each `(source_type, relationship_type)` pair. The combinations `tool uses malware` and `tool uses tool` are not in the suggested set, but the semantics ("attack tool A leverages malware/tool B") are well-defined and frequently observed in incident reports. Major STIX consumers (MISP, OpenCTI) ingest these without complaint. Dropping the relationship would lose attack-graph edges. |
-| `{202}` | `attack-pattern` source with `uses` relationship targeting `attack-pattern` | The relationship is the canonical way to express MITRE ATT&CK sub-technique chaining (e.g., T1234 uses T1234.001) and technique composition. The validator's suggested-target table omits this combination, but the relationship is widespread in real ATT&CK-aligned bundles and is recognised by major STIX consumers. Dropping it would erase the technique hierarchy from the attack graph. Accepted in TRACE 1.0.1 with the same SHOULD-level rationale as the `tool uses` cases. |
+| `{202}` | `attack-pattern` source with `uses` relationship targeting `attack-pattern` | The relationship is the canonical way to express MITRE ATT&CK sub-technique chaining (e.g., T1234 uses T1234.001) and technique composition. The validator's suggested-target table omits this combination, but the relationship is widespread in real ATT&CK-aligned bundles and is recognised by major STIX consumers. Dropping it would erase the technique hierarchy from the attack graph. Accepted with the same SHOULD-level rationale as the `tool uses` cases. |
 
 ### TRACE bundle metadata extension (L4)
 
@@ -154,12 +153,9 @@ When at least one metadata field would be set, the assembler:
 Bundles without metadata (e.g., raw extraction with no PIR / source URL)
 omit the extension definition entirely.
 
-#### Extension-definition version history
+#### Extension-definition declared types
 
-| Version | Change |
-|---------|--------|
-| `1.0` | Initial. Declares `x_trace_*` toplevel properties via `extension_types: ["toplevel-property-extension"]`. |
-| `1.1` | Initiative C Phase 1 (TRACE 1.5.0). Adds `"new-sdo"` to `extension_types` to formally register `x-asset-internal` (Initiative A) and `x-identity-internal` (Initiative C) as STIX 2.1 §7.3-compliant new-SDO types. Both types carry the `extensions` map entry `{"extension-definition--c1e4d6a7-…": {"extension_type": "new-sdo"}}` per §7.3 conformance. |
+The extension declares `extension_types: ["toplevel-property-extension", "new-sdo"]`. The `new-sdo` entry formally registers `x-asset-internal` and `x-identity-internal` as STIX 2.1 §7.3-compliant new-SDO types. Both types carry the `extensions` map entry `{"extension-definition--c1e4d6a7-…": {"extension_type": "new-sdo"}}` per §7.3 conformance.
 
 | Property | When | Meaning |
 |----------|------|---------|
@@ -169,22 +165,20 @@ omit the extension definition entirely.
 | `x_trace_relevance_score` | L2 gate ran | float `[0.0, 1.0]` |
 | `x_trace_relevance_rationale` | L2 gate ran | short LLM-authored justification (or `parse_failed`/`call_failed` when the gate fell open) |
 
-#### Identity_assets schema evolution (Initiative C Phase 2 / TRACE 1.6.0)
+#### Identity_assets impersonation fields
 
 `IdentityEntry` (the `identity_assets.json[*].identities[]` row shape
-mirrored from BEACON's `Identity` model) gained two optional fields in
-TRACE 1.6.0, matching BEACON 0.13.0's emit-side additions:
+mirrored from BEACON's `Identity` model) carries two optional impersonation fields:
 
 | Field | Type | Default | Purpose |
 |-------|------|---------|---------|
-| `is_high_value_impersonation_target` | `bool` | `false` | When `true`, TRACE's PIR L2 relevance gate adds a `+0.2` boost (capped at 1.0) to the LLM verdict if the crawled document mentions this identity's name (case-insensitive substring). SAGE 0.9.0+ consumes the flag in its `effective_priority` formula. |
+| `is_high_value_impersonation_target` | `bool` | `false` | When `true`, TRACE's PIR L2 relevance gate adds a `+0.2` boost (capped at 1.0) to the LLM verdict if the crawled document mentions this identity's name (case-insensitive substring). SAGE consumes the flag in its `effective_priority` formula. |
 | `impersonation_risk_factors` | `list[str]` | `[]` | Free-form tags (`["public-facing-brand", "executive", "trusted-supplier"]` are the canonical examples). Passed through to SAGE for analyst-facing dashboards; not consumed by TRACE itself. |
 
-Both fields are accepted (not just tolerated) on `IdentityEntry`'s strict
-Pydantic model — without the explicit declaration, BEACON 0.13.0+
-`identity_assets.json` would be rejected by `_StrictModel`'s
-`extra="forbid"`. Defaults preserve backward compat with BEACON 0.12.x
-artifacts (no flag emitted).
+Both fields are explicitly declared on `IdentityEntry`'s strict Pydantic
+model (`_StrictModel`, `extra="forbid"`); without the declaration, BEACON's
+`identity_assets.json` would be rejected by `_StrictModel`'s `extra="forbid"`.
+Both default to `false` / `[]`.
 
 CLI access: `cmd/crawl_single.py --identity-assets PATH` loads the file,
 extracts flagged identity names, and threads them into
@@ -231,9 +225,7 @@ which entities relate to each other — keyed by short `local_id` aliases:
 - Drops relationships whose endpoints don't resolve (LLM hallucination)
   with a structured-log warning rather than emitting dangling refs.
 
-This eliminates the two failure modes that plagued the earlier
-LLM-emits-STIX approach: malformed UUIDs (LLM output sequential or non-v4
-ids) and timestamp format violations (`HH:mm:ss:sss` vs `.sss`). Anything
+This structurally prevents two failure modes: malformed UUIDs (LLM output sequential or non-v4 ids) and timestamp format violations (`HH:mm:ss:sss` vs `.sss`). Anything
 remaining (vocabulary mismatches in `labels` / `malware_types` /
 `tool_types`, missing `description`, ATT&CK external references without
 hashes) is best-practice level and reported as a warning by the OASIS
