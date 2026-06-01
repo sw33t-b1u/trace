@@ -8,7 +8,7 @@ the result atomically.
 External bundles (OpenCTI feeds, hand-authored STIX, old TRACE output)
 often lack these tags and are therefore silently dropped by SAGE's
 ``pir_filter.is_relevant_actor``.  Run this rescue step before
-``run_etl --manual-bundle`` to ensure actors are retained.
+``run_etl --input <bundle>`` to ensure actors are retained.
 
 Usage:
     uv run python cmd/enrich_bundle.py \\
