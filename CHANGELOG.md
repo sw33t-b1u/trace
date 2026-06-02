@@ -6,6 +6,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [2.1.1] - 2026-06-03
+
+### Fixed
+- `google-cloud-storage` is now a required dependency (was an optional
+  `[gcs]` extra). The Dockerfile previously had to pass `--extra gcs`,
+  but the runtime `uv run trace` resync silently dropped the extra and
+  triggered `ModuleNotFoundError` on `TRACE_STORAGE=gcs` paths. Cloud
+  Run deployments no longer need a `uv run --no-sync` command override.
+
+
 ## [2.1.0] - 2026-05-28
 
 **Standalone `cmd` invocation retired; unified `trace` CLI only.**

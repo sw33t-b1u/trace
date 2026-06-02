@@ -1,6 +1,6 @@
 [project]
 name = "trace"
-version = "2.1.0"
+version = "2.1.1"
 requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.0",
@@ -14,7 +14,7 @@ dependencies = [
     "python-dotenv>=1.0",  # load .env into os.environ at startup
     "idna>=3.15",  # CVE-2026-45409 fix; transitive via anyio/httpx
     "feedparser>=6.0",  # RSS/Atom feed expansion (Initiative F — TRACE 1.10.0)
-    "google-cloud-storage>=2.18.0",  # GCS StorageBackend (was optional [gcs] until TRACE 2.2.0)
+    "google-cloud-storage>=2.18.0",  # GCS StorageBackend (was optional [gcs] until TRACE 2.1.1)
 ]
 
 [project.optional-dependencies]
