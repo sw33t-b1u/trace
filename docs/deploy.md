@@ -67,14 +67,21 @@ gcloud run jobs create trace-crawl \
 
 > **`sources.yaml`:** The container image does not include `input/sources.yaml`
 > (it is gitignored and contains deployment-specific URLs). Mount it at runtime
-> via GCS or a Secret Manager volume:
+> via GCS or a Secret Manager volume. The default expects the file at
+> `/app/input/sources.yaml`, so use `mount-options="only-dir=input"` if the
+> file lives under an `input/` subdir of the bucket (recommended — keeps the
+> bucket root free for crawl outputs):
 > ```sh
+> # Upload sources.yaml under the input/ prefix
+> gcloud storage cp sources.yaml gs://${TRACE_GCS_BUCKET}/input/sources.yaml
+>
 > gcloud run jobs update trace-crawl \
->   --add-volume=name=sources,type=cloud-storage,bucket=${TRACE_GCS_BUCKET} \
+>   --add-volume=name=sources,type=cloud-storage,bucket=${TRACE_GCS_BUCKET},mount-options="only-dir=input" \
 >   --add-volume-mount=volume=sources,mount-path=/app/input \
 >   --region=${VERTEX_LOCATION:-us-central1} \
 >   --project=${GCP_PROJECT_ID}
 > ```
+> Omit `mount-options` if you upload `sources.yaml` to the bucket root.
 
 ---
 

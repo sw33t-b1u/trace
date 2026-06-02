@@ -68,14 +68,21 @@ gcloud run jobs create trace-crawl \
 
 > **`sources.yaml`:** コンテナイメージには `input/sources.yaml` が含まれない
 >（gitignored であり、デプロイ固有の URL を含む）。実行時に GCS または
-> Secret Manager ボリュームとしてマウントすること:
+> Secret Manager ボリュームとしてマウントすること。default では
+> `/app/input/sources.yaml` を参照するため、bucket の `input/` サブディレクトリ
+> 配下に置く場合は `mount-options="only-dir=input"` を指定する（推奨 — bucket
+> root を crawl 出力用に空けておける）:
 > ```sh
+> # input/ prefix 配下に sources.yaml を upload
+> gcloud storage cp sources.yaml gs://${TRACE_GCS_BUCKET}/input/sources.yaml
+>
 > gcloud run jobs update trace-crawl \
->   --add-volume=name=sources,type=cloud-storage,bucket=${TRACE_GCS_BUCKET} \
+>   --add-volume=name=sources,type=cloud-storage,bucket=${TRACE_GCS_BUCKET},mount-options="only-dir=input" \
 >   --add-volume-mount=volume=sources,mount-path=/app/input \
 >   --region=${VERTEX_LOCATION:-us-central1} \
 >   --project=${GCP_PROJECT_ID}
 > ```
+> `sources.yaml` を bucket root に置く場合は `mount-options` を省略する。
 
 ---
 
