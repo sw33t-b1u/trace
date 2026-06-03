@@ -362,8 +362,8 @@ class TestCreateStorageBackend:
         class _Cfg:
             trace_storage = "local"
             trace_storage_base_dir = str(tmp_path)
-            trace_gcs_bucket = ""
-            trace_gcs_prefix = ""
+            trace_storage_bucket = ""
+            trace_storage_prefix = ""
 
         backend = create_storage_backend(_Cfg())
         from trace_engine.storage.local import LocalStorage
@@ -376,8 +376,8 @@ class TestCreateStorageBackend:
         class _Cfg:
             trace_storage = "local"
             trace_storage_base_dir = str(tmp_path)
-            trace_gcs_bucket = ""
-            trace_gcs_prefix = ""
+            trace_storage_bucket = ""
+            trace_storage_prefix = ""
 
         backend = create_storage_backend(_Cfg())
         backend.save("stix", "test.json", "{}")
@@ -396,8 +396,8 @@ class TestCreateStorageBackend:
             class _Cfg:
                 trace_storage = "gcs"
                 trace_storage_base_dir = "output"
-                trace_gcs_bucket = "my-bucket"
-                trace_gcs_prefix = "trace"
+                trace_storage_bucket = "my-bucket"
+                trace_storage_prefix = "trace"
 
             backend = storage_pkg.create_storage_backend(_Cfg())
             assert isinstance(backend, gcs_mod.GCSStorage)
@@ -408,10 +408,10 @@ class TestCreateStorageBackend:
         class _Cfg:
             trace_storage = "gcs"
             trace_storage_base_dir = "output"
-            trace_gcs_bucket = ""
-            trace_gcs_prefix = ""
+            trace_storage_bucket = ""
+            trace_storage_prefix = ""
 
-        with pytest.raises(ValueError, match="TRACE_GCS_BUCKET"):
+        with pytest.raises(ValueError, match="TRACE_STORAGE_BUCKET"):
             create_storage_backend(_Cfg())
 
     def test_unknown_backend_raises_value_error(self):
@@ -420,8 +420,8 @@ class TestCreateStorageBackend:
         class _Cfg:
             trace_storage = "s3"
             trace_storage_base_dir = "output"
-            trace_gcs_bucket = ""
-            trace_gcs_prefix = ""
+            trace_storage_bucket = ""
+            trace_storage_prefix = ""
 
         with pytest.raises(ValueError, match="s3"):
             create_storage_backend(_Cfg())
@@ -474,21 +474,21 @@ class TestConfigStorageFields:
         assert cfg.trace_storage_base_dir == "/tmp/trace_out"
 
     def test_env_overrides_gcs_bucket(self, monkeypatch):
-        monkeypatch.setenv("TRACE_GCS_BUCKET", "my-test-bucket")
+        monkeypatch.setenv("TRACE_STORAGE_BUCKET", "my-test-bucket")
         from importlib import reload
 
         import trace_engine.config as cfg_mod
 
         reload(cfg_mod)
         cfg = cfg_mod.load_config()
-        assert cfg.trace_gcs_bucket == "my-test-bucket"
+        assert cfg.trace_storage_bucket == "my-test-bucket"
 
     def test_env_overrides_gcs_prefix(self, monkeypatch):
-        monkeypatch.setenv("TRACE_GCS_PREFIX", "prod/trace")
+        monkeypatch.setenv("TRACE_STORAGE_PREFIX", "prod/trace")
         from importlib import reload
 
         import trace_engine.config as cfg_mod
 
         reload(cfg_mod)
         cfg = cfg_mod.load_config()
-        assert cfg.trace_gcs_prefix == "prod/trace"
+        assert cfg.trace_storage_prefix == "prod/trace"

@@ -208,8 +208,8 @@ TRACE routes crawl output through a pluggable StorageBackend:
 |----------|---------|-------------|
 | `TRACE_STORAGE` | `local` | Backend selector: `local` or `gcs` |
 | `TRACE_STORAGE_BASE_DIR` | `output/` | Root directory for `LocalStorage` |
-| `TRACE_GCS_BUCKET` | — | GCS bucket name (required when `TRACE_STORAGE=gcs`) |
-| `TRACE_GCS_PREFIX` | (empty) | Key prefix within the GCS bucket |
+| `TRACE_STORAGE_BUCKET` | — | GCS bucket name (required when `TRACE_STORAGE=gcs`) |
+| `TRACE_STORAGE_PREFIX` | (empty) | Key prefix within the GCS bucket |
 
 Output category `stix` produces filenames in the format
 `stix_bundle_<YYYYMMDDHHmm>.json`.

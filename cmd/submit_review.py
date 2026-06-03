@@ -7,7 +7,7 @@ Usage:
     # echo the rendered report
     uv run python cmd/submit_review.py --report output/validation_report.md
 
-    # post to the GHE repo configured in env (TRACE_GHE_TOKEN, GHE_REPO,
+    # post to the GHE repo configured in env (GHE_TOKEN, GHE_REPO,
     # optionally GHE_API_BASE) as one Issue with label "trace-review"
     uv run python cmd/submit_review.py --report output/validation_report.md \\
         --open-issue --title "TRACE validation 2026-05-08"
@@ -63,7 +63,7 @@ def main() -> None:
         action="store_true",
         help=(
             "Create a GitHub/GHE Issue carrying the report. Requires "
-            "TRACE_GHE_TOKEN and GHE_REPO env vars."
+            "GHE_TOKEN and GHE_REPO env vars."
         ),
     )
     parser.add_argument(

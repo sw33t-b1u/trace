@@ -69,13 +69,13 @@ Fill in:
 | `TRACE_STATE_PATH` | No | `output/crawl_state.json` | Batch dedupe state file |
 | `TRACE_FEED_MAX_ENTRIES` | No | `50` | Max entries per RSS/Atom feed after expansion |
 | `TRACE_FEED_SINCE_DAYS` | No | `90` | Discard feed entries older than N days (falls back to `ACTIVITY_WINDOW_DAYS`) |
-| `TRACE_GHE_TOKEN` | GHE only | — | PAT for `submit_review.py --open-issue` |
+| `GHE_TOKEN` | GHE only | — | PAT for `submit_review.py --open-issue` |
 | `GHE_REPO` | GHE only | — | `owner/repo` |
 | `GHE_API_BASE` | No | `https://api.github.com` | Override for self-hosted GHE |
 | `TRACE_STORAGE` | No | `local` | Storage backend: `local` or `gcs` |
 | `TRACE_STORAGE_BASE_DIR` | No | `output/` | Root directory for `LocalStorage` |
-| `TRACE_GCS_BUCKET` | GCS only | — | GCS bucket name (required when `TRACE_STORAGE=gcs`) |
-| `TRACE_GCS_PREFIX` | No | (empty) | Key prefix within the GCS bucket |
+| `TRACE_STORAGE_BUCKET` | GCS only | — | GCS bucket name (required when `TRACE_STORAGE=gcs`) |
+| `TRACE_STORAGE_PREFIX` | No | (empty) | Key prefix within the GCS bucket |
 
 There is **no `--no-llm` mode** — both the L2 gate and L3 extraction are LLM-only.
 
@@ -88,8 +88,8 @@ To route crawl output to Google Cloud Storage instead of the local filesystem:
 uv sync --extra gcs
 
 export TRACE_STORAGE=gcs
-export TRACE_GCS_BUCKET=my-cti-artifacts
-export TRACE_GCS_PREFIX=trace/   # optional; defaults to empty string
+export TRACE_STORAGE_BUCKET=my-cti-artifacts
+export TRACE_STORAGE_PREFIX=trace/   # optional; defaults to empty string
 ```
 
 The `google-cloud-storage` package is only required when `TRACE_STORAGE=gcs`.

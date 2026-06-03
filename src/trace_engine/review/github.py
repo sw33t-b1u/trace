@@ -31,9 +31,7 @@ class GHEClient:
 
     def __init__(self, token: str, repo: str, api_base: str = "https://api.github.com") -> None:
         if not token:
-            raise ValueError(
-                "TRACE_GHE_TOKEN is not set. Cannot create Issues without authentication."
-            )
+            raise ValueError("GHE_TOKEN is not set. Cannot create Issues without authentication.")
         if not repo:
             raise ValueError("GHE_REPO is not set. Specify as 'owner/repo'.")
         self._token = token

@@ -18,7 +18,7 @@ RULES.md Rule 18 に従い、すべての runtime 依存に採用理由を記録
 | `markitdown[pdf]` | `>=0.1.0` | PDF / URL 入力を L3 プロンプト用にクリーンな Markdown へ変換。`[pdf]` extra で `pdfminer.six` を引き込む。BEACON 0.8.x から移管。 | MIT |
 | `stix2-validator` | `>=3.2` | OASIS `cti-stix-validator`。STIX 2.1 バンドルが SAGE に渡る前にスキーマ + ベストプラクティスを確認。`validate/semantic/stix_refcheck.py` で局所 ID/参照/kill_chain チェックを上層に積む。 | BSD-3 |
 | `pyyaml` | `>=6.0` | `input/sources.yaml` のパーサー（`crawler/sources.py` から）。 | MIT |
-| `python-dotenv` | `>=1.0` | CLI 起動時に `.env` を `os.environ` にロード。`GCP_PROJECT_ID`, `TRACE_GHE_TOKEN` 等を手動 export 不要に。 | BSD-3 |
+| `python-dotenv` | `>=1.0` | CLI 起動時に `.env` を `os.environ` にロード。`GCP_PROJECT_ID`, `GHE_TOKEN` 等を手動 export 不要に。 | BSD-3 |
 | `idna` | `>=3.15` | CVE-2026-45409 修正バージョン pin。`anyio` / `httpx` 経由で transitive。 | BSD-3 |
 | `feedparser` | `>=6.0` | RSS / Atom フィード展開。`crawler/feed_detector.py` が `Content-Type` で `html`/`rss`/`atom` を分類し、`crawler/feed_expander.py` が feedparser で RSS/Atom ペイロードを解析して記事 URL を抽出、バッチクローラが L2 PIR ゲートに通す。TRACE 1.10.0（Initiative F）で追加。 | BSD-2 |
 

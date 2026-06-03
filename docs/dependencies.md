@@ -18,7 +18,7 @@ add a new dependency, update both files in the same commit.
 | `markitdown[pdf]` | `>=0.1.0` | Converts PDF / URL inputs to clean Markdown for the L3 prompt. The `[pdf]` extra pulls in `pdfminer.six`. Migrated from BEACON 0.8.x. | MIT |
 | `stix2-validator` | `>=3.2` | OASIS `cti-stix-validator`. Schema + best-practice checks on STIX 2.1 bundles before they enter SAGE. We layer local id/refcheck/kill-chain checks on top in `validate/semantic/stix_refcheck.py`. | BSD-3 |
 | `pyyaml` | `>=6.0` | Parser for `input/sources.yaml` (loaded via `crawler/sources.py`). | MIT |
-| `python-dotenv` | `>=1.0` | Load `.env` into `os.environ` at CLI startup so `GCP_PROJECT_ID`, `TRACE_GHE_TOKEN`, etc. are picked up without exporting manually. | BSD-3 |
+| `python-dotenv` | `>=1.0` | Load `.env` into `os.environ` at CLI startup so `GCP_PROJECT_ID`, `GHE_TOKEN`, etc. are picked up without exporting manually. | BSD-3 |
 | `feedparser` | `>=6.0` | RSS / Atom feed expansion. `crawler/feed_detector.py` classifies a fetched URL as `html`/`rss`/`atom` by `Content-Type`, and `crawler/feed_expander.py` parses RSS/Atom payloads via feedparser to yield per-entry article URLs that the batch crawler then runs through the L2 PIR gate. Added in TRACE 1.10.0 (Initiative F). | BSD-2 |
 
 ## Optional

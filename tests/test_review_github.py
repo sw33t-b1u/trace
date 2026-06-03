@@ -11,7 +11,7 @@ from trace_engine.review.github import GHEClient, _truncate, submit_validation_r
 
 class TestGHEClientInit:
     def test_raises_if_token_missing(self) -> None:
-        with pytest.raises(ValueError, match="TRACE_GHE_TOKEN"):
+        with pytest.raises(ValueError, match="GHE_TOKEN"):
             GHEClient(token="", repo="owner/repo")
 
     def test_raises_if_repo_missing(self) -> None:

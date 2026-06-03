@@ -138,7 +138,7 @@ class Config:
     )
 
     # GitHub / GHE review workflow
-    ghe_token: str = field(default_factory=lambda: os.environ.get("TRACE_GHE_TOKEN", ""))
+    ghe_token: str = field(default_factory=lambda: os.environ.get("GHE_TOKEN", ""))
     ghe_repo: str = field(default_factory=lambda: os.environ.get("GHE_REPO", ""))
     ghe_api_base: str = field(
         default_factory=lambda: os.environ.get("GHE_API_BASE", "https://api.github.com")
@@ -151,10 +151,14 @@ class Config:
     trace_storage_base_dir: str = field(
         default_factory=lambda: os.environ.get("TRACE_STORAGE_BASE_DIR", "output")
     )
-    # TRACE_GCS_BUCKET: GCS bucket name (required when TRACE_STORAGE=gcs).
-    trace_gcs_bucket: str = field(default_factory=lambda: os.environ.get("TRACE_GCS_BUCKET", ""))
-    # TRACE_GCS_PREFIX: optional key prefix for all GCS objects.
-    trace_gcs_prefix: str = field(default_factory=lambda: os.environ.get("TRACE_GCS_PREFIX", ""))
+    # TRACE_STORAGE_BUCKET: GCS bucket name (required when TRACE_STORAGE=gcs).
+    trace_storage_bucket: str = field(
+        default_factory=lambda: os.environ.get("TRACE_STORAGE_BUCKET", "")
+    )
+    # TRACE_STORAGE_PREFIX: optional key prefix for all GCS objects.
+    trace_storage_prefix: str = field(
+        default_factory=lambda: os.environ.get("TRACE_STORAGE_PREFIX", "")
+    )
 
 
 def load_config() -> Config:
