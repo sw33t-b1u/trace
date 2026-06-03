@@ -6,6 +6,56 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [3.0.0] - 2026-06-03
+
+### Changed (BREAKING)
+
+- Renamed environment variables for naming-convention alignment across
+  the BEACON / TRACE / SAGE pipeline. No backward compatibility:
+  - `TRACE_GCS_BUCKET` → `TRACE_STORAGE_BUCKET`
+  - `TRACE_GCS_PREFIX` → `TRACE_STORAGE_PREFIX`
+  - `TRACE_GHE_TOKEN` → `GHE_TOKEN` (aligns with BEACON / SAGE)
+- Internal `Config` field renames (`src/trace_engine/config.py`):
+  - `trace_gcs_bucket` → `trace_storage_bucket`
+  - `trace_gcs_prefix` → `trace_storage_prefix`
+  - `ghe_token` Python field name preserved (env-var key only renamed)
+- `docs/deploy.md` restructured to common Day-0 / Day-1 / Day-N / Access /
+  Out-of-scope sections. Removed `--set-secrets` example (prefixes are
+  not secrets) and the IAP / Internal Load Balancer / VPC-SC section
+  (L2 IAM binding with `roles/run.invoker` is the production-recommended
+  path for small Workspace user counts). Added `aiplatform.googleapis.com`
+  to Day-0 API enablement (was missing).
+
+### Migration
+
+1. Update `.env`:
+   ```diff
+   - TRACE_GCS_BUCKET=your-bucket
+   + TRACE_STORAGE_BUCKET=your-bucket
+   - TRACE_GCS_PREFIX=trace/
+   + TRACE_STORAGE_PREFIX=trace/
+   - TRACE_GHE_TOKEN=your-pat
+   + GHE_TOKEN=your-pat
+   ```
+2. Cloud Run: update env-vars on existing revision (use
+   `--update-env-vars` + `--remove-env-vars` to avoid the destructive
+   `--set-env-vars` whole-set replacement):
+   ```sh
+   gcloud run jobs update trace-crawl \
+     --update-env-vars=TRACE_STORAGE_BUCKET=${TRACE_STORAGE_BUCKET},TRACE_STORAGE_PREFIX=${TRACE_STORAGE_PREFIX} \
+     --remove-env-vars=TRACE_GCS_BUCKET,TRACE_GCS_PREFIX,TRACE_GHE_TOKEN \
+     --region=${REGION} --project=${GCP_PROJECT_ID}
+   ```
+3. Rebuild and redeploy image:
+   ```sh
+   gcloud builds submit --tag $IMAGE --project=${GCP_PROJECT_ID}
+   gcloud run jobs update trace-crawl --image=$IMAGE --region=${REGION} --project=${GCP_PROJECT_ID}
+   ```
+
+Shipped together with BEACON 3.0.0 and SAGE 3.0.0 (Initiative M).
+
+---
+
 ## [2.1.1] - 2026-06-03
 
 ### Fixed
