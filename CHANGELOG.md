@@ -42,7 +42,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
    `--set-env-vars` whole-set replacement):
    ```sh
    gcloud run jobs update trace-crawl \
-     --update-env-vars=TRACE_STORAGE_BUCKET=${TRACE_STORAGE_BUCKET},TRACE_STORAGE_PREFIX=${TRACE_STORAGE_PREFIX} \
+     --update-env-vars=TRACE_STORAGE_BUCKET=${TRACE_STORAGE_BUCKET},TRACE_STORAGE_PREFIX=${TRACE_STORAGE_PREFIX},GHE_TOKEN=${GHE_TOKEN} \
      --remove-env-vars=TRACE_GCS_BUCKET,TRACE_GCS_PREFIX,TRACE_GHE_TOKEN \
      --region=${REGION} --project=${GCP_PROJECT_ID}
    ```
