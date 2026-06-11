@@ -184,8 +184,8 @@ class ActorTriageEntry(BaseModel):
     """Single actor triage entry from BEACON's ``prioritized_actors[]``.
 
     ``extra='allow'`` keeps the entry forward-compatible with additive
-    BEACON sub-field additions (allowed in minors per the 90-day BC
-    policy).
+    BEACON sub-field additions (additive only, allowed in minor
+    releases).
     """
 
     model_config = ConfigDict(extra="allow")

@@ -63,7 +63,7 @@
     },
     "ActorTriageEntry": {
       "additionalProperties": true,
-      "description": "Single actor triage entry from BEACON's ``prioritized_actors[]``.\n\n``extra='allow'`` keeps the entry forward-compatible with additive\nBEACON sub-field additions (allowed in minors per the 90-day BC\npolicy).",
+      "description": "Single actor triage entry from BEACON's ``prioritized_actors[]``.\n\n``extra='allow'`` keeps the entry forward-compatible with additive\nBEACON sub-field additions (additive only, allowed in minor\nreleases).",
       "properties": {
         "actor_id": {
           "minLength": 1,
