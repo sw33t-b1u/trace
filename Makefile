@@ -20,7 +20,7 @@ test-integration:
 	uv run python -m pytest tests/ -v -m integration
 
 audit:
-	PIPAPI_PYTHON_LOCATION=.venv/bin/python3 uv run pip-audit
+	PIPAPI_PYTHON_LOCATION=.venv/bin/python3 uv run pip-audit --skip-editable
 
 # Compare BEACON's producer-canonical PIR schema against TRACE's consumer
 # canonical. Skips silently when the BEACON sibling repo is not checked out
