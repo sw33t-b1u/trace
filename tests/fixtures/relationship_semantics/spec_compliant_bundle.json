@@ -9,7 +9,7 @@
       "created": "2026-05-12T00:00:00.000Z",
       "modified": "2026-05-12T00:00:00.000Z",
       "name": "TRACE bundle metadata extension",
-      "description": "TRACE-emitted top-level bundle properties (x_trace_*) and new-SDO type declarations for x-asset-internal (Initiative A) and x-identity-internal (Initiative C). Consumers without the extension can ignore these fields safely.",
+      "description": "TRACE-emitted top-level bundle properties (x_trace_*) and new-SDO type declarations for x-asset-internal (TRACE 1.2.0) and x-identity-internal (TRACE 1.5.0). Consumers without the extension can ignore these fields safely.",
       "schema": "https://github.com/sw33t-b1u/sage/blob/main/TRACE/docs/data-model.md#trace-bundle-metadata-extension",
       "version": "1.1",
       "extension_types": ["toplevel-property-extension", "new-sdo"],

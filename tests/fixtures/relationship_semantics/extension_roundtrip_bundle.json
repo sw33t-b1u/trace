@@ -16,7 +16,7 @@
       "created": "2026-05-12T00:00:00.000Z",
       "modified": "2026-05-12T00:00:00.000Z",
       "name": "TRACE bundle metadata extension",
-      "description": "TRACE-emitted top-level bundle properties (x_trace_*) and new-SDO type declarations. x-asset-internal: synthesized STIX object referencing a SAGE asset_id, emitted when the identity-resolver maps an LLM asset hint to a known asset (Initiative A). x-identity-internal: synthesized STIX object referencing a BEACON identity_id, emitted when the impersonation-resolver maps an LLM identity hint to a known identity (Initiative C). Both carry this extensions map entry per STIX 2.1 §7.3.",
+      "description": "TRACE-emitted top-level bundle properties (x_trace_*) and new-SDO type declarations. x-asset-internal: synthesized STIX object referencing a SAGE asset_id, emitted when the identity-resolver maps an LLM asset hint to a known asset (TRACE 1.2.0). x-identity-internal: synthesized STIX object referencing a BEACON identity_id, emitted when the impersonation-resolver maps an LLM identity hint to a known identity (TRACE 1.5.0). Both carry this extensions map entry per STIX 2.1 §7.3.",
       "schema": "https://github.com/sw33t-b1u/sage/blob/main/TRACE/docs/data-model.md#trace-bundle-metadata-extension",
       "version": "1.1",
       "extension_types": ["toplevel-property-extension", "new-sdo"],
@@ -85,7 +85,7 @@
       "source_ref": "identity--00000000-0000-4000-8000-000000000401",
       "target_ref": "x-asset-internal--f994f072-4b5c-59f0-990c-6e4642bbaee6",
       "confidence": 80,
-      "description": "Acme Corp identity has access to the internal infrastructure asset (Initiative A has-access path, v1.1 extension roundtrip)."
+      "description": "Acme Corp identity has access to the internal infrastructure asset (has-access path, v1.1 extension roundtrip)."
     },
     {
       "type": "relationship",

@@ -1,4 +1,11 @@
-"""E2E tests for Initiative C Phase 1 using §8.5 synthetic bundles."""
+"""E2E tests for relationship-semantics validation using synthetic bundles.
+
+Exercises ``validate.semantic.relationships`` end-to-end against three
+hand-built STIX bundles: a fully emit-ready bundle (all allowed
+source × relationship_type × target combinations), a bundle made only of
+out-of-spec combinations that must be flagged, and an extension-definition
+roundtrip bundle for the custom internal SDO types.
+"""
 
 from __future__ import annotations
 
@@ -10,7 +17,7 @@ from trace_engine.validate.semantic.relationships import (
     check_relationship_type_match,
 )
 
-_FIXTURES = Path(__file__).parent / "fixtures" / "initiative_c"
+_FIXTURES = Path(__file__).parent / "fixtures" / "relationship_semantics"
 
 _KNOWN_IDENTITY_IDS = {"id-supplier-dhl", "id-brand-microsoft", "id-exec-cfo"}
 
@@ -20,13 +27,15 @@ def _load(name: str) -> dict:
 
 
 class TestSpecCompliantBundle:
-    """spec_compliant_bundle.json — covers all 5 §3.4 emit-ready combinations.
+    """spec_compliant_bundle.json — covers all 5 emit-ready combinations.
 
-    Combination 5 (threat-actor → impersonates → identity / x-identity-internal)
-    has two instances: one targeting an x-identity-internal with no roles
-    (multiplier=1.0, eff=30) and one targeting an executive-role identity
-    (roles=[cfo], multiplier=1.5, eff=90) to exercise the §6.6 boost path
-    end-to-end (HLD §8.5).
+    Emit-ready = the source × relationship_type × target rows allowed by
+    ``_RELATIONSHIP_TYPE_TABLE`` (attributed-to / impersonates / targets).
+    The impersonates combination (threat-actor → identity /
+    x-identity-internal) has two instances: one targeting an
+    x-identity-internal with no roles (multiplier=1.0, eff=30) and one
+    targeting an executive-role identity (roles=[cfo], multiplier=1.5,
+    eff=90) to exercise the role-based priority boost end-to-end.
     """
 
     def test_six_relationships_present(self):
@@ -47,7 +56,13 @@ class TestSpecCompliantBundle:
 
 
 class TestPendingDropBundle:
-    """pending_drop_bundle.json — all 5 §3.1.1 rows flagged + tier-4 unresolved."""
+    """pending_drop_bundle.json — out-of-spec rows flagged + unresolved identity.
+
+    Contains the 5 source × relationship_type × target rows NOT allowed by
+    ``_RELATIONSHIP_TYPE_TABLE`` (each must raise a RELATIONSHIP_TYPE_MATCH
+    error) plus one reference to an identity id absent from the known set
+    (must raise an IDENTITY_REF_RESOLUTION warning).
+    """
 
     def test_five_relationship_type_match_errors(self):
         bundle = _load("pending_drop_bundle.json")
