@@ -232,3 +232,77 @@ class TestEnsureClient:
 
             with pytest.raises(RuntimeError, match="google-genai"):
                 _ensure_client(config)
+
+
+@pytest.mark.integration
+class TestCallLlmIntegration:
+    """Integration tests — require real Vertex AI. Run with: make test-integration.
+
+    Smoke-level only: they verify the live model/prompt contract (model ids
+    resolve, JSON mode honours the schema the L2/L3 pipeline expects), not
+    output quality. Each test skips when GCP_PROJECT_ID is not set.
+    """
+
+    @staticmethod
+    def _require_project() -> None:
+        import os
+
+        if not os.environ.get("GCP_PROJECT_ID"):
+            pytest.skip("GCP_PROJECT_ID not set")
+
+    def test_simple_call_returns_json(self):
+        """Smoke: gemini flash-lite answers in JSON mode."""
+        self._require_project()
+        from trace_engine.llm.client import call_llm_json
+
+        result = call_llm_json(
+            "simple",
+            'Return JSON: {"status": "ok", "message": "hello"}',
+        )
+        assert isinstance(result, dict)
+        assert result.get("status") == "ok"
+
+    def test_relevance_prompt_contract(self):
+        """Smoke for the L2 gate: relevance_check.md yields score + matched_pir_ids."""
+        self._require_project()
+        from trace_engine.llm.client import call_llm_json, load_prompt
+
+        prompt = (
+            load_prompt("relevance_check.md")
+            .replace(
+                "{{PIR_CONTEXT}}",
+                "- PIR-2025-001 (strategic): monitor ransomware campaigns "
+                "targeting manufacturing ERP systems",
+            )
+            .replace(
+                "{{ARTICLE_TEXT}}",
+                "A ransomware group deployed new malware against a European "
+                "car manufacturer's SAP environment last week.",
+            )
+        )
+        result = call_llm_json("simple", prompt)
+        assert isinstance(result, dict)
+        assert "score" in result
+        assert 0.0 <= float(result["score"]) <= 1.0
+        assert isinstance(result.get("matched_pir_ids", []), list)
+
+    def test_extraction_prompt_contract(self):
+        """Smoke for the L3 extractor: stix_extraction.md yields entities/relationships."""
+        self._require_project()
+        from trace_engine.llm.client import call_llm_json, load_prompt
+
+        prompt = (
+            load_prompt("stix_extraction.md")
+            .replace("{{PIR_CONTEXT_BLOCK}}", "")
+            .replace(
+                "{{REPORT_TEXT}}",
+                "FIN7 used Cobalt Strike to exploit CVE-2023-3519 against "
+                "internet-facing Citrix servers.",
+            )
+        )
+        result = call_llm_json("medium", prompt)
+        assert isinstance(result, dict)
+        assert isinstance(result.get("entities"), list)
+        assert isinstance(result.get("relationships"), list)
+        names = {e.get("name", "").lower() for e in result["entities"]}
+        assert any("fin7" in n for n in names)
