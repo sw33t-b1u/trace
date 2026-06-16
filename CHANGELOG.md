@@ -6,6 +6,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [3.0.1] - 2026-06-16
+
+### Security
+
+- Raised the `cryptography` floor from 46.0.7 to 48.0.1 (locked 48.0.0 →
+  48.0.1), closing GHSA-537c-gmf6-5ccf and clearing the pip-audit finding.
+  `cryptography` is a transitive dependency via google-genai.
+
+---
+
 ## [3.0.0] - 2026-06-03
 
 ### Changed (BREAKING)
