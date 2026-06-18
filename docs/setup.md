@@ -201,7 +201,7 @@ BEACON dependency is needed.
 To regenerate the test taxonomy snapshot from a live BEACON installation:
 
 ```bash
-trace taxonomy-refresh
+uv run trace taxonomy-refresh
 cp schema/threat_taxonomy.cached.json tests/fixtures/threat_taxonomy.json
 ```
 

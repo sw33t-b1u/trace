@@ -70,14 +70,14 @@ for the full architecture.
 
 ```bash
 # Without PIR (all articles extracted)
-trace crawl-single --input https://example.com/report
+uv run trace crawl-single --input https://example.com/report
 
 # With PIR (L2 gate + L3 conditioning + L4 metadata)
-trace crawl-single --input https://example.com/report \
+uv run trace crawl-single --input https://example.com/report \
   --pir ../BEACON/output/pir_output.json
 
 # Explicit output path (bypasses StorageBackend)
-trace crawl-single --input https://example.com/report \
+uv run trace crawl-single --input https://example.com/report \
   --pir ../BEACON/output/pir_output.json \
   --output output/my_bundle.json
 ```
@@ -86,13 +86,13 @@ trace crawl-single --input https://example.com/report \
 
 ```bash
 # Batch crawl with PIR filtering and content-hash deduplication
-trace crawl-batch --pir ../BEACON/output/pir_output.json
+uv run trace crawl-batch --pir ../BEACON/output/pir_output.json
 
 # Skip taxonomy sync for CI
-trace crawl-batch --pir ../BEACON/output/pir_output.json --no-sync-taxonomy
+uv run trace crawl-batch --pir ../BEACON/output/pir_output.json --no-sync-taxonomy
 
 # Explicit output directory (bypasses StorageBackend)
-trace crawl-batch --pir ../BEACON/output/pir_output.json \
+uv run trace crawl-batch --pir ../BEACON/output/pir_output.json \
   --output-dir output/stix/
 ```
 
@@ -104,23 +104,23 @@ schema (including `feed_type` and per-source configuration).
 Run all validators together and produce a single Markdown report:
 
 ```bash
-trace validate-all
+uv run trace validate-all
 ```
 
 Or run individual validators:
 
 ```bash
-trace validate-stix output/stix/stix_bundle_*.json
-trace validate-pir  ../BEACON/output/pir_output.json
-trace validate-assets ../BEACON/output/assets.json
-trace validate-identity ../BEACON/output/identity_assets.json
-trace validate-accounts ../BEACON/output/user_accounts.json
+uv run trace validate-stix output/stix/stix_bundle_*.json
+uv run trace validate-pir  ../BEACON/output/pir_output.json
+uv run trace validate-assets ../BEACON/output/assets.json
+uv run trace validate-identity ../BEACON/output/identity_assets.json
+uv run trace validate-accounts ../BEACON/output/user_accounts.json
 ```
 
 Review the generated `output/validation_report_*.md` and optionally submit:
 
 ```bash
-trace submit-review --open-issue
+uv run trace submit-review --open-issue
 ```
 
 SAGE only ingests artifacts that TRACE has validated.
@@ -129,10 +129,10 @@ SAGE only ingests artifacts that TRACE has validated.
 
 ```bash
 # Search by value
-trace search-iocs --ioc 203.0.113.42
+uv run trace search-iocs --ioc 203.0.113.42
 
 # Filter by type and TLP level
-trace search-iocs --type ipv4 --tlp-max green --json
+uv run trace search-iocs --type ipv4 --tlp-max green --json
 ```
 
 ---
@@ -189,13 +189,13 @@ emitted.
 **Manual refresh:**
 
 ```bash
-trace taxonomy-refresh
+uv run trace taxonomy-refresh
 ```
 
 **Skip auto-sync** (CI / air-gapped environments):
 
 ```bash
-trace crawl-batch --no-sync-taxonomy ...
+uv run trace crawl-batch --no-sync-taxonomy ...
 ```
 
 ---

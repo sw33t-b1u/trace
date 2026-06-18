@@ -196,7 +196,7 @@ def test_low_relevance_skipped(mock_llm, crawl_state):
 ライブ BEACON からテスト用タクソノミスナップショットを再生成する場合:
 
 ```bash
-trace taxonomy-refresh
+uv run trace taxonomy-refresh
 cp schema/threat_taxonomy.cached.json tests/fixtures/threat_taxonomy.json
 ```
 
