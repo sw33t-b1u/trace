@@ -223,3 +223,13 @@ gcloud storage buckets add-iam-policy-binding gs://${TRACE_STORAGE_BUCKET} \
 ## Out of scope
 
 IAP / Internal Load Balancer / VPC Service Controls are not configured by this guide. For small Google Workspace user counts (a few users), the L2 IAM binding above is sufficient. If you need context-aware access or custom network topology, see https://cloud.google.com/iap/docs.
+
+---
+
+## CTI Platform console integration
+
+TRACE can run as a standalone `trace-crawl` Cloud Run Job for scheduled batch
+collection, or be bundled into the CTI Platform console image
+(`beacon/Dockerfile.cti-console`) so the browser Collection tab can execute
+`trace discover-pir` and `trace crawl-batch` as local subprocesses. The bundled
+console uses `TRACE_ROOT_PATH=/app/trace`.

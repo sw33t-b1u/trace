@@ -222,3 +222,12 @@ gcloud storage buckets add-iam-policy-binding gs://${TRACE_STORAGE_BUCKET} \
 ## 対象外
 
 IAP / 内部ロードバランサ / VPC Service Controls はこのガイドでは設定しない。少数の Google Workspace ユーザー運用（数名程度）では、上記の L2 IAM バインディングで十分である。コンテキストアウェアアクセスやカスタムネットワーク構成が必要な場合は https://cloud.google.com/iap/docs を参照すること。
+
+---
+
+## CTI Platform console 連携
+
+TRACE はスケジュールバッチ収集用の単独 `trace-crawl` Cloud Run Job としても、
+CTI Platform console image（`beacon/Dockerfile.cti-console`）に同梱しても運用できる。
+同梱時はブラウザの Collection タブが `trace discover-pir` と `trace crawl-batch` を
+ローカル subprocess として実行できる。統合 console の既定は `TRACE_ROOT_PATH=/app/trace`。
