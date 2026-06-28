@@ -1,21 +1,12 @@
 """Tests for the unified ``trace`` CLI entry point (Initiative H Phase 6).
 
 Coverage:
-  - ``trace --help`` lists every Phase 6 subcommand (12 entries from
-    ``docs/api-stability.md`` §3.8).
+  - ``trace --help`` lists every registered subcommand.
   - ``trace <subcommand> --help`` resolves to the wrapped command's
     real help formatter (argparse text for the argparse-based wrappers,
     click text for ``search-iocs``).
   - End-to-end: ``trace validate-pir --pir <wrapped 1.0.0 fixture>``
     runs the underlying validator with exit code 0.
-  - Each ``cmd/<name>.py`` direct invocation prints the
-    ``DeprecationWarning`` line steering operators to ``trace
-    <subcommand>``.
-
-The legacy ``cmd/*.py --help`` checks shell out via subprocess so that
-the ``__main__`` block — where the deprecation print lives — actually
-executes. ``CliRunner`` cannot test that path because it imports the
-module instead of running it as a script.
 """
 
 from __future__ import annotations
@@ -34,6 +25,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 SUBCOMMANDS: list[tuple[str, str, str]] = [
     ("crawl-batch", "crawl_batch", "trace crawl-batch"),
     ("crawl-single", "crawl_single", "trace crawl-single"),
+    ("discover-pir", "discover_pir", "trace discover-pir"),
     ("search-iocs", "search_iocs", "trace search-iocs"),
     ("validate-pir", "validate_pir", "trace validate-pir"),
     ("validate-stix", "validate_stix", "trace validate-stix"),
@@ -68,7 +60,7 @@ class TestTraceGroupHelp:
         result = runner.invoke(cli, ["--help"])
         assert "trace <subcommand> --help" in result.output
 
-    def test_all_13_subcommands_registered(self):
+    def test_all_14_subcommands_registered(self):
         registered = set(cli.commands.keys())
         expected = {cmd_name for cmd_name, _, _ in SUBCOMMANDS}
         assert registered == expected, (

@@ -368,3 +368,91 @@ the success path).
 If `x_trace_relevance_rationale` shows `parse_failed` / `call_failed`, the
 gate didn't make a real decision. Investigate the LLM call path before
 trusting the threshold.
+
+---
+
+## 10. PIR-driven article discovery (`trace discover-pir`)
+
+`trace discover-pir` is the pre-crawl discovery step used by the BEACON
+Collection UI. It reads BEACON `pir_output.json`, derives lightweight search
+terms, searches an RSS/Atom source catalog for entries in a date window, and
+emits a candidate JSON document for human approval. It intentionally does not
+run L2 relevance, L3 STIX extraction, bundle assembly, or `crawl_state.json`
+updates.
+
+Discovery is a conservative routing aid, not an intelligence decision:
+
+1. Load `pir_output.json` through the same `PIRDocument.from_payload()` contract
+   used by the validators and crawl commands.
+2. Build weighted terms from prioritized actor names, actor aliases,
+   `threat_actor_tags`, optional `notable_groups`, optional `collection_focus`,
+   and `asset_weight_rules[].tag`.
+3. Load `input/source_catalog.yaml`; if it is absent, fall back to the committed
+   `input/source_catalog.example.yaml` template.
+4. Fetch each enabled RSS/Atom feed, parse entries, and keep entries whose
+   `published` / `updated` timestamp falls within the requested window. Entries
+   without timestamps are retained for human review because many CTI feeds omit
+   reliable publication dates.
+5. Match PIR terms against entry title, summary, and URL. Actor and alias terms
+   carry the highest weight; title matches and recency add small bonuses.
+6. Deduplicate by canonicalized URL and emit the top `--max-candidates` records.
+
+Approved candidates are converted by the BEACON UI into a normal
+`SourcesDocument` and then sent to `trace crawl-batch --pir ...`. The existing
+crawl path remains the source of truth for L2 PIR relevance, STIX extraction,
+state dedupe, and bundle metadata.
+
+### 10.1 `input/source_catalog.yaml` schema
+
+The operator catalog is local runtime configuration and is gitignored. TRACE
+commits `input/source_catalog.example.yaml` as a template.
+
+```yaml
+version: 1
+sources:
+  - name: Microsoft Security Blog
+    url: https://www.microsoft.com/en-us/security/blog/feed/
+    type: rss        # rss | atom
+    category: vendor # optional, informational
+    enabled: true    # optional, default true
+    max_entries: 50  # optional per-source cap for future provider tuning
+```
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `version` | int | `1` | Catalog schema version |
+| `sources[].name` | str | required | Human-readable source name shown in candidates |
+| `sources[].url` | http(s) URL | required | RSS/Atom feed URL |
+| `sources[].type` | `rss` / `atom` | `rss` | Parser hint |
+| `sources[].category` | str / null | null | Informational grouping (`vendor`, `news`, `government`, etc.) |
+| `sources[].enabled` | bool | `true` | Disabled sources are skipped |
+| `sources[].max_entries` | int / null | null | Reserved per-source cap; global `--max-candidates` still applies |
+
+### 10.2 Candidate JSON contract
+
+`trace discover-pir --json` emits a stable envelope:
+
+```json
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-06-28T00:00:00Z",
+  "pir_path": "../BEACON/output/pir_output.json",
+  "window": {"from": "2026-06-01", "to": "2026-06-30"},
+  "candidates": [
+    {
+      "url": "https://example.com/report",
+      "title": "Example report",
+      "source_name": "Example Feed",
+      "published_at": "2026-06-15T10:00:00Z",
+      "matched_pir_ids": ["PIR-2026-001"],
+      "matched_terms": ["salt typhoon"],
+      "score": 0.9,
+      "summary": "Short feed summary"
+    }
+  ]
+}
+```
+
+`score` is clamped to `0.0..1.0` and is used only for sorting and operator
+triage. It is not copied into STIX bundles; crawl-time `x_trace_relevance_score`
+continues to come from the L2 PIR relevance gate.

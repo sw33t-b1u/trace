@@ -12,6 +12,9 @@ build/
 # Runtime artifacts
 output/
 input/
+!input/
+input/*
+!input/source_catalog.example.yaml
 .env
 
 # Local-only design notes (kept out of VCS by maintainer policy)

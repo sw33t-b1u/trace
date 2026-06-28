@@ -143,6 +143,11 @@ _register_passthrough(
     "Convert a single PDF / URL to a STIX 2.1 bundle.",
 )
 _register_passthrough(
+    "discover-pir",
+    "discover_pir",
+    "Discover candidate CTI articles from BEACON PIRs.",
+)
+_register_passthrough(
     "search-iocs",
     "search_iocs",
     "Search the crawl_state IoC index for an indicator value.",

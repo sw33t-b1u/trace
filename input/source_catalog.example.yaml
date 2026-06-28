@@ -1,0 +1,22 @@
+version: 1
+sources:
+  - name: CISA News
+    url: https://www.cisa.gov/news.xml
+    type: rss
+    category: government
+  - name: Microsoft Security Blog
+    url: https://www.microsoft.com/en-us/security/blog/feed/
+    type: rss
+    category: vendor
+  - name: Google Threat Analysis Group
+    url: https://blog.google/threat-analysis-group/rss/
+    type: rss
+    category: vendor
+  - name: Unit 42 Threat Research
+    url: https://unit42.paloaltonetworks.com/feed/
+    type: rss
+    category: vendor
+  - name: The Hacker News
+    url: https://feeds.feedburner.com/TheHackersNews
+    type: rss
+    category: news

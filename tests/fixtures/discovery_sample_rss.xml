@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+  <channel>
+    <title>Example CTI Feed</title>
+    <link>https://feeds.example.com/cti</link>
+    <description>Fixture feed for discovery tests</description>
+    <item>
+      <title>Salt Typhoon targets telecom edge VPN appliances</title>
+      <link>https://example.com/research/salt-typhoon-edge-vpn</link>
+      <description>APT-China activity against internet-facing telecom assets.</description>
+      <pubDate>Mon, 15 Jun 2026 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>APT-China campaign update</title>
+      <link>https://example.com/research/salt-typhoon-edge-vpn/</link>
+      <description>Duplicate canonical article URL with additional tag wording.</description>
+      <pubDate>Tue, 16 Jun 2026 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Salt Typhoon historical note</title>
+      <link>https://example.com/research/old-salt-typhoon</link>
+      <description>Out-of-window article.</description>
+      <pubDate>Mon, 15 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>General password hygiene guidance</title>
+      <link>https://example.com/news/password-guidance</link>
+      <description>No relevant PIR terms here.</description>
+      <pubDate>Wed, 17 Jun 2026 10:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

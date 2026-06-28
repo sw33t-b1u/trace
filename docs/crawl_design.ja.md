@@ -314,3 +314,87 @@ L2 ゲートが記事をスキップした場合は
 `x_trace_relevance_rationale` が `parse_failed` / `call_failed` /
 `(truncated)` を示している場合、ゲートは本来の判定を行えていない。
 LLM 呼び出しパスを先に確認すること。
+
+---
+
+## 10. PIR 駆動の記事探索（`trace discover-pir`）
+
+`trace discover-pir` は BEACON Collection UI が利用する pre-crawl の探索ステップ。
+BEACON `pir_output.json` を読み、軽量な検索 term を生成し、指定期間内の
+RSS/Atom ソースカタログ entry を検索し、人間の承認用 candidate JSON を出力する。
+L2 リレバンス、L3 STIX 抽出、bundle 組立、`crawl_state.json` 更新は意図的に行わない。
+
+Discovery は保守的なルーティング補助であり、インテリジェンス判定ではない:
+
+1. Validator と crawl コマンドが使う同じ `PIRDocument.from_payload()` 契約で
+   `pir_output.json` をロードする。
+2. prioritized actor 名、actor alias、`threat_actor_tags`、任意の
+   `notable_groups`、任意の `collection_focus`、`asset_weight_rules[].tag`
+   から重み付き term を生成する。
+3. `input/source_catalog.yaml` をロードする。存在しない場合はコミット済みの
+   `input/source_catalog.example.yaml` テンプレートへフォールバックする。
+4. 有効な RSS/Atom feed を取得・parse し、`published` / `updated` timestamp が
+   要求期間内の entry を残す。timestamp がない entry は、多くの CTI feed が信頼できる
+   公開日を省略するため、人間レビュー向けに残す。
+5. entry title、summary、URL に PIR term を照合する。actor / alias term が最も高い
+   weight を持ち、title match と recency が小さな bonus を加える。
+6. 正規化 URL で重複排除し、上位 `--max-candidates` 件を出力する。
+
+承認済み candidate は BEACON UI が通常の `SourcesDocument` に変換し、
+`trace crawl-batch --pir ...` に渡す。既存 crawl path が L2 PIR relevance、
+STIX 抽出、state dedupe、bundle metadata の source of truth であり続ける。
+
+### 10.1 `input/source_catalog.yaml` スキーマ
+
+運用者カタログはローカル runtime 設定であり gitignored。TRACE はテンプレートとして
+`input/source_catalog.example.yaml` をコミットする。
+
+```yaml
+version: 1
+sources:
+  - name: Microsoft Security Blog
+    url: https://www.microsoft.com/en-us/security/blog/feed/
+    type: rss        # rss | atom
+    category: vendor # optional, informational
+    enabled: true    # optional, default true
+    max_entries: 50  # optional per-source cap for future provider tuning
+```
+
+| フィールド | 型 | 既定 | 備考 |
+|-----------|----|------|------|
+| `version` | int | `1` | カタログスキーマバージョン |
+| `sources[].name` | str | 必須 | candidate に表示する人間可読ソース名 |
+| `sources[].url` | http(s) URL | 必須 | RSS/Atom feed URL |
+| `sources[].type` | `rss` / `atom` | `rss` | parser hint |
+| `sources[].category` | str / null | null | 情報用 grouping（`vendor`, `news`, `government` など）|
+| `sources[].enabled` | bool | `true` | false の source はスキップ |
+| `sources[].max_entries` | int / null | null | source ごとの cap 予約枠。global `--max-candidates` は引き続き適用 |
+
+### 10.2 Candidate JSON 契約
+
+`trace discover-pir --json` は安定した envelope を出力する:
+
+```json
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-06-28T00:00:00Z",
+  "pir_path": "../BEACON/output/pir_output.json",
+  "window": {"from": "2026-06-01", "to": "2026-06-30"},
+  "candidates": [
+    {
+      "url": "https://example.com/report",
+      "title": "Example report",
+      "source_name": "Example Feed",
+      "published_at": "2026-06-15T10:00:00Z",
+      "matched_pir_ids": ["PIR-2026-001"],
+      "matched_terms": ["salt typhoon"],
+      "score": 0.9,
+      "summary": "Short feed summary"
+    }
+  ]
+}
+```
+
+`score` は `0.0..1.0` に clamp され、sorting と operator triage のみに使われる。
+STIX bundle へコピーされない。crawl 時の `x_trace_relevance_score` は引き続き
+L2 PIR relevance gate が出力する。

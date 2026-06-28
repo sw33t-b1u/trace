@@ -46,6 +46,8 @@ From TRACE 2.0.0 onwards:
 | `schema/sources.schema.json` | ✓ | 1.10.0 (F) | Includes `feed_type` enum (html/rss/atom) |
 | `schema/assets.schema.json` | ✓ | 1.0.0 | Identity + asset bundle shape |
 | `sources.yaml` schema (operator config) | ✓ | 1.10.0 | `url`, `label`, `task`, `max_chars`, `pir_ids`, `feed_type` |
+| `source_catalog.yaml` discovery schema | ✓ | 3.1.0 | RSS/Atom discovery catalog: `name`, `url`, `type`, `category`, `enabled`, `max_entries` |
+| `discover-pir` candidate JSON | ✓ | 3.1.0 | Human-approval envelope for PIR-driven article discovery |
 | Crawl output: STIX 2.1 bundles | ✓ | 1.0.0 | x_trace_collected_at extension, conforming STIX 2.1 |
 | Crawl output: `crawl_state.json` schema | ✓ | 1.11.0 (G) | Per-entry `iocs[]` since G Phase 4 |
 | LLM IoC extraction (`iocs[]` shape) | ✓ | 1.11.0 (G) | 7 IoC types, confidence, context_snippet |
@@ -209,6 +211,7 @@ visible surface from 1.12.0:
 | `trace crawl-batch` | `cmd/crawl_batch.py` | Batch crawl from `input/sources.yaml` (RSS/Atom + HTML, dedup via crawl_state.json) |
 | `trace crawl-single` | `cmd/crawl_single.py` | One-shot crawl + STIX bundle emit |
 | `trace search-iocs` | `cmd/search_iocs.py` | Query crawl_state IoC index (G Phase 5) |
+| `trace discover-pir` | `cmd/discover_pir.py` | Discover PIR-matching article candidates from RSS/Atom catalogs |
 | `trace validate-pir` | `cmd/validate_pir.py` | Validate BEACON pir_output.json |
 | `trace validate-stix` | `cmd/validate_stix.py` | Validate STIX 2.1 bundles |
 | `trace validate-assets` | `cmd/validate_assets.py` | Validate assets.json |
@@ -221,7 +224,7 @@ visible surface from 1.12.0:
 | `trace schema-regenerate` | `cmd/generate_schemas.py` | Regenerate schema/*.schema.json from Pydantic models |
 
 **Committed**: subcommand names + each subcommand's main flags
-(e.g., `crawl-batch --sources`, `search-iocs --ioc`, `search-iocs
+(e.g., `crawl-batch --sources`, `discover-pir --pir`, `discover-pir --catalog`, `discover-pir --json`, `search-iocs --ioc`, `search-iocs
 --tlp-max`, `search-iocs --json`).
 
 **Evolving**: optional flag defaults, help text wording, output
@@ -231,7 +234,43 @@ formatting.
 unified `trace` CLI is the only supported entry point. All `cmd/*.py`
 modules remain callable via `main()` from the CLI wrappers.
 
-### 3.9 Environment variables (Committed)
+
+### 3.9 Discovery catalog and candidate JSON
+
+`trace discover-pir` is a discovery-only command. It reads BEACON
+`pir_output.json`, derives PIR search terms, searches RSS/Atom feeds from a
+source catalog, and emits candidate article metadata for human approval. It
+does not run STIX extraction or update `crawl_state.json`.
+
+**Committed source catalog fields** (`input/source_catalog.yaml`, with the
+committed `input/source_catalog.example.yaml` as a template):
+
+- `version: int`
+- `sources[].name: str`
+- `sources[].url: http(s) URL`
+- `sources[].type: "rss" | "atom"`
+- `sources[].category: str | null`
+- `sources[].enabled: bool`
+- `sources[].max_entries: int | null`
+
+**Committed candidate JSON envelope:**
+
+- `schema_version: "1.0.0"`
+- `generated_at: ISO-8601 datetime`
+- `pir_path: str`
+- `window: {"from": "YYYY-MM-DD", "to": "YYYY-MM-DD"}`
+- `candidates[]` entries with `url`, `title`, `source_name`,
+  `published_at`, `matched_pir_ids`, `matched_terms`, `score`, and `summary`.
+
+**Committed CLI flags:** `discover-pir --pir`, `--catalog`, `--from`,
+`--to`, `--since-days`, `--max-candidates`, `--json`, and `--output`.
+
+**Evolving:** scoring weights, optional default values, source catalog example
+contents, output ordering when scores tie, and future additive discovery
+providers. Candidate `score` is discovery triage metadata only and is not the
+STIX bundle `x_trace_relevance_score`.
+
+### 3.10 Environment variables (Committed)
 
 | Env | Default | Purpose |
 |---|---|---|

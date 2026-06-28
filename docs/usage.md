@@ -10,12 +10,13 @@ pipeline internals, see [`docs/crawl_design.md`](crawl_design.md).
 
 ## CLI commands (`trace` entry point)
 
-TRACE exposes a unified `trace` console script with 13 subcommands:
+TRACE exposes a unified `trace` console script with 14 subcommands:
 
 | Subcommand | Description |
 |------------|-------------|
 | `trace crawl-single` | Crawl a single URL or PDF and emit a STIX 2.1 bundle |
 | `trace crawl-batch` | Batch crawl from `input/sources.yaml` with content-hash deduplication |
+| `trace discover-pir` | Discover PIR-matching article candidates from an RSS/Atom source catalog |
 | `trace validate-all` | Run all validators and produce a combined Markdown report |
 | `trace validate-stix` | Validate a STIX 2.1 bundle (schema + local reference check) |
 | `trace validate-pir` | Validate `pir_output.json` (Pydantic + taxonomy + asset-tag match) |
@@ -36,12 +37,15 @@ TRACE exposes a unified `trace` console script with 13 subcommands:
 
 | Flag | Commands | Description |
 |------|----------|-------------|
-| `--pir <path>` | `crawl-single`, `crawl-batch` | Path to `pir_output.json`; enables L2 gate, L3 conditioning, L4 metadata |
+| `--pir <path>` | `crawl-single`, `crawl-batch`, `discover-pir` | Path to `pir_output.json`; enables L2/L3/L4 for crawl commands and provides discovery context for `discover-pir` |
 | `--output <path>` | `crawl-single` | Write bundle to explicit path (bypasses StorageBackend) |
 | `--output-dir <path>` | `crawl-batch` | Write bundles to explicit directory (bypasses StorageBackend) |
 | `--no-sync-taxonomy` | `crawl-single`, `crawl-batch` | Skip taxonomy auto-sync at startup (CI / air-gapped environments) |
+| `--catalog <path>` | `discover-pir` | Source catalog YAML for RSS/Atom article discovery |
+| `--from`, `--to`, `--since-days` | `discover-pir` | Discovery date window |
+| `--max-candidates <N>` | `discover-pir` | Cap candidate JSON results |
 | `--open-issue` | `submit-review` | Post the validation report as a GitHub issue |
-| `--json` | `search-iocs` | Emit results as JSON instead of human-readable text |
+| `--json` | `search-iocs`, `discover-pir` | Emit results as JSON instead of human-readable text |
 
 ---
 
@@ -98,6 +102,39 @@ uv run trace crawl-batch --pir ../BEACON/output/pir_output.json \
 
 See [`docs/crawl_design.md`](crawl_design.md) for the `input/sources.yaml`
 schema (including `feed_type` and per-source configuration).
+
+
+### PIR-driven article discovery
+
+`trace discover-pir` searches an RSS/Atom source catalog for article candidates
+that match BEACON PIR terms. It does **not** extract STIX; the output is a
+candidate JSON document intended for human approval in the BEACON Collection
+UI or for an operator-managed review step. Approved URLs are then passed to
+`trace crawl-batch --pir`, which runs the normal L2/L3/L4 pipeline.
+
+```bash
+# Discover candidates from input/source_catalog.yaml, falling back to the
+# committed example catalog when the operator catalog does not exist.
+uv run trace discover-pir \
+  --pir ../BEACON/output/pir_output.json \
+  --since-days 30 \
+  --json \
+  --output output/candidates.json
+
+# Use an explicit catalog and absolute date window.
+uv run trace discover-pir \
+  --pir ../BEACON/output/pir_output.json \
+  --catalog input/source_catalog.yaml \
+  --from 2026-06-01 \
+  --to 2026-06-30 \
+  --max-candidates 25 \
+  --json
+```
+
+The committed `input/source_catalog.example.yaml` is a template. Operators
+should copy it to the gitignored `input/source_catalog.yaml` and customize the
+feed list for their environment. See [`docs/crawl_design.md`](crawl_design.md)
+for the catalog and candidate JSON contracts.
 
 ### Validation before SAGE ingestion
 

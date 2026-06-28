@@ -1,0 +1,6 @@
+version: 1
+sources:
+  - name: Example CTI Feed
+    url: https://feeds.example.com/cti.xml
+    type: rss
+    category: vendor
