@@ -68,3 +68,62 @@ def test_discover_candidates_returns_empty_when_no_terms_match() -> None:
     )
 
     assert candidates == []
+
+
+def test_discover_candidates_include_recent_fallback_when_no_terms_match() -> None:
+    catalog = load_catalog(FIXTURES / "discovery_source_catalog.yaml")
+    feed = b"""
+    <rss version='2.0'>
+      <channel>
+        <item>
+          <title>ShinyHunters targets education sector</title>
+          <link>https://example.com/shinyhunters-education</link>
+          <description>Recent but unmatched by the fixture PIR terms.</description>
+          <pubDate>Mon, 15 Jun 2026 10:00:00 GMT</pubDate>
+        </item>
+      </channel>
+    </rss>
+    """
+
+    candidates = discover_candidates(
+        _pir_doc(),
+        catalog,
+        start_date=date(2026, 6, 1),
+        end_date=date(2026, 6, 30),
+        config=Config(gcp_project_id="test"),
+        fetch_feed=lambda _url, _cfg: feed,
+        include_recent=True,
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0].url == "https://example.com/shinyhunters-education"
+    assert candidates[0].score == 0.0
+    assert candidates[0].matched_pir_ids == []
+    assert candidates[0].matched_terms == []
+
+
+def test_discover_candidates_skips_failed_source_and_keeps_others() -> None:
+    catalog = load_catalog(FIXTURES / "discovery_source_catalog.yaml")
+    catalog.sources.append(
+        catalog.sources[0].model_copy(
+            update={"name": "Second Feed", "url": "https://feeds.example.com/second.xml"}
+        )
+    )
+    feed_bytes = (FIXTURES / "discovery_sample_rss.xml").read_bytes()
+
+    def fetch_feed(url: str, _cfg: Config) -> bytes:
+        if "cti.xml" in url:
+            raise OSError("boom")
+        return feed_bytes
+
+    candidates = discover_candidates(
+        _pir_doc(),
+        catalog,
+        start_date=date(2026, 6, 1),
+        end_date=date(2026, 6, 30),
+        config=Config(gcp_project_id="test"),
+        fetch_feed=fetch_feed,
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0].url == "https://example.com/research/salt-typhoon-edge-vpn"

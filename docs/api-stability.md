@@ -263,7 +263,7 @@ committed `input/source_catalog.example.yaml` as a template):
   `published_at`, `matched_pir_ids`, `matched_terms`, `score`, and `summary`.
 
 **Committed CLI flags:** `discover-pir --pir`, `--catalog`, `--from`,
-`--to`, `--since-days`, `--max-candidates`, `--json`, and `--output`.
+`--to`, `--since-days`, `--max-candidates`, `--include-recent`, `--json`, and `--output`.
 
 **Evolving:** scoring weights, optional default values, source catalog example
 contents, output ordering when scores tie, and future additive discovery

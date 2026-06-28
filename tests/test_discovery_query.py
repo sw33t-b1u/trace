@@ -61,3 +61,47 @@ def test_build_search_terms_deduplicates_normalised_values() -> None:
 
     assert values.count("salt typhoon") == 1
     assert values.count("apt-china") == 1
+
+
+def test_actor_names_and_tags_are_not_crowded_out_by_aliases() -> None:
+    component = {"score": 0.5}
+    actors = []
+    for index in range(30):
+        actors.append(
+            {
+                "actor_id": f"actor-{index}",
+                "name": f"Actor {index}",
+                "aliases": [f"Alias {index}-{alias}" for alias in range(5)],
+                "likelihood": 0.5,
+                "score_breakdown": {
+                    "intent": component,
+                    "capability": component,
+                    "opportunity": component,
+                },
+                "rationale": {"text": "fixture"},
+            }
+        )
+    pir_doc = PIRDocument.from_payload(
+        {
+            "schema_version": "2.0.0",
+            "pirs": [
+                {
+                    "pir_id": "PIR-2026-002",
+                    "description": "Financial crime tracking",
+                    "threat_actor_tags": ["financial-crime"],
+                    "asset_weight_rules": [],
+                    "valid_from": "2026-01-01",
+                    "valid_until": "2027-01-01",
+                    "prioritized_actors": actors,
+                }
+            ],
+        }
+    )
+
+    terms = build_search_terms(pir_doc)
+    values = [term.term for term in terms]
+
+    assert "financial-crime" in values
+    assert "actor 0" in values
+    assert "actor 29" in values
+    assert values.index("financial-crime") < values.index("alias 0-0")

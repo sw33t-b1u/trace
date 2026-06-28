@@ -44,6 +44,7 @@ TRACE exposes a unified `trace` console script with 14 subcommands:
 | `--catalog <path>` | `discover-pir` | Source catalog YAML for RSS/Atom article discovery |
 | `--from`, `--to`, `--since-days` | `discover-pir` | Discovery date window |
 | `--max-candidates <N>` | `discover-pir` | Cap candidate JSON results |
+| `--include-recent` | `discover-pir` | Include recent in-window articles even when no PIR term matched |
 | `--open-issue` | `submit-review` | Post the validation report as a GitHub issue |
 | `--json` | `search-iocs`, `discover-pir` | Emit results as JSON instead of human-readable text |
 
@@ -128,13 +129,14 @@ uv run trace discover-pir \
   --from 2026-06-01 \
   --to 2026-06-30 \
   --max-candidates 25 \
+  --include-recent \
   --json
 ```
 
 The committed `input/source_catalog.example.yaml` is a template. Operators
 should copy it to the gitignored `input/source_catalog.yaml` and customize the
 feed list for their environment. See [`docs/crawl_design.md`](crawl_design.md)
-for the catalog and candidate JSON contracts.
+for the catalog, candidate JSON contracts, per-source diagnostics, and the `--include-recent` fallback.
 
 ### Validation before SAGE ingestion
 

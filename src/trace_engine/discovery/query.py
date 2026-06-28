@@ -9,7 +9,7 @@ from typing import Any
 from trace_engine.validate.schema import PIRDocument, PIRItem
 
 _TERM_MAX_CHARS = 80
-_DEFAULT_MAX_TERMS_PER_PIR = 24
+_DEFAULT_MAX_TERMS_PER_PIR = 80
 _DESCRIPTION_KEYWORD_LIMIT = 6
 _STOPWORDS = {
     "about",
@@ -72,10 +72,11 @@ def _terms_for_item(item: PIRItem, *, max_terms: int) -> list[SearchTerm]:
 
     payload = item.model_dump(mode="python")
 
+    # Order matters: high-signal terms are added before aliases so a PIR with
+    # many prioritized actors does not exhaust the per-PIR cap on aliases alone
+    # (which previously dropped tags and later actor names entirely).
     for actor in item.prioritized_actors:
         add(actor.name, "actor", 0.5)
-        for alias in actor.aliases:
-            add(alias, "actor_alias", 0.5)
 
     for tag in item.threat_actor_tags:
         add(tag, "threat_actor_tag", 0.3)
@@ -86,6 +87,10 @@ def _terms_for_item(item: PIRItem, *, max_terms: int) -> list[SearchTerm]:
 
     for rule in item.asset_weight_rules:
         add(rule.tag, "asset_tag", 0.1)
+
+    for actor in item.prioritized_actors:
+        for alias in actor.aliases:
+            add(alias, "actor_alias", 0.5)
 
     for keyword in _description_keywords(item.description or ""):
         add(keyword, "description", 0.1)

@@ -396,6 +396,13 @@ Discovery is a conservative routing aid, not an intelligence decision:
 5. Match PIR terms against entry title, summary, and URL. Actor and alias terms
    carry the highest weight; title matches and recency add small bonuses.
 6. Deduplicate by canonicalized URL and emit the top `--max-candidates` records.
+7. Log per-source `entries`, `in_window`, and `matched` counts plus a final
+   `discovery_summary` so a zero-candidate result is diagnosable from stderr.
+
+If `--include-recent` is set, in-window entries that matched no PIR term are
+appended after matched candidates with `score: 0.0`, empty `matched_pir_ids`,
+and empty `matched_terms`, capped by `--max-candidates`. This fallback is for
+human triage only; the normal L2 gate still runs after approval.
 
 Approved candidates are converted by the BEACON UI into a normal
 `SourcesDocument` and then sent to `trace crawl-batch --pir ...`. The existing

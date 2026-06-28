@@ -85,6 +85,14 @@ def main() -> int:
         help="Maximum number of candidates to emit (default: 50).",
     )
     parser.add_argument(
+        "--include-recent",
+        action="store_true",
+        help=(
+            "Append recent in-window feed entries even when no PIR term matched. "
+            "Fallback candidates have score 0.0 and empty matched_pir_ids."
+        ),
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit the full candidate document as JSON.",
@@ -136,6 +144,7 @@ def main() -> int:
             end_date=end_date,
             config=cfg,
             max_candidates=args.max_candidates,
+            include_recent=args.include_recent,
         )
     except Exception as exc:  # noqa: BLE001 - CLI must convert all setup failures to exit 2.
         print(f"discover_pir_failed: {exc}", file=sys.stderr)

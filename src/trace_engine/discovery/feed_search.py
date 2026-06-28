@@ -10,15 +10,18 @@ from time import struct_time
 from typing import Any
 
 import feedparser
+import structlog
 
 from trace_engine.config import Config, load_config
-from trace_engine.crawler.fetcher import fetch
+from trace_engine.crawler.fetcher import FetchError, fetch
 from trace_engine.discovery.candidates import ArticleCandidate
 from trace_engine.discovery.catalog import CatalogDocument, CatalogSource
 from trace_engine.discovery.query import SearchTerm, build_search_terms
 from trace_engine.validate.schema import PIRDocument
 
 FetchFeed = Callable[[str, Config], bytes]
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -27,6 +30,10 @@ class _ParsedFeedEntry:
     title: str | None
     summary: str | None
     published_at: datetime | None
+
+
+class FeedParseError(RuntimeError):
+    """Raised when feedparser cannot recover any entries from a feed."""
 
 
 def discover_candidates(
@@ -38,6 +45,7 @@ def discover_candidates(
     config: Config | None = None,
     max_candidates: int = 50,
     fetch_feed: FetchFeed | None = None,
+    include_recent: bool = False,
 ) -> list[ArticleCandidate]:
     """Discover candidate articles for ``pir_doc`` from RSS/Atom catalog sources.
 
@@ -45,19 +53,49 @@ def discover_candidates(
     filters entries to the requested date window when a published timestamp is
     present, scores lightweight title/summary/url term matches, deduplicates by
     URL, and returns candidates sorted by score and recency.
+
+    A single source whose fetch or parse fails is logged and skipped; other
+    sources still contribute. Per-source counts and a final summary are logged
+    so operators can tell why a run returned few or no candidates.
+
+    ``include_recent`` (opt-in fallback): when True, in-window entries that
+    matched no PIR term are still returned with ``score == 0.0`` and empty
+    ``matched_pir_ids`` after the matched candidates, capped by
+    ``max_candidates``. This lets an operator review recent articles for human
+    approval when term matching alone finds nothing.
     """
     cfg = config or load_config()
     terms = build_search_terms(pir_doc)
     if not terms or max_candidates <= 0:
+        logger.info(
+            "discovery_no_terms_or_zero_cap",
+            term_count=len(terms),
+            max_candidates=max_candidates,
+        )
         return []
 
     do_fetch = fetch_feed or _fetch_feed
     candidates: dict[str, ArticleCandidate] = {}
+    recent: dict[str, ArticleCandidate] = {}
+    total_entries = 0
+    total_in_window = 0
     for source in catalog.enabled_sources:
-        payload = do_fetch(source.url, cfg)
-        for entry in _parse_feed(payload):
+        try:
+            entries = _parse_feed(do_fetch(source.url, cfg))
+        except (FetchError, FeedParseError, OSError) as exc:
+            logger.warning(
+                "discovery_source_failed",
+                source=source.name,
+                url=source.url,
+                error=str(exc),
+            )
+            continue
+        in_window = 0
+        matched = 0
+        for entry in entries:
             if not _in_window(entry.published_at, start_date=start_date, end_date=end_date):
                 continue
+            in_window += 1
             candidate = _score_entry(
                 entry,
                 source=source,
@@ -66,18 +104,53 @@ def discover_candidates(
                 end_date=end_date,
             )
             if candidate is None:
+                if include_recent:
+                    key = _normalise_url(entry.url)
+                    if key not in recent:
+                        recent[key] = _recent_candidate(entry, source=source)
                 continue
+            matched += 1
             key = _normalise_url(candidate.url)
             existing = candidates.get(key)
             candidates[key] = (
                 candidate if existing is None else _merge_candidates(existing, candidate)
             )
+        total_entries += len(entries)
+        total_in_window += in_window
+        logger.info(
+            "discovery_source_scanned",
+            source=source.name,
+            url=source.url,
+            entries=len(entries),
+            in_window=in_window,
+            matched=matched,
+        )
 
-    return sorted(
+    ranked = sorted(
         candidates.values(),
         key=lambda c: (c.score, c.published_at or datetime.min.replace(tzinfo=UTC), c.title or ""),
         reverse=True,
-    )[:max_candidates]
+    )
+    if include_recent and len(ranked) < max_candidates:
+        matched_keys = {_normalise_url(c.url) for c in ranked}
+        fallback = sorted(
+            (c for k, c in recent.items() if k not in matched_keys),
+            key=lambda c: (c.published_at or datetime.min.replace(tzinfo=UTC), c.title or ""),
+            reverse=True,
+        )
+        ranked = ranked + fallback
+
+    result = ranked[:max_candidates]
+    logger.info(
+        "discovery_summary",
+        sources=len(catalog.enabled_sources),
+        entries=total_entries,
+        in_window=total_in_window,
+        matched=len(candidates),
+        include_recent=include_recent,
+        returned=len(result),
+    )
+    return result
 
 
 def _fetch_feed(url: str, cfg: Config) -> bytes:
@@ -86,6 +159,9 @@ def _fetch_feed(url: str, cfg: Config) -> bytes:
 
 def _parse_feed(content: bytes) -> list[_ParsedFeedEntry]:
     parsed = feedparser.parse(content)
+    if parsed.bozo and not parsed.entries:
+        exc = parsed.bozo_exception
+        raise FeedParseError(str(exc) if exc else "feedparser failed to parse feed")
     entries: list[_ParsedFeedEntry] = []
     for raw in parsed.entries:
         url = _entry_url(raw)
@@ -206,6 +282,20 @@ def _recency_bonus(published_at: datetime | None, *, start_date: date, end_date:
 
 def _normalise_url(url: str) -> str:
     return url.strip().rstrip("/").lower()
+
+
+def _recent_candidate(entry: _ParsedFeedEntry, *, source: CatalogSource) -> ArticleCandidate:
+    """Build a zero-score fallback candidate that matched no PIR term."""
+    return ArticleCandidate(
+        url=entry.url,
+        title=entry.title,
+        source_name=source.name,
+        published_at=entry.published_at,
+        matched_pir_ids=[],
+        matched_terms=[],
+        score=0.0,
+        summary=entry.summary,
+    )
 
 
 def _merge_candidates(left: ArticleCandidate, right: ArticleCandidate) -> ArticleCandidate:

@@ -116,3 +116,33 @@ def test_discover_pir_invalid_window_exits_2(monkeypatch, capsys, tmp_path: Path
 
     assert mod.main() == 2
     assert "invalid_window" in capsys.readouterr().err
+
+
+def test_discover_pir_include_recent_forwarded(monkeypatch, tmp_path: Path) -> None:
+    mod = _load_cmd_module()
+    pir_path = _write_pir(tmp_path)
+    seen: dict = {}
+
+    def fake_discover(*args, **kwargs):
+        seen.update(kwargs)
+        return []
+
+    monkeypatch.setattr(mod, "discover_candidates", fake_discover)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "discover_pir.py",
+            "--pir",
+            str(pir_path),
+            "--catalog",
+            str(FIXTURES / "discovery_source_catalog.yaml"),
+            "--since-days",
+            "30",
+            "--include-recent",
+            "--json",
+        ],
+    )
+
+    assert mod.main() == 0
+    assert seen["include_recent"] is True
