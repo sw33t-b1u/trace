@@ -226,11 +226,12 @@ IAP / Internal Load Balancer / VPC Service Controls are not configured by this g
 
 ---
 
-## CTI Platform console integration
+## CTI Platform unified deployment
 
-TRACE remains deployable as a standalone `trace-crawl` Cloud Run Job for
-scheduled PIR-based collection. For the browser-complete CTI workflow, deploy
-`cti-console` from the BEACON repository; that image uses the latest TRACE main by default
-and sets `TRACE_ROOT_PATH=/app/trace` so the Collection tab can run
-`trace discover-pir` and `trace crawl-batch` locally. See the BEACON deployment
-guide for the console build/deploy command and the optional `TRACE_REF` pin for reproducible builds.
+For browser-complete operation, use the unified CTI Platform runbook in the
+BEACON repository: `beacon/docs/deploy-cti-platform.md`. The `cti-console` image
+bundles TRACE at `/app/trace` and sets `TRACE_ROOT_PATH=/app/trace`, so the
+Collection tab can run TRACE locally.
+
+Keep this standalone TRACE deploy guide for the optional `trace-crawl` Cloud Run
+Job when you need scheduled/background collection outside the browser console.
