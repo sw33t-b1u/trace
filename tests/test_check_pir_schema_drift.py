@@ -1,8 +1,7 @@
 """Unit tests for ``scripts/check_pir_schema_drift.py``.
 
-Each §2.2 rule of the plan
-``/Users/test/Projects/claude_pj/.plans/2026-05-13-pir-schema-diff-ci.md``
-is exercised with a synthetic minimal 2-schema pair.
+Each §2.2 rule of the PIR schema drift CI plan is exercised with a synthetic
+minimal 2-schema pair.
 """
 
 from __future__ import annotations
