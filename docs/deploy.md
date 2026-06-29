@@ -230,7 +230,7 @@ IAP / Internal Load Balancer / VPC Service Controls are not configured by this g
 
 TRACE remains deployable as a standalone `trace-crawl` Cloud Run Job for
 scheduled PIR-based collection. For the browser-complete CTI workflow, deploy
-`cti-console` from the BEACON repository; that image pins a compatible TRACE tag
+`cti-console` from the BEACON repository; that image pins a compatible TRACE ref
 and sets `TRACE_ROOT_PATH=/app/trace` so the Collection tab can run
 `trace discover-pir` and `trace crawl-batch` locally. See the BEACON deployment
 guide for the console build/deploy command and the BEACON↔TRACE compatibility
