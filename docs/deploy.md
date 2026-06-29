@@ -228,8 +228,10 @@ IAP / Internal Load Balancer / VPC Service Controls are not configured by this g
 
 ## CTI Platform console integration
 
-TRACE can run as a standalone `trace-crawl` Cloud Run Job for scheduled batch
-collection, or be bundled into the CTI Platform console image
-(`beacon/Dockerfile.cti-console`) so the browser Collection tab can execute
-`trace discover-pir` and `trace crawl-batch` as local subprocesses. The bundled
-console uses `TRACE_ROOT_PATH=/app/trace`.
+TRACE remains deployable as a standalone `trace-crawl` Cloud Run Job for
+scheduled PIR-based collection. For the browser-complete CTI workflow, deploy
+`cti-console` from the BEACON repository; that image pins a compatible TRACE tag
+and sets `TRACE_ROOT_PATH=/app/trace` so the Collection tab can run
+`trace discover-pir` and `trace crawl-batch` locally. See the BEACON deployment
+guide for the console build/deploy command and the BEACON↔TRACE compatibility
+pin.
