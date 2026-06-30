@@ -52,6 +52,7 @@ From TRACE 2.0.0 onwards:
 | Crawl output: `crawl_state.json` schema | ✓ | 1.11.0 (G) | Per-entry `iocs[]` since G Phase 4 |
 | LLM IoC extraction (`iocs[]` shape) | ✓ | 1.11.0 (G) | 7 IoC types, confidence, context_snippet |
 | `trace` CLI entry + subcommands (Phase 6 of H) | ✓ | 1.12.0 | Subcommand names + main flags frozen |
+| CLI artifact input references | ✓ | 3.2.0 | PIR, assets, STIX bundle, sources, and discovery catalog inputs accept local paths, `gs://` URIs, and storage keys |
 | Legacy `python -m cmd.<name>` | (removed) | n/a | Removed in 2.1.0; use `trace <subcommand>` |
 | Env vars (§5) | ✓ | 1.12.0 | Name + meaning + default frozen |
 | Internal Python modules (`src/trace_engine/*` non-public symbols) | ✗ | n/a | Underscore-prefixed and undocumented helpers may change |
@@ -270,7 +271,26 @@ contents, output ordering when scores tie, and future additive discovery
 providers. Candidate `score` is discovery triage metadata only and is not the
 STIX bundle `x_trace_relevance_score`.
 
-### 3.10 Environment variables (Committed)
+### 3.10 CLI artifact input references
+
+Starting with TRACE 3.2.0, CLI artifact and operator-config inputs use one
+storage-aware resolution rule. The affected inputs are `--pir`, `--it-assets` /
+`--ita`, `--identity-assets`, `--user-accounts`, `--bundle`, `--sources`, and
+`--catalog`.
+
+Resolution order:
+
+1. `gs://bucket/key` reads that exact object.
+2. An existing local filesystem path reads locally.
+3. Otherwise TRACE treats the value as a StorageBackend reference in the
+   command's category. The accepted forms are `filename`, `category/filename`,
+   and `<TRACE_STORAGE_PREFIX>/category/filename`.
+
+Categories are explicit: PIR inputs use `pir`; IT assets, identity assets, and
+user accounts use `assets`; STIX bundles use `stix`; `sources.yaml` and
+`source_catalog.yaml` use `input`.
+
+### 3.11 Environment variables (Committed)
 
 | Env | Default | Purpose |
 |---|---|---|

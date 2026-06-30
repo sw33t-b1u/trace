@@ -47,8 +47,9 @@ from trace_engine.cli._logging import configure as configure_logging  # noqa: E4
 from trace_engine.config import load_config  # noqa: E402
 from trace_engine.crawler.taxonomy_sync import ensure_taxonomy_fresh  # noqa: E402
 from trace_engine.ingest.report_reader import _MAX_CHARS, read_report  # noqa: E402
+from trace_engine.io.inputs import resolve_input  # noqa: E402
 from trace_engine.pir import relevance as pir_relevance  # noqa: E402
-from trace_engine.pir.loader import load_pir  # noqa: E402
+from trace_engine.pir.loader import load_pir_text  # noqa: E402
 from trace_engine.stix.extractor import (  # noqa: E402
     build_stix_bundle_from_extraction,
     extract_entities,
@@ -106,10 +107,10 @@ def main() -> None:
     parser.add_argument(
         "--pir",
         "-p",
-        type=Path,
         default=None,
         help=(
-            "Path to BEACON pir_output.json. Enables the L2 relevance gate: "
+            "Path, gs:// URI, or pir/ storage key for BEACON pir_output.json. "
+            "Enables the L2 relevance gate: "
             "articles below the threshold are not extracted. The PIR context is "
             "also injected into the L3 prompt and recorded in the bundle's "
             "x_trace_* metadata."
@@ -124,10 +125,10 @@ def main() -> None:
     parser.add_argument(
         "--it-assets",
         "--ita",
-        type=Path,
         default=None,
         help=(
-            "Path to BEACON assets.json. Enables identity-asset edge "
+            "Path, gs:// URI, or assets/ storage key for BEACON assets.json. "
+            "Enables identity-asset edge "
             "extraction (Initiative A): the L3 prompt asks the LLM to "
             "emit identity_asset_edges, and the bundle assembler resolves "
             "each free-form asset reference against this assets file via "
@@ -140,10 +141,10 @@ def main() -> None:
     parser.add_argument(
         "--identity-assets",
         "--ida",
-        type=Path,
         default=None,
         help=(
-            "Path to BEACON identity_assets.json. Initiative C Phase 2 "
+            "Path, gs:// URI, or assets/ storage key for BEACON identity_assets.json. "
+            "Initiative C Phase 2 "
             "(TRACE 1.6.0): identities flagged "
             "is_high_value_impersonation_target=true contribute a +0.2 "
             "boost to the L2 relevance score when their name appears in "
@@ -185,10 +186,12 @@ def main() -> None:
     pir_doc = None
     verdict = None
     if args.pir is not None:
-        if not args.pir.exists():
+        try:
+            pir_input = resolve_input(cfg, "pir", args.pir)
+        except FileNotFoundError:
             logger.error("pir_not_found", path=str(args.pir))
             sys.exit(2)
-        pir_doc, _ = load_pir(args.pir)
+        pir_doc, _ = load_pir_text(pir_input.text)
         threshold = (
             args.relevance_threshold
             if args.relevance_threshold is not None
@@ -196,11 +199,12 @@ def main() -> None:
         )
         high_value_identity_names: list[str] | None = None
         if args.identity_assets is not None:
-            if not args.identity_assets.exists():
+            try:
+                identity_assets_input = resolve_input(cfg, "assets", args.identity_assets)
+            except FileNotFoundError:
                 logger.error("identity_assets_not_found", path=str(args.identity_assets))
                 sys.exit(2)
-            with args.identity_assets.open() as f:
-                ia_payload = json.load(f)
+            ia_payload = json.loads(identity_assets_input.text)
             high_value_identity_names = [
                 entry["name"]
                 for entry in ia_payload.get("identities", [])
@@ -226,11 +230,12 @@ def main() -> None:
     # can be resolved to known asset_ids during bundle assembly.
     assets_list: list[dict] | None = None
     if args.it_assets is not None:
-        if not args.it_assets.exists():
+        try:
+            assets_input = resolve_input(cfg, "assets", args.it_assets)
+        except FileNotFoundError:
             logger.error("assets_not_found", path=str(args.it_assets))
             sys.exit(2)
-        with args.it_assets.open() as f:
-            assets_payload = json.load(f)
+        assets_payload = json.loads(assets_input.text)
         assets_list = assets_payload.get("assets") if isinstance(assets_payload, dict) else None
         if assets_list is None:
             logger.error("assets_missing_assets_key", path=str(args.it_assets))

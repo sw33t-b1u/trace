@@ -42,6 +42,8 @@ from pydantic import ValidationError
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from trace_engine.cli._logging import configure as configure_logging  # noqa: E402
+from trace_engine.config import load_config  # noqa: E402
+from trace_engine.io.inputs import resolve_json_input  # noqa: E402
 from trace_engine.review.markdown_report import render_report  # noqa: E402
 from trace_engine.validate.schema import (  # noqa: E402
     AssetsDocument,
@@ -71,6 +73,14 @@ def _load_and_validate_schema(
     """
     with path.open() as f:
         payload = json.load(f)
+    return _validate_schema_payload(payload, model_cls, findings)
+
+
+def _validate_schema_payload(
+    payload: object,
+    model_cls: type,
+    findings: list[ValidationFinding],
+):
     try:
         return model_cls.model_validate(payload)
     except ValidationError as exc:
@@ -99,6 +109,19 @@ def validate_identity_assets_files(
     return findings
 
 
+def validate_identity_assets_payloads(
+    identity_assets_payload: object,
+    assets_payload: object,
+) -> list[ValidationFinding]:
+    findings: list[ValidationFinding] = []
+    ia_doc = _validate_schema_payload(identity_assets_payload, IdentityAssetsDocument, findings)
+    a_doc = _validate_schema_payload(assets_payload, AssetsDocument, findings)
+    if ia_doc is None or a_doc is None:
+        return findings
+    findings.extend(check_identity_assets(ia_doc, a_doc))
+    return findings
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Validate identity_assets.json before SAGE ingestion"
@@ -107,15 +130,16 @@ def main() -> None:
         "--identity-assets",
         "--ida",
         required=True,
-        type=Path,
-        help="Path to identity_assets.json",
+        help="Path, gs:// URI, or assets/ storage key for identity_assets.json",
     )
     parser.add_argument(
         "--it-assets",
         "--ita",
         required=True,
-        type=Path,
-        help=("Path to assets.json (REQUIRED for cross-reference of has_access[*].asset_id)"),
+        help=(
+            "Path, gs:// URI, or assets/ storage key for assets.json "
+            "(REQUIRED for cross-reference of has_access[*].asset_id)"
+        ),
     )
     parser.add_argument(
         "--report",
@@ -124,13 +148,22 @@ def main() -> None:
         help="Optional Markdown report output path",
     )
     args = parser.parse_args()
+    cfg = load_config()
 
-    for label, path in (("identity-assets", args.identity_assets), ("it-assets", args.it_assets)):
-        if not path.exists():
-            logger.error("file_not_found", role=label, path=str(path))
-            sys.exit(1)
+    try:
+        identity_assets_payload, identity_assets_input = resolve_json_input(
+            cfg, "assets", args.identity_assets
+        )
+    except FileNotFoundError:
+        logger.error("file_not_found", role="identity-assets", path=str(args.identity_assets))
+        sys.exit(1)
+    try:
+        assets_payload, _ = resolve_json_input(cfg, "assets", args.it_assets)
+    except FileNotFoundError:
+        logger.error("file_not_found", role="it-assets", path=str(args.it_assets))
+        sys.exit(1)
 
-    findings = validate_identity_assets_files(args.identity_assets, args.it_assets)
+    findings = validate_identity_assets_payloads(identity_assets_payload, assets_payload)
 
     for f in findings:
         log_method = logger.error if f.severity == "error" else logger.warning
@@ -138,7 +171,7 @@ def main() -> None:
 
     if args.report:
         text = render_report(
-            [(f"IdentityAssets: {args.identity_assets.name}", findings)],
+            [(f"IdentityAssets: {identity_assets_input.display_name}", findings)],
             timestamp=datetime.now(tz=UTC),
         )
         args.report.parent.mkdir(parents=True, exist_ok=True)

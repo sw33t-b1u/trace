@@ -6,6 +6,25 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [3.2.0] - 2026-06-30
+
+### Added
+
+- Added backend-aware input resolution for TRACE CLI artifact and operator-config
+  inputs. `--pir`, `--it-assets` / `--ita`, `--identity-assets`,
+  `--user-accounts`, `--bundle`, `--sources`, and `--catalog` now accept local
+  paths, `gs://` URIs, and storage references such as `pir/pir_output.json` or
+  `<TRACE_STORAGE_PREFIX>/pir/pir_output.json`.
+
+### Changed
+
+- Updated `discover-pir`, `crawl-batch`, `crawl-single`, and validation commands
+  to read PIR, assets, STIX bundle, sources, and discovery catalog inputs through
+  the shared TRACE storage resolver while preserving existing local-path behavior
+  and not-found exit contracts.
+
+---
+
 ## [3.1.0] - 2026-06-30
 
 ### Added

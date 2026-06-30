@@ -36,6 +36,8 @@ from pydantic import ValidationError
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from trace_engine.cli._logging import configure as configure_logging  # noqa: E402
+from trace_engine.config import load_config  # noqa: E402
+from trace_engine.io.inputs import resolve_json_input  # noqa: E402
 from trace_engine.review.markdown_report import render_report  # noqa: E402
 from trace_engine.validate.schema import AssetsDocument, PIRDocument  # noqa: E402
 from trace_engine.validate.semantic.findings import (  # noqa: E402
@@ -52,10 +54,22 @@ def validate_pir_file(
     pir_path: Path,
     assets_path: Path | None,
 ) -> tuple[PIRDocument | None, list[ValidationFinding]]:
-    findings: list[ValidationFinding] = []
-
     with pir_path.open() as f:
         payload = json.load(f)
+    assets_payload = None
+    if assets_path:
+        with assets_path.open() as f:
+            assets_payload = json.load(f)
+    return validate_pir_payload(payload, assets_payload, location=str(pir_path))
+
+
+def validate_pir_payload(
+    payload: object,
+    assets_payload: object | None,
+    *,
+    location: str,
+) -> tuple[PIRDocument | None, list[ValidationFinding]]:
+    findings: list[ValidationFinding] = []
     try:
         pir_doc = PIRDocument.from_payload(payload)
     except ValidationError as exc:
@@ -74,16 +88,14 @@ def validate_pir_file(
             ValidationFinding(
                 severity="error",
                 code="SCHEMA_ENVELOPE",
-                location=str(pir_path),
+                location=location,
                 message=str(exc),
             )
         )
         return None, findings
 
     assets_doc: AssetsDocument | None = None
-    if assets_path:
-        with assets_path.open() as f:
-            assets_payload = json.load(f)
+    if assets_payload is not None:
         try:
             assets_doc = AssetsDocument.model_validate(assets_payload)
         except ValidationError as exc:
@@ -104,25 +116,45 @@ def validate_pir_file(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Validate pir_output.json before SAGE ingestion")
-    parser.add_argument("--pir", "-p", required=True, type=Path, help="Path to pir_output.json")
+    parser.add_argument(
+        "--pir",
+        "-p",
+        required=True,
+        help="Path, gs:// URI, or pir/ storage key for pir_output.json",
+    )
     parser.add_argument(
         "--it-assets",
         "--ita",
-        type=Path,
         default=None,
-        help="Optional assets.json — enables asset_weight_rules.tag match check",
+        help=(
+            "Optional path, gs:// URI, or assets/ storage key for assets.json — "
+            "enables asset_weight_rules.tag match check"
+        ),
     )
     parser.add_argument("--report", type=Path, default=None, help="Markdown report output path")
     args = parser.parse_args()
+    cfg = load_config()
 
-    if not args.pir.exists():
+    try:
+        pir_payload, pir_input = resolve_json_input(cfg, "pir", args.pir)
+    except FileNotFoundError:
         logger.error("file_not_found", path=str(args.pir))
         sys.exit(1)
-    if args.it_assets and not args.it_assets.exists():
-        logger.error("file_not_found", path=str(args.it_assets))
+    except Exception as exc:  # noqa: BLE001
+        logger.error("pir_invalid", path=str(args.pir), error=str(exc))
         sys.exit(1)
+    assets_payload = None
+    if args.it_assets:
+        try:
+            assets_payload, _ = resolve_json_input(cfg, "assets", args.it_assets)
+        except FileNotFoundError:
+            logger.error("file_not_found", path=str(args.it_assets))
+            sys.exit(1)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("assets_invalid", path=str(args.it_assets), error=str(exc))
+            sys.exit(1)
 
-    _, findings = validate_pir_file(args.pir, args.it_assets)
+    _, findings = validate_pir_payload(pir_payload, assets_payload, location=str(args.pir))
 
     for f in findings:
         log_method = logger.error if f.severity == "error" else logger.warning
@@ -130,7 +162,7 @@ def main() -> None:
 
     if args.report:
         text = render_report(
-            [(f"PIR: {args.pir.name}", findings)],
+            [(f"PIR: {pir_input.display_name}", findings)],
             timestamp=datetime.now(tz=UTC),
         )
         args.report.parent.mkdir(parents=True, exist_ok=True)

@@ -35,6 +35,8 @@ from pydantic import ValidationError
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from trace_engine.cli._logging import configure as configure_logging  # noqa: E402
+from trace_engine.config import load_config  # noqa: E402
+from trace_engine.io.inputs import resolve_json_input  # noqa: E402
 from trace_engine.review.markdown_report import render_report  # noqa: E402
 from trace_engine.validate.schema import AssetsDocument  # noqa: E402
 from trace_engine.validate.semantic.assets import check_assets  # noqa: E402
@@ -48,9 +50,15 @@ logger = structlog.get_logger(__name__)
 
 
 def validate_assets_file(path: Path) -> tuple[AssetsDocument | None, list[ValidationFinding]]:
-    findings: list[ValidationFinding] = []
     with path.open() as f:
         payload = json.load(f)
+    return validate_assets_payload(payload)
+
+
+def validate_assets_payload(
+    payload: object,
+) -> tuple[AssetsDocument | None, list[ValidationFinding]]:
+    findings: list[ValidationFinding] = []
     try:
         doc = AssetsDocument.model_validate(payload)
     except ValidationError as exc:
@@ -75,8 +83,7 @@ def main() -> None:
         "--it-assets",
         "--ita",
         required=True,
-        type=Path,
-        help="Path to assets.json",
+        help="Path, gs:// URI, or assets/ storage key for assets.json",
     )
     parser.add_argument(
         "--report",
@@ -85,12 +92,18 @@ def main() -> None:
         help="Optional Markdown report output path",
     )
     args = parser.parse_args()
+    cfg = load_config()
 
-    if not args.it_assets.exists():
+    try:
+        assets_payload, assets_input = resolve_json_input(cfg, "assets", args.it_assets)
+    except FileNotFoundError:
         logger.error("file_not_found", path=str(args.it_assets))
         sys.exit(1)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("assets_invalid", path=str(args.it_assets), error=str(exc))
+        sys.exit(1)
 
-    _, findings = validate_assets_file(args.it_assets)
+    _, findings = validate_assets_payload(assets_payload)
 
     for f in findings:
         log_method = logger.error if f.severity == "error" else logger.warning
@@ -98,7 +111,7 @@ def main() -> None:
 
     if args.report:
         text = render_report(
-            [(f"Assets: {args.it_assets.name}", findings)],
+            [(f"Assets: {assets_input.display_name}", findings)],
             timestamp=datetime.now(tz=UTC),
         )
         args.report.parent.mkdir(parents=True, exist_ok=True)

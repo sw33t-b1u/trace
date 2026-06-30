@@ -49,6 +49,8 @@ from pydantic import ValidationError
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from trace_engine.cli._logging import configure as configure_logging  # noqa: E402
+from trace_engine.config import load_config  # noqa: E402
+from trace_engine.io.inputs import resolve_json_input  # noqa: E402
 from trace_engine.review.markdown_report import render_report  # noqa: E402
 from trace_engine.validate.schema import (  # noqa: E402
     AssetsDocument,
@@ -74,6 +76,10 @@ def _load_and_validate_schema(
 ):
     with path.open() as f:
         payload = json.load(f)
+    return _validate_schema_payload(payload, model_cls, findings)
+
+
+def _validate_schema_payload(payload: object, model_cls: type, findings: list[ValidationFinding]):
     try:
         return model_cls.model_validate(payload)
     except ValidationError as exc:
@@ -106,6 +112,23 @@ def validate_user_accounts_files(
     return findings
 
 
+def validate_user_accounts_payloads(
+    user_accounts_payload: object,
+    assets_payload: object,
+    identity_assets_payload: object | None = None,
+) -> list[ValidationFinding]:
+    findings: list[ValidationFinding] = []
+    ua_doc = _validate_schema_payload(user_accounts_payload, UserAccountsDocument, findings)
+    a_doc = _validate_schema_payload(assets_payload, AssetsDocument, findings)
+    ia_doc = None
+    if identity_assets_payload is not None:
+        ia_doc = _validate_schema_payload(identity_assets_payload, IdentityAssetsDocument, findings)
+    if ua_doc is None or a_doc is None:
+        return findings
+    findings.extend(check_user_accounts(ua_doc, a_doc, ia_doc))
+    return findings
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Validate user_accounts.json before SAGE ingestion"
@@ -114,23 +137,24 @@ def main() -> None:
         "--user-accounts",
         "--ua",
         required=True,
-        type=Path,
-        help="Path to user_accounts.json",
+        help="Path, gs:// URI, or assets/ storage key for user_accounts.json",
     )
     parser.add_argument(
         "--it-assets",
         "--ita",
         required=True,
-        type=Path,
-        help=("Path to assets.json (REQUIRED for cross-reference of account_on_asset[*].asset_id)"),
+        help=(
+            "Path, gs:// URI, or assets/ storage key for assets.json "
+            "(REQUIRED for cross-reference of account_on_asset[*].asset_id)"
+        ),
     )
     parser.add_argument(
         "--identity-assets",
         "--ida",
-        type=Path,
         default=None,
         help=(
-            "Optional path to identity_assets.json. When provided, validates "
+            "Optional path, gs:// URI, or assets/ storage key for identity_assets.json. "
+            "When provided, validates "
             "user_accounts[*].identity_id against identities[*].id."
         ),
     )
@@ -141,22 +165,32 @@ def main() -> None:
         help="Optional Markdown report output path",
     )
     args = parser.parse_args()
+    cfg = load_config()
 
-    for label, path in (
-        ("user-accounts", args.user_accounts),
-        ("it-assets", args.it_assets),
-    ):
-        if not path.exists():
-            logger.error("file_not_found", role=label, path=str(path))
-            sys.exit(1)
-    if args.identity_assets is not None and not args.identity_assets.exists():
-        logger.error("file_not_found", role="identity-assets", path=str(args.identity_assets))
+    try:
+        user_accounts_payload, user_accounts_input = resolve_json_input(
+            cfg, "assets", args.user_accounts
+        )
+    except FileNotFoundError:
+        logger.error("file_not_found", role="user-accounts", path=str(args.user_accounts))
         sys.exit(1)
+    try:
+        assets_payload, _ = resolve_json_input(cfg, "assets", args.it_assets)
+    except FileNotFoundError:
+        logger.error("file_not_found", role="it-assets", path=str(args.it_assets))
+        sys.exit(1)
+    identity_assets_payload = None
+    if args.identity_assets is not None:
+        try:
+            identity_assets_payload, _ = resolve_json_input(cfg, "assets", args.identity_assets)
+        except FileNotFoundError:
+            logger.error("file_not_found", role="identity-assets", path=str(args.identity_assets))
+            sys.exit(1)
 
-    findings = validate_user_accounts_files(
-        args.user_accounts,
-        args.it_assets,
-        args.identity_assets,
+    findings = validate_user_accounts_payloads(
+        user_accounts_payload,
+        assets_payload,
+        identity_assets_payload,
     )
 
     for f in findings:
@@ -165,7 +199,7 @@ def main() -> None:
 
     if args.report:
         text = render_report(
-            [(f"UserAccounts: {args.user_accounts.name}", findings)],
+            [(f"UserAccounts: {user_accounts_input.display_name}", findings)],
             timestamp=datetime.now(tz=UTC),
         )
         args.report.parent.mkdir(parents=True, exist_ok=True)

@@ -45,5 +45,10 @@ class CatalogDocument(BaseModel):
 
 def load_catalog(path: str | Path) -> CatalogDocument:
     """Load and validate a discovery source catalog YAML file."""
-    payload = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    return load_catalog_text(Path(path).read_text(encoding="utf-8"))
+
+
+def load_catalog_text(text: str) -> CatalogDocument:
+    """Load and validate a discovery source catalog YAML document."""
+    payload = yaml.safe_load(text) or {}
     return CatalogDocument.model_validate(payload)

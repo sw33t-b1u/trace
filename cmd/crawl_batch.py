@@ -41,10 +41,11 @@ from trace_engine.cli import _metrics  # noqa: E402
 from trace_engine.cli._logging import configure as configure_logging  # noqa: E402
 from trace_engine.config import load_config  # noqa: E402
 from trace_engine.crawler.batch import crawl_batch  # noqa: E402
-from trace_engine.crawler.sources import load_sources  # noqa: E402
+from trace_engine.crawler.sources import load_sources_text  # noqa: E402
 from trace_engine.crawler.state import CrawlState  # noqa: E402
 from trace_engine.crawler.taxonomy_sync import ensure_taxonomy_fresh  # noqa: E402
-from trace_engine.pir.loader import load_pir  # noqa: E402
+from trace_engine.io.inputs import resolve_input  # noqa: E402
+from trace_engine.pir.loader import load_pir_text  # noqa: E402
 
 load_dotenv()
 _metrics.install_collector()
@@ -61,16 +62,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Batch crawl URLs into STIX bundles")
     parser.add_argument(
         "--sources",
-        type=Path,
-        default=_DEFAULT_SOURCES,
-        help=f"Path to sources.yaml (default: {_DEFAULT_SOURCES.relative_to(_ROOT)})",
+        default=str(_DEFAULT_SOURCES),
+        help=(
+            "Path, gs:// URI, or input/ storage key for sources.yaml "
+            f"(default: {_DEFAULT_SOURCES.relative_to(_ROOT)})"
+        ),
     )
     parser.add_argument(
         "--pir",
         "-p",
-        type=Path,
         default=None,
-        help="Path to BEACON pir_output.json. Enables the L2 relevance gate.",
+        help=(
+            "Path, gs:// URI, or pir/ storage key for BEACON pir_output.json. "
+            "Enables the L2 relevance gate."
+        ),
     )
     parser.add_argument(
         "--state",
@@ -108,10 +113,10 @@ def main() -> None:
     parser.add_argument(
         "--it-assets",
         "--ita",
-        type=Path,
         default=None,
         help=(
-            "Path to BEACON assets.json. Enables identity-asset edge "
+            "Path, gs:// URI, or assets/ storage key for BEACON assets.json. "
+            "Enables identity-asset edge "
             "extraction (Initiative A): the bundle assembler resolves "
             "free-form asset references in identity_asset_edges against "
             "this assets file. Without --it-assets, no identity-asset edges "
@@ -134,12 +139,13 @@ def main() -> None:
         except Exception as exc:
             logger.warning("taxonomy_sync_failed", error=str(exc))
 
-    if not args.sources.exists():
+    try:
+        sources_input = resolve_input(cfg, "input", args.sources)
+    except FileNotFoundError:
         logger.error("sources_not_found", path=str(args.sources))
         sys.exit(2)
-
     try:
-        sources = load_sources(args.sources)
+        sources = load_sources_text(sources_input.text)
     except Exception as exc:
         logger.error("sources_invalid", path=str(args.sources), error=str(exc))
         sys.exit(2)
@@ -147,11 +153,13 @@ def main() -> None:
     pir_doc = None
     pir_set_hash = None
     if args.pir is not None:
-        if not args.pir.exists():
+        try:
+            pir_input = resolve_input(cfg, "pir", args.pir)
+        except FileNotFoundError:
             logger.error("pir_not_found", path=str(args.pir))
             sys.exit(2)
         try:
-            pir_doc, pir_set_hash = load_pir(args.pir)
+            pir_doc, pir_set_hash = load_pir_text(pir_input.text)
         except Exception as exc:
             logger.error("pir_invalid", path=str(args.pir), error=str(exc))
             sys.exit(2)
@@ -159,12 +167,13 @@ def main() -> None:
     # Initiative A: load --assets so identity_asset_edges resolve.
     assets_list: list[dict] | None = None
     if args.it_assets is not None:
-        if not args.it_assets.exists():
+        try:
+            assets_input = resolve_input(cfg, "assets", args.it_assets)
+        except FileNotFoundError:
             logger.error("assets_not_found", path=str(args.it_assets))
             sys.exit(2)
         try:
-            with args.it_assets.open() as f:
-                assets_payload = json.load(f)
+            assets_payload = json.loads(assets_input.text)
             assets_list = assets_payload.get("assets") if isinstance(assets_payload, dict) else None
             if assets_list is None:
                 logger.error("assets_missing_assets_key", path=str(args.it_assets))

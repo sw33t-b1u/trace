@@ -19,9 +19,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from trace_engine.config import load_config  # noqa: E402
 from trace_engine.discovery.candidates import CandidateDocument  # noqa: E402
-from trace_engine.discovery.catalog import load_catalog  # noqa: E402
+from trace_engine.discovery.catalog import load_catalog, load_catalog_text  # noqa: E402
 from trace_engine.discovery.feed_search import discover_candidates  # noqa: E402
-from trace_engine.pir.loader import load_pir  # noqa: E402
+from trace_engine.io.inputs import ResolvedInput, resolve_input  # noqa: E402
+from trace_engine.pir.loader import load_pir_text  # noqa: E402
 
 load_dotenv()
 
@@ -38,16 +39,14 @@ def main() -> int:
     parser.add_argument(
         "--pir",
         "-p",
-        type=Path,
         required=True,
-        help="Path to BEACON pir_output.json.",
+        help="Path, gs:// URI, or pir/ storage key for BEACON pir_output.json.",
     )
     parser.add_argument(
         "--catalog",
-        type=Path,
         default=None,
         help=(
-            "Path to discovery source catalog YAML "
+            "Path, gs:// URI, or input/ storage key for discovery source catalog YAML "
             f"(default: {_DEFAULT_CATALOG.relative_to(_ROOT)}, with example fallback)."
         ),
     )
@@ -111,12 +110,17 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not args.pir.exists():
+    try:
+        pir_input = resolve_input(cfg, "pir", args.pir)
+    except FileNotFoundError:
         print(f"pir_not_found: {args.pir}", file=sys.stderr)
         return 2
+    except Exception as exc:  # noqa: BLE001
+        print(f"pir_invalid: {exc}", file=sys.stderr)
+        return 2
 
-    catalog_path = _resolve_catalog_path(args.catalog)
-    if catalog_path is None:
+    catalog_input = _resolve_catalog_input(cfg, args.catalog)
+    if catalog_input is None:
         print(
             f"catalog_not_found: {_DEFAULT_CATALOG} (or example fallback {_EXAMPLE_CATALOG})",
             file=sys.stderr,
@@ -135,8 +139,12 @@ def main() -> int:
         return 2
 
     try:
-        pir_doc, _ = load_pir(args.pir)
-        catalog = load_catalog(catalog_path)
+        pir_doc, _ = load_pir_text(pir_input.text)
+        catalog = (
+            load_catalog_text(catalog_input.text)
+            if catalog_input is not None
+            else load_catalog(_EXAMPLE_CATALOG)
+        )
         candidates = discover_candidates(
             pir_doc,
             catalog,
@@ -176,13 +184,28 @@ def _parse_date(raw: str) -> date:
         raise argparse.ArgumentTypeError("expected YYYY-MM-DD") from exc
 
 
-def _resolve_catalog_path(explicit: Path | None) -> Path | None:
+def _resolve_catalog_input(config: object, explicit: str | None) -> ResolvedInput | None:
     if explicit is not None:
-        return explicit if explicit.exists() else None
+        try:
+            return resolve_input(config, "input", explicit)
+        except FileNotFoundError:
+            return None
     if _DEFAULT_CATALOG.exists():
-        return _DEFAULT_CATALOG
+        return ResolvedInput(
+            category="input",
+            reference=str(_DEFAULT_CATALOG),
+            text=_DEFAULT_CATALOG.read_text(encoding="utf-8"),
+            filename=_DEFAULT_CATALOG.name,
+            source="local",
+        )
     if _EXAMPLE_CATALOG.exists():
-        return _EXAMPLE_CATALOG
+        return ResolvedInput(
+            category="input",
+            reference=str(_EXAMPLE_CATALOG),
+            text=_EXAMPLE_CATALOG.read_text(encoding="utf-8"),
+            filename=_EXAMPLE_CATALOG.name,
+            source="local",
+        )
     return None
 
 

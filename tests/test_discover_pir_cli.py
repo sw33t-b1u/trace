@@ -146,3 +146,41 @@ def test_discover_pir_include_recent_forwarded(monkeypatch, tmp_path: Path) -> N
 
     assert mod.main() == 0
     assert seen["include_recent"] is True
+
+
+def test_discover_pir_accepts_prefixed_storage_keys(monkeypatch, capsys, tmp_path: Path) -> None:
+    mod = _load_cmd_module()
+    (tmp_path / "pir").mkdir()
+    (tmp_path / "input").mkdir()
+    (tmp_path / "pir" / "pir_output.json").write_text(
+        (FIXTURES / "valid_pir.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (tmp_path / "input" / "source_catalog.yaml").write_text(
+        (FIXTURES / "discovery_source_catalog.yaml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("TRACE_STORAGE", "local")
+    monkeypatch.setenv("TRACE_STORAGE_BASE_DIR", str(tmp_path))
+    monkeypatch.setenv("TRACE_STORAGE_PREFIX", "prod/")
+    monkeypatch.setattr(mod, "discover_candidates", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "discover_pir.py",
+            "--pir",
+            "prod/pir/pir_output.json",
+            "--catalog",
+            "prod/input/source_catalog.yaml",
+            "--since-days",
+            "30",
+            "--json",
+        ],
+    )
+
+    assert mod.main() == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["pir_path"] == "prod/pir/pir_output.json"
+    assert payload["candidates"] == []

@@ -49,6 +49,7 @@ TRACE 2.0.0 以降:
 | クロール出力: `crawl_state.json` スキーマ | ✓ | 1.11.0（G）| G フェーズ 4 以降、エントリごとに `iocs[]` を持つ |
 | LLM IoC 抽出（`iocs[]` の形式）| ✓ | 1.11.0（G）| 7 IoC タイプ、confidence、context_snippet |
 | `trace` CLI エントリ + サブコマンド（H フェーズ 6）| ✓ | 1.12.0 | サブコマンド名 + 主要フラグは固定 |
+| CLI artifact 入力参照 | ✓ | 3.2.0 | PIR、assets、STIX bundle、sources、discovery catalog 入力は local path、`gs://` URI、storage key を受け付ける |
 | レガシー `python -m cmd.<name>` | （削除済み）| n/a | 2.1.0 で削除; `trace <subcommand>` を使用すること |
 | 環境変数（§5）| ✓ | 1.12.0 | 名前 + 意味 + デフォルト値を固定 |
 | 内部 Python モジュール（`src/trace_engine/*` 非公開シンボル）| ✗ | n/a | アンダースコア付きおよびドキュメント未記載のヘルパーは変更される可能性あり |
@@ -236,7 +237,25 @@ score 同点時の出力順、将来追加される discovery provider。candida
 discovery triage metadata のみであり、STIX bundle の `x_trace_relevance_score`
 ではない。
 
-### 3.10 環境変数（Committed）
+### 3.10 CLI artifact 入力参照
+
+TRACE 3.2.0 以降、CLI の artifact / operator config 入力は 1 つの
+storage-aware 解決規則を使う。対象は `--pir`、`--it-assets` / `--ita`、
+`--identity-assets`、`--user-accounts`、`--bundle`、`--sources`、`--catalog`。
+
+解決順序:
+
+1. `gs://bucket/key` はその GCS object を直接読む。
+2. 既存の local filesystem path は local から読む。
+3. それ以外は command の category 内の StorageBackend 参照として扱う。
+   受け付ける形式は `filename`、`category/filename`、
+   `<TRACE_STORAGE_PREFIX>/category/filename`。
+
+category は明示的である。PIR 入力は `pir`、IT assets / identity assets /
+user accounts は `assets`、STIX bundle は `stix`、`sources.yaml` と
+`source_catalog.yaml` は `input` を使う。
+
+### 3.11 環境変数（Committed）
 
 | 環境変数 | デフォルト | 目的 |
 |---|---|---|

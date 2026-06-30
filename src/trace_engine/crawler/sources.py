@@ -14,5 +14,9 @@ from trace_engine.validate.schema import SourcesDocument
 
 
 def load_sources(path: str | Path) -> SourcesDocument:
-    payload = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    return load_sources_text(Path(path).read_text(encoding="utf-8"))
+
+
+def load_sources_text(text: str) -> SourcesDocument:
+    payload = yaml.safe_load(text) or {}
     return SourcesDocument.model_validate(payload)

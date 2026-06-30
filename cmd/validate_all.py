@@ -21,7 +21,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,6 +31,8 @@ from pydantic import ValidationError
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from trace_engine.cli._logging import configure as configure_logging  # noqa: E402
+from trace_engine.config import load_config  # noqa: E402
+from trace_engine.io.inputs import resolve_json_input  # noqa: E402
 from trace_engine.review.markdown_report import render_report  # noqa: E402
 from trace_engine.validate.schema import AssetsDocument, PIRDocument  # noqa: E402
 from trace_engine.validate.semantic.assets import check_assets  # noqa: E402
@@ -63,9 +64,7 @@ def _schema_findings(exc: ValidationError, code: str) -> list[ValidationFinding]
     ]
 
 
-def _validate_assets(path: Path) -> tuple[AssetsDocument | None, list[ValidationFinding]]:
-    with path.open() as f:
-        payload = json.load(f)
+def _validate_assets(payload: object) -> tuple[AssetsDocument | None, list[ValidationFinding]]:
     try:
         doc = AssetsDocument.model_validate(payload)
     except ValidationError as exc:
@@ -74,10 +73,8 @@ def _validate_assets(path: Path) -> tuple[AssetsDocument | None, list[Validation
 
 
 def _validate_pir(
-    path: Path, assets: AssetsDocument | None
+    payload: object, assets: AssetsDocument | None, *, location: str
 ) -> tuple[PIRDocument | None, list[ValidationFinding]]:
-    with path.open() as f:
-        payload = json.load(f)
     try:
         doc = PIRDocument.from_payload(payload)
     except ValidationError as exc:
@@ -87,24 +84,22 @@ def _validate_pir(
             ValidationFinding(
                 severity="error",
                 code="PIR_SCHEMA_ENVELOPE",
-                location=str(path),
+                location=location,
                 message=str(exc),
             )
         ]
     return doc, check_pir(doc, assets=assets)
 
 
-def _validate_bundle(path: Path, *, strict: bool) -> list[ValidationFinding]:
-    with path.open() as f:
-        bundle = json.load(f)
+def _validate_bundle(bundle: object, *, strict: bool) -> list[ValidationFinding]:
     return [*run_stix2_validator(bundle, strict=strict), *check_stix_bundle(bundle)]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run every TRACE validator and emit a report")
-    parser.add_argument("--it-assets", "--ita", type=Path, default=None)
-    parser.add_argument("--pir", "-p", type=Path, default=None)
-    parser.add_argument("--bundle", "-b", type=Path, default=None)
+    parser.add_argument("--it-assets", "--ita", default=None)
+    parser.add_argument("--pir", "-p", default=None)
+    parser.add_argument("--bundle", "-b", default=None)
     parser.add_argument("--strict", action="store_true", help="Promote STIX warnings to errors")
     parser.add_argument(
         "--report",
@@ -113,33 +108,39 @@ def main() -> None:
         help="Output Markdown path (default: output/validation_report_<ts>.md)",
     )
     args = parser.parse_args()
+    cfg = load_config()
 
     if not (args.it_assets or args.pir or args.bundle):
         parser.error("at least one of --it-assets / --pir / --bundle is required")
 
     sections: list[tuple[str, list[ValidationFinding]]] = []
     assets_doc: AssetsDocument | None = None
-
     if args.it_assets:
-        if not args.it_assets.exists():
+        try:
+            assets_payload, assets_input = resolve_json_input(cfg, "assets", args.it_assets)
+        except FileNotFoundError:
             logger.error("file_not_found", path=str(args.it_assets))
             sys.exit(1)
-        assets_doc, findings = _validate_assets(args.it_assets)
-        sections.append((f"Assets: {args.it_assets.name}", findings))
+        assets_doc, findings = _validate_assets(assets_payload)
+        sections.append((f"Assets: {assets_input.display_name}", findings))
 
     if args.pir:
-        if not args.pir.exists():
+        try:
+            pir_payload, pir_input = resolve_json_input(cfg, "pir", args.pir)
+        except FileNotFoundError:
             logger.error("file_not_found", path=str(args.pir))
             sys.exit(1)
-        _, findings = _validate_pir(args.pir, assets_doc)
-        sections.append((f"PIR: {args.pir.name}", findings))
+        _, findings = _validate_pir(pir_payload, assets_doc, location=str(args.pir))
+        sections.append((f"PIR: {pir_input.display_name}", findings))
 
     if args.bundle:
-        if not args.bundle.exists():
+        try:
+            bundle_payload, bundle_input = resolve_json_input(cfg, "stix", args.bundle)
+        except FileNotFoundError:
             logger.error("file_not_found", path=str(args.bundle))
             sys.exit(1)
-        findings = _validate_bundle(args.bundle, strict=args.strict)
-        sections.append((f"STIX bundle: {args.bundle.name}", findings))
+        findings = _validate_bundle(bundle_payload, strict=args.strict)
+        sections.append((f"STIX bundle: {bundle_input.display_name}", findings))
 
     now = datetime.now(tz=UTC)
     text = render_report(sections, timestamp=now)
