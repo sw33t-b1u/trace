@@ -6,6 +6,29 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [3.1.0] - 2026-06-30
+
+### Added
+
+- Added PIR-driven article discovery with `trace discover-pir`, producing a
+  JSON candidate envelope for human review before STIX extraction.
+- Added the `input/source_catalog.example.yaml` discovery catalog template for
+  RSS/Atom sources; operators can copy it to `input/source_catalog.yaml` and
+  customize feed coverage.
+
+### Changed
+
+- Improved discovery recall and operator feedback with per-source summary
+  metrics, resilient feed parsing, and the `--include-recent` fallback option.
+
+### Maintenance
+
+- Pinned `msgpack>=1.2.1` in the dev/audit dependency set.
+- Added CTI Platform console integration deployment documentation pointing
+  BEACON operators to the unified Cloud Run runbook.
+
+---
+
 ## [3.0.1] - 2026-06-16
 
 ### Security
