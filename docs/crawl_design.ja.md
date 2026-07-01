@@ -102,7 +102,7 @@ sources:
 1. PIR ファイルを `PIRDocument` にロードし、バイト列の SHA-256 を
    `pir_set_hash` として記録。
 2. 各記事に対し `pir.relevance.evaluate(text, pir_doc)` が `simple` tier の
-   LLM（既定 `gemini-2.5-flash-lite`）を呼び出し、JSON のみを要求して
+   LLM（既定 `gemini-3.1-flash-lite`）を呼び出し、JSON のみを要求して
    `{score, matched_pir_ids[], rationale?}` を得る。
 3. score は `[0.0, 1.0]` にクランプ。応答が full JSON としてパース失敗
    した場合、**regex で `score` と `matched_pir_ids` をサルベージ**する

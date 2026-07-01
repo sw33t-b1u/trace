@@ -20,8 +20,8 @@ def _make_config(**kwargs) -> Config:
     defaults = dict(
         gcp_project_id="test-project",
         vertex_location="us-central1",
-        llm_model_simple="gemini-2.5-flash-lite",
-        llm_model_medium="gemini-2.5-flash",
+        llm_model_simple="gemini-3.1-flash-lite",
+        llm_model_medium="gemini-3.5-flash",
         llm_model_complex="gemini-2.5-pro",
     )
     defaults.update(kwargs)
@@ -78,7 +78,7 @@ class TestCallLlm:
             call_llm("simple", "test", config=config)
 
         call_kwargs = mock_client.models.generate_content.call_args.kwargs
-        assert call_kwargs["model"] == "gemini-2.5-flash-lite"
+        assert call_kwargs["model"] == "gemini-3.1-flash-lite"
 
     def test_selects_medium_model(self):
         config = _make_config()
@@ -90,7 +90,7 @@ class TestCallLlm:
             call_llm("medium", "test", config=config)
 
         call_kwargs = mock_client.models.generate_content.call_args.kwargs
-        assert call_kwargs["model"] == "gemini-2.5-flash"
+        assert call_kwargs["model"] == "gemini-3.5-flash"
 
     def test_selects_complex_model(self):
         config = _make_config()

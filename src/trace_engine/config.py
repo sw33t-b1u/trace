@@ -20,10 +20,10 @@ class Config:
 
     # LLM model selection (overridable per environment)
     llm_model_simple: str = field(
-        default_factory=lambda: os.environ.get("TRACE_LLM_SIMPLE", "gemini-2.5-flash-lite")
+        default_factory=lambda: os.environ.get("TRACE_LLM_SIMPLE", "gemini-3.1-flash-lite")
     )
     llm_model_medium: str = field(
-        default_factory=lambda: os.environ.get("TRACE_LLM_MEDIUM", "gemini-2.5-flash")
+        default_factory=lambda: os.environ.get("TRACE_LLM_MEDIUM", "gemini-3.5-flash")
     )
     llm_model_complex: str = field(
         default_factory=lambda: os.environ.get("TRACE_LLM_COMPLEX", "gemini-2.5-pro")

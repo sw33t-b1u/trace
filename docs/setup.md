@@ -55,8 +55,8 @@ Fill in:
 |----------|----------|---------|-------------|
 | `GCP_PROJECT_ID` | Yes | — | GCP project for Vertex AI Gemini |
 | `VERTEX_LOCATION` | No | `us-central1` | Vertex AI region |
-| `TRACE_LLM_SIMPLE` | No | `gemini-2.5-flash-lite` | L2 relevance gate model |
-| `TRACE_LLM_MEDIUM` | No | `gemini-2.5-flash` | L3 STIX extraction default |
+| `TRACE_LLM_SIMPLE` | No | `gemini-3.1-flash-lite` | L2 relevance gate model |
+| `TRACE_LLM_MEDIUM` | No | `gemini-3.5-flash` | L3 STIX extraction default |
 | `TRACE_LLM_COMPLEX` | No | `gemini-2.5-pro` | L3 STIX extraction for `--task complex` |
 | `TRACE_RELEVANCE_MODEL_TIER` | No | `simple` | `simple` / `medium` / `complex` |
 | `TRACE_RELEVANCE_THRESHOLD` | No | `0.5` | L2 score `>=` threshold keeps the article |

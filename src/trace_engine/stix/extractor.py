@@ -40,7 +40,7 @@ from trace_engine.validate.schema import PIRDocument, PIRItem
 
 logger = structlog.get_logger(__name__)
 
-# "medium" (gemini-2.5-flash) is the default: fast enough for large CTI articles
+# "medium" (gemini-3.5-flash) is the default: fast enough for large CTI articles
 # and accurate enough for STIX entity extraction.  Use "complex" only for reports
 # with dense, ambiguous, or multi-language content.
 _DEFAULT_TASK: TaskType = "medium"
@@ -710,12 +710,11 @@ def _extract_chunk(
         "{{PIR_CONTEXT_BLOCK}}", _render_pir_context_block(pir_doc)
     )
 
-    # Per-chunk output ceiling: Gemini 2.5 flash supports up to 65,535 output
-    # tokens. Each entity's nested structure (kill_chain_phases, external
-    # references, labels) is verbose, so 8192 tokens runs out mid-array on
-    # dense reports. 32768 leaves comfortable headroom while still bounding
-    # cost. Truncated responses past this limit fall through to
-    # `_extract_json_from_text`'s bracket-balanced salvage.
+    # Per-chunk output ceiling: each entity's nested structure
+    # (kill_chain_phases, external references, labels) is verbose, so 8192
+    # tokens runs out mid-array on dense reports. 32768 leaves comfortable
+    # headroom while still bounding cost. Truncated responses past this limit
+    # fall through to `_extract_json_from_text`'s bracket-balanced salvage.
     raw = call_llm(task, prompt, config=config, json_mode=True, max_output_tokens=32768)
 
     parsed = _extract_json_from_text(raw)

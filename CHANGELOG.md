@@ -6,6 +6,23 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [3.3.0] - 2026-07-01
+
+### Changed
+
+- Updated the default TRACE Gemini model tiers for `us-central1` Vertex AI:
+  `TRACE_LLM_SIMPLE` now defaults to `gemini-3.1-flash-lite`, and
+  `TRACE_LLM_MEDIUM` now defaults to `gemini-3.5-flash`.
+  `TRACE_LLM_COMPLEX` remains `gemini-2.5-pro` until a suitable Gemini 3.x Pro
+  GA model is available without switching the Vertex location to `global`.
+
+### Documentation
+
+- Refreshed TRACE setup, usage, crawl design, and dependency docs to show the
+  current Gemini defaults.
+
+---
+
 ## [3.2.0] - 2026-06-30
 
 ### Added

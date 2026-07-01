@@ -11,7 +11,7 @@ RULES.md Rule 18 に従い、すべての runtime 依存に採用理由を記録
 | パッケージ | 最小バージョン | TRACE での用途 | ライセンス |
 |-----------|--------------|--------------|-----------|
 | `pydantic` | `>=2.0` | `assets.json`, `pir_output.json`, `sources.yaml` のスキーマ層 + `ValidationFinding` データモデル。`RootModel` と `model_validator(mode="after")` （`valid_from < valid_until` 検証用）が v2 必須。 | MIT |
-| `google-genai` | `>=1.0` | Vertex AI Gemini クライアント。L2 PIR リレバンスゲート（`gemini-2.5-flash-lite`）と L3 STIX 抽出（`gemini-2.5-flash` / `pro`）で使用。BEACON と同じ SDK のため、複製した `llm/client.py` も SDK 境界で揃う。 | Apache-2.0 |
+| `google-genai` | `>=1.0` | Vertex AI Gemini クライアント。L2 PIR リレバンスゲート（`gemini-3.1-flash-lite`）と L3 STIX 抽出（`gemini-3.5-flash` / `pro`）で使用。BEACON と同じ SDK のため、複製した `llm/client.py` も SDK 境界で揃う。 | Apache-2.0 |
 | `structlog` | `>=24.4.0` | 全エントリポイントの構造化 JSON ログ。Rule 19 が構造化ログを義務付け。 | MIT / Apache-2.0 |
 | `httpx` | `>=0.27.0` | バッチクローラの `fetcher.py`、`review/github.py` の GHE Issue クライアントが使う同期 HTTP クライアント。 | BSD-3 |
 | `cryptography` | `>=46.0.7` | CVE-2026-39892 修正バージョン pin。`google-genai` と `httpx` 経由で transitive。BEACON の pin と一致。 | Apache-2.0 / BSD |

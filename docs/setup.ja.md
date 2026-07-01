@@ -53,8 +53,8 @@ cp .env.example .env   # 存在する場合
 |--------|------|-----------|------|
 | `GCP_PROJECT_ID` | はい | — | Vertex AI Gemini で使う GCP プロジェクト ID |
 | `VERTEX_LOCATION` | いいえ | `us-central1` | Vertex AI リージョン |
-| `TRACE_LLM_SIMPLE` | いいえ | `gemini-2.5-flash-lite` | L2 リレバンスゲートのモデル |
-| `TRACE_LLM_MEDIUM` | いいえ | `gemini-2.5-flash` | L3 STIX 抽出（既定） |
+| `TRACE_LLM_SIMPLE` | いいえ | `gemini-3.1-flash-lite` | L2 リレバンスゲートのモデル |
+| `TRACE_LLM_MEDIUM` | いいえ | `gemini-3.5-flash` | L3 STIX 抽出（既定） |
 | `TRACE_LLM_COMPLEX` | いいえ | `gemini-2.5-pro` | L3 STIX 抽出（`--task complex` 指定時） |
 | `TRACE_RELEVANCE_MODEL_TIER` | いいえ | `simple` | `simple` / `medium` / `complex` |
 | `TRACE_RELEVANCE_THRESHOLD` | いいえ | `0.5` | L2 score `>=` 閾値で記事を残す |

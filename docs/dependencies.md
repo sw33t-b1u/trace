@@ -11,7 +11,7 @@ add a new dependency, update both files in the same commit.
 | Package | Min version | Why TRACE needs it | License |
 |---------|-------------|--------------------|---------|
 | `pydantic` | `>=2.0` | Schema layer for `assets.json`, `pir_output.json`, `sources.yaml`, and the `ValidationFinding` data model. v2 is required for `RootModel` and the post-init `model_validator(mode="after")` we use to enforce `valid_from < valid_until`. | MIT |
-| `google-genai` | `>=1.0` | Vertex AI Gemini client for the L2 PIR relevance gate (`gemini-2.5-flash-lite`) and L3 STIX extraction (`gemini-2.5-flash` / `pro`). Same SDK BEACON uses, so the duplicated `llm/client.py` stays in sync at the SDK boundary. | Apache-2.0 |
+| `google-genai` | `>=1.0` | Vertex AI Gemini client for the L2 PIR relevance gate (`gemini-3.1-flash-lite`) and L3 STIX extraction (`gemini-3.5-flash` / `pro`). Same SDK BEACON uses, so the duplicated `llm/client.py` stays in sync at the SDK boundary. | Apache-2.0 |
 | `structlog` | `>=24.4.0` | Structured JSON logging across all entry points; Rule 19 mandates structured logs. | MIT / Apache-2.0 |
 | `httpx` | `>=0.27.0` | Synchronous HTTP client for the batch crawler's `fetcher.py` and the GHE Issue client in `review/github.py`. | BSD-3 |
 | `cryptography` | `>=46.0.7` | Pin to the CVE-2026-39892 fix. Transitive via `google-genai` and TLS validation in `httpx`. Mirrors BEACON's pin. | Apache-2.0 / BSD |
