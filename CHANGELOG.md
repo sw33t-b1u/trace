@@ -6,6 +6,24 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ---
 
+## [3.3.1] - 2026-07-01
+
+### Fixed
+
+- Reverted the default Gemini model tiers to two `us-central1`-available GA
+  models. 3.3.0's `gemini-3.1-flash-lite` / `gemini-3.5-flash` defaults caused a
+  Vertex `404_NOT_FOUND` because those models are served only on the global /
+  EU multi-region endpoint, not the `us-central1` regional endpoint.
+  `TRACE_LLM_SIMPLE` and `TRACE_LLM_MEDIUM` now default to `gemini-2.5-flash`,
+  and `TRACE_LLM_COMPLEX` stays `gemini-2.5-pro`.
+
+### Documentation
+
+- Updated TRACE setup, usage, crawl design, and dependency docs to the two-model
+  `us-central1` configuration.
+
+---
+
 ## [3.3.0] - 2026-07-01
 
 ### Changed

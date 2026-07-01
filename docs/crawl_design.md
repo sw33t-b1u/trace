@@ -101,7 +101,7 @@ When `--pir <path>` is supplied:
 1. The PIR file is loaded into `PIRDocument` and a SHA-256 of its bytes is
    recorded as `pir_set_hash`.
 2. For each article, `pir.relevance.evaluate(text, pir_doc)` calls the
-   `simple`-tier LLM (default `gemini-3.1-flash-lite`) with a JSON-only
+   `simple`-tier LLM (default `gemini-2.5-flash`) with a JSON-only
    prompt, requesting `{score, matched_pir_ids[], rationale}`.
 3. The score is clamped to `[0.0, 1.0]`. If the response can't be parsed —
    even after fence-stripping — the gate **fails open**: the article still

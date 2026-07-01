@@ -40,7 +40,7 @@ from trace_engine.validate.schema import PIRDocument, PIRItem
 
 logger = structlog.get_logger(__name__)
 
-# "medium" (gemini-3.5-flash) is the default: fast enough for large CTI articles
+# "medium" (gemini-2.5-flash) is the default: fast enough for large CTI articles
 # and accurate enough for STIX entity extraction.  Use "complex" only for reports
 # with dense, ambiguous, or multi-language content.
 _DEFAULT_TASK: TaskType = "medium"

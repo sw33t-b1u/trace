@@ -92,7 +92,7 @@ def main() -> None:
         choices=["simple", "medium", "complex"],
         default="medium",
         help=(
-            "LLM complexity tier (default: medium = gemini-3.5-flash). "
+            "LLM complexity tier (default: medium = gemini-2.5-flash). "
             "Use 'complex' (gemini-2.5-pro) for dense or multi-language reports — "
             "expect 2–5 minutes per call."
         ),

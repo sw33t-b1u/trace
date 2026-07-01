@@ -54,7 +54,7 @@ TRACE exposes a unified `trace` console script with 14 subcommands:
 
 When `--pir` is supplied, each article passes through three stages:
 
-- **L2 — Relevance gate**: A lightweight `gemini-3.1-flash-lite` call scores
+- **L2 — Relevance gate**: A lightweight `gemini-2.5-flash` call scores
   the article against the PIR. Articles below the threshold are skipped;
   skip decisions are recorded in `crawl_state.json`.
 - **L3 — PIR-conditioned extraction**: The STIX extraction prompt is augmented

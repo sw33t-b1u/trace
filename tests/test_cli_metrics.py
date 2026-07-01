@@ -25,7 +25,7 @@ class TestMetricsCollector:
         c.start_run(input_url_or_path="https://example.com/post")
         _emit(c, event="url_converted", chars=31628, body_chars=24750)
         _emit(c, event="relevance_call_start", tier="simple")
-        _emit(c, event="llm_call_start", task="simple", model="gemini-3.1-flash-lite")
+        _emit(c, event="llm_call_start", task="simple", model="gemini-2.5-flash")
         _emit(c, event="llm_call_done", task="simple", chars=120)
         _emit(c, event="relevance_call_done", score=0.6, matched_pir_ids=["PIR-001"])
         _emit(
@@ -37,7 +37,7 @@ class TestMetricsCollector:
             task="medium",
         )
         for i in range(3):
-            _emit(c, event="llm_call_start", task="medium", model="gemini-3.5-flash")
+            _emit(c, event="llm_call_start", task="medium", model="gemini-2.5-flash")
             _emit(c, event="llm_call_done", task="medium", chars=10000)
             _emit(
                 c,
